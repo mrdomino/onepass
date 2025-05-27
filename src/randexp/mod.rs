@@ -12,6 +12,8 @@ use nom::{
     multi::many1,
     sequence::{delimited, preceded, separated_pair},
 };
+use num_bigint::BigUint;
+use num_traits::{One, Zero};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct CharRange {
@@ -78,6 +80,29 @@ impl Expr {
             return Ok((input, exprs.into_iter().next().unwrap()));
         }
         Ok((input, Expr::Sequence(exprs)))
+    }
+
+    pub fn size(&self, word_count: u32) -> BigUint {
+        match self {
+            Expr::Word => word_count.into(),
+            Expr::Literal(_) => BigUint::one(),
+
+            Expr::CharClass(cc) => {
+                cc.ranges.iter().map(|CharRange { start, end }| char_iter::new(*start, *end).len()).sum()
+            },
+
+            Expr::Sequence(exprs) => {
+                exprs.iter().fold(BigUint::one(), |acc, expr| acc * expr.size(word_count))
+            },
+
+            Expr::Repeat(expr, min, max) => {
+                let base_size = expr.size(word_count);
+                (*min..=*max).fold(BigUint::zero(), |mut acc, i| {
+                    acc += base_size.pow(i);
+                    acc
+                })
+            },
+        }
     }
 
     fn parse_word(input: &str) -> IResult<&str, Expr> {
