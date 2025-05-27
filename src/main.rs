@@ -2,6 +2,8 @@ use std::env::args;
 
 use anyhow::Result;
 use nom::Finish;
+use num_bigint::BigUint;
+use num_traits::Zero;
 use randexp::Expr;
 
 mod randexp;
@@ -20,6 +22,10 @@ fn main() -> Result<()> {
         let size = expr.size(7776);
         let bits = size.bits();
         println!("{expr:?}\t{size}\t{bits}");
+
+        let words = vec!["bob", "dole"];
+        let samp = expr.gen_at_index(&words, BigUint::zero())?;
+        println!("Sample: {samp}");
     }
     Ok(())
 }

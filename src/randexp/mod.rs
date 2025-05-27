@@ -1,5 +1,6 @@
 use std::cmp;
 
+use anyhow::Result;
 use nom::{
     IResult, Parser,
     branch::alt,
@@ -80,6 +81,41 @@ impl Expr {
             return Ok((input, exprs.into_iter().next().unwrap()));
         }
         Ok((input, Expr::Sequence(exprs)))
+    }
+
+    pub fn gen_at_index(&self, words: &[&str], mut index: BigUint) -> Result<String> {
+        let word_count = words.len() as u32;
+        let res = match self {
+            Expr::Word => words[usize::try_from(index).unwrap()].into(),
+            Expr::Literal(s) => s.clone(),
+
+            Expr::CharClass(cc) => {
+                for CharRange { start, end } in &cc.ranges {
+                    let mut it = char_iter::new(*start, *end);
+                    let n = it.len().into();
+                    if index < n {
+                        return Ok(it.nth(usize::try_from(index).unwrap()).unwrap().into());
+                    }
+                    index -= n;
+                }
+                anyhow::bail!("index too big");
+            },
+
+            Expr::Sequence(exprs) => {
+                let mut acc = Vec::new();
+                for expr in exprs {
+                    let sz = expr.size(word_count);
+                    acc.push(expr.gen_at_index(words, &index % &sz)?);
+                    index /= sz;
+                }
+                acc.concat()
+            },
+
+            Expr::Repeat(expr, min, max) => {
+                todo!()
+            }
+        };
+        Ok(res)
     }
 
     pub fn size(&self, word_count: u32) -> BigUint {
