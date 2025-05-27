@@ -83,10 +83,10 @@ impl Expr {
         Ok((input, Expr::Sequence(exprs)))
     }
 
-    pub fn gen_at_index(&self, words: &[&str], mut index: BigUint) -> Result<String> {
+    pub fn gen_at_index<T: AsRef<str>>(&self, words: &[T], mut index: BigUint) -> Result<String> {
         let word_count = words.len() as u32;
         let res = match self {
-            Expr::Word => words[usize::try_from(index).unwrap()].into(),
+            Expr::Word => words[usize::try_from(index).unwrap()].as_ref().into(),
             Expr::Literal(s) => s.clone(),
 
             Expr::CharClass(cc) => {
@@ -259,6 +259,7 @@ impl Expr {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use num_traits::Num;
 
     use super::*;
 
@@ -352,6 +353,30 @@ mod tests {
             Expr::Repeat(Box::new(Expr::Literal("a".into())), 3, 5),
             expr
         );
+        Ok(())
+    }
+
+    #[test]
+    fn enumerate_full() -> Result<()> {
+        let (input, expr) = Expr::parse("[123][:word:]")?;
+        assert_eq!("", input);
+        let sz = expr.size(2);
+        assert_eq!(BigUint::from(6u32), sz);
+            let words = vec!["a", "b"];
+        let strs: Vec<_> = (0u32..6).map(|i| expr.gen_at_index(&words, BigUint::from(i)).unwrap()).collect();
+        assert_eq!(vec!["1a", "2a", "3a", "1b", "2b", "3b"], strs);
+        Ok(())
+    }
+
+    #[test]
+    fn enumerate_passphrase() -> Result<()> {
+        let words: Vec<_> = (0..7776).map(|i| format!("({i})")).collect();
+        let (input, expr) = Expr::parse("[:word:](-[:word:]){4}")?;
+        assert_eq!("", input);
+        let sz = BigUint::from_str_radix("28430288029929701376", 10)?;
+        assert_eq!(sz, expr.size(words.len() as u32));
+        assert_eq!("(0)-(0)-(0)-(0)-(0)", expr.gen_at_index(&words, BigUint::zero())?);
+        assert_eq!("(7775)-(7775)-(7775)-(7775)-(7775)", expr.gen_at_index(&words, sz - 1u32)?);
         Ok(())
     }
 }
