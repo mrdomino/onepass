@@ -3,17 +3,15 @@ use std::cmp;
 use nom::{
     IResult, Parser,
     branch::alt,
-    bytes::complete::{is_not, tag},
+    bytes::complete::tag,
     character::{
-        complete::{self, anychar, char, none_of},
+        complete::{self, char, none_of},
         one_of,
     },
     combinator::{fail, map, opt, value},
     multi::many1,
     sequence::{delimited, preceded, separated_pair},
 };
-use num_bigint::BigUint;
-use num_traits::{One, Zero};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct CharRange {
