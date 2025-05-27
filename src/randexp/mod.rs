@@ -112,7 +112,20 @@ impl Expr {
             },
 
             Expr::Repeat(expr, min, max) => {
-                todo!()
+                let mut acc = Vec::new();
+                let base_size = expr.size(word_count);
+                for i in (*max..=*min).rev() {
+                    let n = base_size.pow(i);
+                    if index < n {
+                        for _ in 0..i {
+                            acc.push(expr.gen_at_index(words, &index % &base_size)?);
+                            index /= &base_size;
+                        }
+                        return Ok(acc.concat());
+                    }
+                    index -= n;
+                }
+                anyhow::bail!("index too big");
             }
         };
         Ok(res)
