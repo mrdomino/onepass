@@ -87,13 +87,15 @@ impl Expr {
             Expr::Word => word_count.into(),
             Expr::Literal(_) => BigUint::one(),
 
-            Expr::CharClass(cc) => {
-                cc.ranges.iter().map(|CharRange { start, end }| char_iter::new(*start, *end).len()).sum()
-            },
+            Expr::CharClass(cc) => cc
+                .ranges
+                .iter()
+                .map(|CharRange { start, end }| char_iter::new(*start, *end).len())
+                .sum(),
 
-            Expr::Sequence(exprs) => {
-                exprs.iter().fold(BigUint::one(), |acc, expr| acc * expr.size(word_count))
-            },
+            Expr::Sequence(exprs) => exprs
+                .iter()
+                .fold(BigUint::one(), |acc, expr| acc * expr.size(word_count)),
 
             Expr::Repeat(expr, min, max) => {
                 let base_size = expr.size(word_count);
@@ -101,7 +103,7 @@ impl Expr {
                     acc += base_size.pow(i);
                     acc
                 })
-            },
+            }
         }
     }
 

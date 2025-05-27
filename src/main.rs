@@ -1,16 +1,16 @@
 use std::env::args;
 
 use anyhow::Result;
+use nom::Finish;
 use randexp::Expr;
 
 mod randexp;
 
 fn parse_complete(input: &str) -> Result<Expr> {
-    match Expr::parse(input) {
-        Ok(("", expr)) => Ok(expr),
-        Ok((rem, _)) => anyhow::bail!("remaining input: {rem}"),
-        Err(e) => anyhow::bail!("parse error: {e}"),
-    }
+    let (_, expr) = Expr::parse(input).finish().map_err(|e| {
+        anyhow::anyhow!("Parse error at {}: {}", e.input.len(), e.code.description())
+    })?;
+    Ok(expr)
 }
 
 fn main() -> Result<()> {
