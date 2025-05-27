@@ -231,6 +231,24 @@ mod tests {
     }
 
     #[test]
+    fn char_class_table() -> Result<()> {
+        let tests = vec![
+            (vec![('A', 'Z')], "[A-MD-Z]"),
+            (vec![('A', 'Z')], "[D-ZA-M]"),
+            (vec![('a', 'j')], "[a-cb-ea-fb-j]"),
+            (vec![('a', 'a'), ('c', 'c')], "[ac]"),
+        ];
+        for test in tests {
+            let (input, expr) = parse_expr(test.1)?;
+            assert_eq!("", input);
+            let ranges = test.0.into_iter().map(|(start, end)| CharRange { start, end }).collect();
+            let expected = Expr::CharClass(CharClass { ranges });
+            assert_eq!(expected, expr);
+        }
+        Ok(())
+    }
+
+    #[test]
     fn groups_repeat() -> Result<()> {
         let (input, expr) = parse_expr("[:word:](-[:word:]){4}")?;
         assert_eq!("", input);
