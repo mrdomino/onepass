@@ -16,6 +16,24 @@ use nom::{
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
 
+/// Expr represents a subset of regular expressions that allows for literal strings, character
+/// classes, sequences, and counts. It also has a concept of a "Word", which is equivalent to a
+/// group containing a literal for each word in a dictionary, with the dictionary suppliable at
+/// execute time.
+///
+/// This language subset is intended for use in password schemas; it allows the universe of strings
+/// matching the language to be mapped to a BigUint, producing a unique (assuming the language does
+/// not have multiple valid ways of recognizing a given string) string for each different number in
+/// the half-open interval `[0, expr.size())`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum Expr {
+    Word,
+    Literal(String),
+    CharClass(CharClass),
+    Sequence(Vec<Expr>),
+    Repeat(Box<Expr>, u32, u32),
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct CharRange {
     start: char,
@@ -65,15 +83,6 @@ impl CharClass {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum Expr {
-    Word,
-    Literal(String),
-    CharClass(CharClass),
-    Sequence(Vec<Expr>),
-    Repeat(Box<Expr>, u32, u32),
-}
-
 impl Expr {
     pub fn parse(input: &str) -> IResult<&str, Expr> {
         let (input, exprs) = many1(Expr::parse_repeat).parse(input)?;
@@ -99,7 +108,7 @@ impl Expr {
                     index -= n;
                 }
                 anyhow::bail!("index too big");
-            },
+            }
 
             Expr::Sequence(exprs) => {
                 let mut acc = Vec::new();
@@ -109,7 +118,7 @@ impl Expr {
                     index /= sz;
                 }
                 acc.concat()
-            },
+            }
 
             Expr::Repeat(expr, min, max) => {
                 let mut acc = Vec::new();
@@ -362,8 +371,10 @@ mod tests {
         assert_eq!("", input);
         let sz = expr.size(2);
         assert_eq!(BigUint::from(6u32), sz);
-            let words = vec!["a", "b"];
-        let strs: Vec<_> = (0u32..6).map(|i| expr.gen_at_index(&words, BigUint::from(i)).unwrap()).collect();
+        let words = vec!["a", "b"];
+        let strs: Vec<_> = (0u32..6)
+            .map(|i| expr.gen_at_index(&words, BigUint::from(i)).unwrap())
+            .collect();
         assert_eq!(vec!["1a", "2a", "3a", "1b", "2b", "3b"], strs);
         Ok(())
     }
@@ -375,8 +386,14 @@ mod tests {
         assert_eq!("", input);
         let sz = BigUint::from_str_radix("28430288029929701376", 10)?;
         assert_eq!(sz, expr.size(words.len() as u32));
-        assert_eq!("(0)-(0)-(0)-(0)-(0)", expr.gen_at_index(&words, BigUint::zero())?);
-        assert_eq!("(7775)-(7775)-(7775)-(7775)-(7775)", expr.gen_at_index(&words, sz - 1u32)?);
+        assert_eq!(
+            "(0)-(0)-(0)-(0)-(0)",
+            expr.gen_at_index(&words, BigUint::zero())?
+        );
+        assert_eq!(
+            "(7775)-(7775)-(7775)-(7775)-(7775)",
+            expr.gen_at_index(&words, sz - 1u32)?
+        );
         Ok(())
     }
 }
