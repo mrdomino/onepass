@@ -436,6 +436,7 @@ dependencies = [
  "crypto-bigint",
  "nom",
  "num-traits",
+ "rand_core",
  "rpassword",
  "serde",
  "serde_yaml",
