@@ -8,6 +8,7 @@ anyhow = "1.0.98"
 argon2 = { version = "0.5.3", features = ["zeroize"] }
 blake3 = { version = "1.8.2", features = ["zeroize"] }
 char-iter = "0.1.0"
+clap = { version = "4.5.39", features = ["derive", "unicode", "wrap_help"] }
 crypto-bigint = { version = "0.6.1", features = ["rand_core", "zeroize"] }
 nom = "8.0.0"
 num-traits = "0.2.19"
