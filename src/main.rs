@@ -1,9 +1,11 @@
 mod randexp;
 
 use std::{
-    collections::{HashMap, hash_map::Entry},
+    collections::{HashMap, HashSet},
     fs,
+    hash::Hash,
     io::{Write, stdout},
+    path::Path,
 };
 
 use anyhow::{Context, Result};
@@ -13,47 +15,90 @@ use clap::Parser;
 use crypto_bigint::{NonZero, RandomMod, U256, rand_core::RngCore};
 use randexp::Expr;
 use rpassword::read_password;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
-#[derive(Debug, Deserialize)]
-struct DiskConfig {
-    #[serde(default)]
-    pub aliases: HashMap<String, String>,
-    pub sites: Vec<Site>,
+fn default_schema() -> String {
+    "[A-Za-z0-9]{16}".into()
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
+struct Config {
+    #[serde(default = "default_schema")]
+    pub default_schema: String,
+    #[serde(default)]
+    pub aliases: HashMap<String, String>,
+    pub sites: HashSet<Site>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct Site {
     pub name: String,
     pub schema: String,
+    #[serde(default)]
+    pub increment: u32,
 }
 
-#[derive(Default)]
-struct Config {
-    sites: HashMap<String, String>,
+impl Hash for Site {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state)
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        let mut aliases = HashMap::new();
+        aliases.insert("strong".to_string(), "[A-Za-z0-9]{18}".to_string());
+        aliases.insert(
+            "apple".to_string(),
+            "[A-Z][:word:](-[:word:]){4}[!-/]".to_string(),
+        );
+        aliases.insert("mobile".to_string(), "[a-z0-9]{16}".to_string());
+        let mut sites = HashSet::new();
+        sites.insert(Site {
+            name: "apple.com".to_string(),
+            schema: "apple".to_string(),
+            increment: 0,
+        });
+        sites.insert(Site {
+            name: "google.com".to_string(),
+            schema: "strong".to_string(),
+            increment: 0,
+        });
+        let default_schema = "[A-Za-z0-9_-]{16}".to_string();
+        Config {
+            default_schema,
+            aliases,
+            sites,
+        }
+    }
 }
 
 impl Config {
-    pub fn from_file<T: AsRef<str>>(path: T) -> Result<Self> {
-        let content = fs::read_to_string(path.as_ref())?;
-        let disk_config: DiskConfig = serde_yaml::from_str(&content)?;
-        let mut sites: HashMap<String, String> = HashMap::new();
-        for site in disk_config.sites.into_iter() {
-            match sites.entry(site.name) {
-                Entry::Vacant(entry) => {
-                    entry.insert(
-                        disk_config
-                            .aliases
-                            .get(&site.schema)
-                            .unwrap_or(&site.schema)
-                            .clone(),
-                    );
+    pub fn from_file(path: &Path) -> Result<Self> {
+        let mut config = if path.exists() {
+            serde_yaml::from_str(&fs::read_to_string(path)?)?
+        } else {
+            fs::create_dir_all(path.parent().context("invalid file path")?)?;
+            let default_config = Config::default();
+            fs::write(path, serde_yaml::to_string(&default_config)?)?;
+            default_config
+        };
+        config.sites = config
+            .sites
+            .into_iter()
+            .map(|site| {
+                if let Some(schema) = config.aliases.get(&site.schema) {
+                    Site {
+                        schema: schema.clone(),
+                        ..site
+                    }
+                } else {
+                    site
                 }
-                Entry::Occupied(entry) => anyhow::bail!("duplicate site {0}", entry.key()),
-            }
-        }
-        Ok(Config { sites })
+            })
+            .collect();
+        Ok(config)
     }
 }
 
@@ -69,9 +114,6 @@ struct Args {
 
     #[arg(short, long)]
     schema: Option<String>,
-
-    #[arg(short, long, default_value = "[a-z0-9]{16}")]
-    default_schema: String,
 }
 
 const WORDS: &[&str] = &["bob", "dole"];
@@ -106,13 +148,14 @@ impl RngCore for Blake3Rng {
 fn main() -> Result<()> {
     let args = Args::parse();
     let config_file = shellexpand::tilde(&args.config);
-    let config = Config::from_file(&config_file).unwrap_or_default();
+    let config = Config::from_file(Path::new(config_file.as_ref())).unwrap_or_default();
     let schema = &args.schema.unwrap_or_else(|| {
         config
             .sites
-            .get(&args.site)
-            .unwrap_or(&args.default_schema)
-            .into()
+            .iter()
+            .find(|&site| site.name == args.site)
+            .map(|site| site.schema.clone())
+            .unwrap_or(config.default_schema)
     });
     let expr = Expr::parse(schema).context("invalid schema")?;
     let sz = expr.size(WORDS.len() as u32);
