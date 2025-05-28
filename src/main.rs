@@ -29,6 +29,7 @@ struct Site {
     pub schema: String,
 }
 
+#[derive(Default)]
 struct Config {
     sites: HashMap<String, String>,
 }
@@ -63,8 +64,14 @@ struct Args {
     #[arg(short, long, default_value = "~/.config/passgen/config.yaml")]
     config: String,
 
-    #[arg(short, long, default_value = "example salt")]
+    #[arg(long, default_value = "example salt")]
     salt: String,
+
+    #[arg(short, long)]
+    schema: Option<String>,
+
+    #[arg(short, long, default_value = "[a-z0-9]{16}")]
+    default_schema: String,
 }
 
 const WORDS: &[&str] = &["bob", "dole"];
@@ -99,13 +106,21 @@ impl RngCore for Blake3Rng {
 fn main() -> Result<()> {
     let args = Args::parse();
     let config_file = shellexpand::tilde(&args.config);
-    let config = Config::from_file(&config_file)?;
-    let schema = config
-        .sites
-        .get(&args.site)
-        .with_context(|| format!("{} not found", &args.site))?;
+    let config = Config::from_file(&config_file).unwrap_or_default();
+    let schema = &args.schema.unwrap_or_else(|| {
+        config
+            .sites
+            .get(&args.site)
+            .unwrap_or(&args.default_schema)
+            .into()
+    });
     let expr = Expr::parse(schema).context("invalid schema")?;
-    let sz: Zeroizing<U256> = expr.size(WORDS.len() as u32).into();
+    let sz = expr.size(WORDS.len() as u32);
+    eprintln!(
+        "schema has about {0} bits of entropy ({1} possible passwords)",
+        &sz.bits(),
+        &sz.to_string().trim_start_matches('0')
+    );
     let password: Zeroizing<String> = read_password().context("failed reading password")?.into();
     let mut key_material = Zeroizing::new([0u8; 32]);
     Argon2::default()
@@ -117,8 +132,9 @@ fn main() -> Result<()> {
         .map_err(|e| anyhow::anyhow!("argon2 failed: {e}"))?;
     let mut hasher = Zeroizing::new(blake3::Hasher::new());
     hasher.update(&*key_material);
+    hasher.update(args.site.as_bytes());
     let mut rng = Blake3Rng(hasher.finalize_xof());
-    let index = U256::random_mod(&mut rng, &NonZero::new(*sz).unwrap());
+    let index = U256::random_mod(&mut rng, &NonZero::new(sz).unwrap());
     let res: Zeroizing<String> = Zeroizing::new(expr.gen_at_index(WORDS, index)?);
     let mut stdout = stdout();
     stdout.write_all(res.as_bytes())?;
