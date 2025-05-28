@@ -174,21 +174,11 @@ fn main() -> Result<()> {
     let password: Zeroizing<String> = prompt_password("Master password: ")
         .context("failed reading password")?
         .into();
-    // XXX painful with this argon2 api...
-    let buf: Zeroizing<Vec<_>> = Zeroizing::new(
-        password
-            .as_bytes()
-            .iter()
-            .copied()
-            .chain(
-                increment
-                    .to_le_bytes()
-                    .iter()
-                    .copied()
-                    .chain(args.site.as_bytes().iter().copied()),
-            )
-            .collect(),
-    );
+    let mut buf: Zeroizing<Vec<u8>> =
+        Vec::with_capacity(password.len() + 4 + args.site.len()).into();
+    buf.extend(password.as_bytes());
+    buf.extend(increment.to_le_bytes());
+    buf.extend(args.site.as_bytes());
     let mut key_material = Zeroizing::new([0u8; 32]);
     Argon2::default()
         .hash_password_into(&buf, config.salt.as_bytes(), &mut *key_material)
