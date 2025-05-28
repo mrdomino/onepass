@@ -5,7 +5,11 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
+argon2 = { version = "0.5.3", features = ["zeroize"] }
+blake3 = { version = "1.8.2", features = ["zeroize"] }
 char-iter = "0.1.0"
 crypto-bigint = { version = "0.6.1", features = ["rand_core", "zeroize"] }
 nom = "8.0.0"
 num-traits = "0.2.19"
+readpassphrase = "0.2.0"
+zeroize = "1.8.1"
