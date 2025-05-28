@@ -1,7 +1,7 @@
 use std::cmp;
 
 use anyhow::Result;
-use crypto_bigint::{NonZero, U256, zeroize::Zeroize};
+use crypto_bigint::{NonZero, U256};
 use nom::{
     Finish, IResult, Parser,
     branch::alt,
@@ -15,6 +15,7 @@ use nom::{
     sequence::{delimited, preceded, separated_pair},
 };
 use num_traits::{One, Zero};
+use zeroize::Zeroizing;
 
 /// Expr represents a subset of regular expressions that allows for literal strings, character
 /// classes, sequences, and counts. It also has a concept of a "Word", which is equivalent to a
@@ -93,15 +94,14 @@ fn u256_saturating_pow(base: &U256, mut exp: u32) -> U256 {
     if exp == 0 {
         return res;
     }
-    let mut base = *base;
+    let mut base = Zeroizing::new(*base);
     while exp > 0 {
         if exp & 1 == 1 {
             res = res.saturating_mul(&base);
         }
         exp >>= 1;
-        base = base.saturating_mul(&base);
+        *base = base.saturating_mul(&base);
     }
-    base.zeroize();
     res
 }
 
@@ -125,48 +125,41 @@ impl Expr {
             Expr::CharClass(cc) => {
                 for CharRange { start, end } in &cc.ranges {
                     let mut it = char_iter::new(*start, *end);
-                    let mut n = U256::from(it.len() as u32);
-                    if index < n {
+                    let n = Zeroizing::new(U256::from(it.len() as u32));
+                    if index < *n {
                         return Ok(it.nth(u256_to_usize(&index)).unwrap().into());
                     }
-                    index -= n;
-                    n.zeroize();
+                    index -= *n;
                 }
                 anyhow::bail!("index too big");
             }
 
             Expr::Sequence(exprs) => {
-                let mut acc = Vec::new();
+                let mut acc = Zeroizing::new(Vec::new());
                 for expr in exprs {
                     let sz = NonZero::new(expr.size(word_count)).unwrap();
                     let (next_index, j) = index.div_rem(&sz);
                     acc.push(expr.gen_at_index(words, j)?);
                     index = next_index;
                 }
-                // XXX zeroize?
                 acc.concat()
             }
 
             Expr::Repeat(expr, min, max) => {
-                let mut acc = Vec::new();
-                let mut base_size = NonZero::new(expr.size(word_count)).unwrap();
+                let mut acc = Zeroizing::new(Vec::new());
+                let base_size = Zeroizing::new(NonZero::new(expr.size(word_count)).unwrap());
                 for i in (*min..=*max).rev() {
-                    let mut n = u256_saturating_pow(&base_size, i);
-                    if index < n || i == *min {
+                    let n = Zeroizing::new(u256_saturating_pow(&base_size, i));
+                    if index < *n || i == *min {
                         for _ in 0..i {
                             let (next_index, j) = index.div_rem(&base_size);
                             acc.push(expr.gen_at_index(words, j)?);
                             index = next_index;
                         }
-                        n.zeroize();
-                        base_size.zeroize();
-                        // XXX zeroize?
                         return Ok(acc.concat());
                     }
-                    index -= n;
-                    n.zeroize();
+                    index -= *n;
                 }
-                base_size.zeroize();
                 anyhow::bail!("index too big");
             }
         };
