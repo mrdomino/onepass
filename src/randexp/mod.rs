@@ -131,7 +131,10 @@ impl Expr {
                     let mut it = char_iter::new(*start, *end);
                     let n = Zeroizing::new(U256::from(it.len() as u32));
                     if *index < *n {
-                        return Ok(it.nth(u256_to_usize(&index)).unwrap().into());
+                        let c = it.nth(u256_to_usize(&index)).unwrap();
+                        // "zeroize" it...
+                        while it.next().is_some() { }
+                        return Ok(c.into());
                     }
                     *index -= *n;
                 }
