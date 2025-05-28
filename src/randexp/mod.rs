@@ -2,7 +2,7 @@ use std::cmp;
 
 use anyhow::Result;
 use nom::{
-    IResult, Parser,
+    Finish, IResult, Parser,
     branch::alt,
     bytes::complete::tag,
     character::{
@@ -84,12 +84,14 @@ impl CharClass {
 }
 
 impl Expr {
-    pub fn parse(input: &str) -> IResult<&str, Expr> {
-        let (input, exprs) = many1(Expr::parse_repeat).parse(input)?;
-        if exprs.len() == 1 {
-            return Ok((input, exprs.into_iter().next().unwrap()));
+    pub fn parse(input: &str) -> Result<Self> {
+        let (rem, expr) = Expr::parse_expr(input).finish().map_err(|e| {
+            anyhow::anyhow!("Parse error at {}: {}", e.input.len(), e.code.description())
+        })?;
+        if rem != "" {
+            anyhow::bail!("leftover input: {rem}");
         }
-        Ok((input, Expr::Sequence(exprs)))
+        Ok(expr)
     }
 
     pub fn gen_at_index<T: AsRef<str>>(&self, words: &[T], mut index: BigUint) -> Result<String> {
@@ -233,7 +235,7 @@ impl Expr {
     }
 
     fn parse_group(input: &str) -> IResult<&str, Expr> {
-        delimited(char('('), |input| Expr::parse(input), char(')')).parse(input)
+        delimited(char('('), |input| Expr::parse_expr(input), char(')')).parse(input)
     }
 
     fn parse_basic_expr(input: &str) -> IResult<&str, Expr> {
@@ -263,6 +265,14 @@ impl Expr {
         }
         Ok((input, expr))
     }
+
+    fn parse_expr(input: &str) -> IResult<&str, Expr> {
+        let (input, exprs) = many1(Expr::parse_repeat).parse(input)?;
+        if exprs.len() == 1 {
+            return Ok((input, exprs.into_iter().next().unwrap()));
+        }
+        Ok((input, Expr::Sequence(exprs)))
+    }
 }
 
 #[cfg(test)]
@@ -274,24 +284,21 @@ mod tests {
 
     #[test]
     fn word() -> Result<()> {
-        let (input, expr) = Expr::parse("[:word:]")?;
-        assert_eq!("", input);
+        let expr = Expr::parse("[:word:]")?;
         assert_eq!(Expr::Word, expr);
         Ok(())
     }
 
     #[test]
     fn literal() -> Result<()> {
-        let (input, expr) = Expr::parse("some literal")?;
-        assert_eq!("", input);
+        let expr = Expr::parse("some literal")?;
         assert_eq!(Expr::Literal("some literal".into()), expr);
         Ok(())
     }
 
     #[test]
     fn char_classes() -> Result<()> {
-        let (input, expr) = Expr::parse("[A-Za-z0123-9]")?;
-        assert_eq!("", input);
+        let expr = Expr::parse("[A-Za-z0123-9]")?;
         assert_eq!(
             Expr::CharClass(CharClass {
                 ranges: vec![
@@ -323,8 +330,7 @@ mod tests {
             (vec![('a', 'a'), ('c', 'c')], "[ac]"),
         ];
         for test in tests {
-            let (input, expr) = Expr::parse(test.1)?;
-            assert_eq!("", input);
+            let expr = Expr::parse(test.1)?;
             let ranges = test
                 .0
                 .into_iter()
@@ -338,8 +344,7 @@ mod tests {
 
     #[test]
     fn groups_repeat() -> Result<()> {
-        let (input, expr) = Expr::parse("[:word:](-[:word:]){4}")?;
-        assert_eq!("", input);
+        let expr = Expr::parse("[:word:](-[:word:]){4}")?;
         assert_eq!(
             Expr::Sequence(vec![
                 Expr::Word,
@@ -356,8 +361,7 @@ mod tests {
 
     #[test]
     fn multi_group() -> Result<()> {
-        let (input, expr) = Expr::parse("a{3,5}")?;
-        assert_eq!("", input);
+        let expr = Expr::parse("a{3,5}")?;
         assert_eq!(
             Expr::Repeat(Box::new(Expr::Literal("a".into())), 3, 5),
             expr
@@ -367,8 +371,7 @@ mod tests {
 
     #[test]
     fn enumerate_full() -> Result<()> {
-        let (input, expr) = Expr::parse("[123][:word:]")?;
-        assert_eq!("", input);
+        let expr = Expr::parse("[123][:word:]")?;
         let sz = expr.size(2);
         assert_eq!(BigUint::from(6u32), sz);
         let words = vec!["a", "b"];
@@ -382,8 +385,7 @@ mod tests {
     #[test]
     fn enumerate_passphrase() -> Result<()> {
         let words: Vec<_> = (0..7776).map(|i| format!("({i})")).collect();
-        let (input, expr) = Expr::parse("[:word:](-[:word:]){4}")?;
-        assert_eq!("", input);
+        let expr = Expr::parse("[:word:](-[:word:]){4}")?;
         let sz = BigUint::from_str_radix("28430288029929701376", 10)?;
         assert_eq!(sz, expr.size(words.len() as u32));
         assert_eq!(
