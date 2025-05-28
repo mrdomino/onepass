@@ -1,6 +1,7 @@
 use std::cmp;
 
 use anyhow::Result;
+use crypto_bigint::{NonZero, U256, zeroize::Zeroize};
 use nom::{
     Finish, IResult, Parser,
     branch::alt,
@@ -13,7 +14,6 @@ use nom::{
     multi::many1,
     sequence::{delimited, preceded, separated_pair},
 };
-use crypto_bigint::{zeroize::Zeroize, NonZero, U256};
 use num_traits::{One, Zero};
 
 /// Expr represents a subset of regular expressions that allows for literal strings, character
