@@ -95,6 +95,9 @@ impl Config {
             fs::write(path, serde_yaml::to_string(&default_config)?)?;
             default_config
         };
+        if let Some(schema) = config.aliases.get(&config.default_schema) {
+            config.default_schema = schema.clone();
+        }
         config.sites = config
             .sites
             .into_iter()
