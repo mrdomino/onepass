@@ -4,7 +4,7 @@ use std::{
     collections::HashMap,
     fs,
     hash::Hash,
-    io::{Write, stdout},
+    io::{IsTerminal, Write, stdout},
     path::Path,
 };
 
@@ -14,7 +14,7 @@ use blake3::OutputReader;
 use clap::Parser;
 use crypto_bigint::{NonZero, RandomMod, U256, rand_core::RngCore};
 use randexp::Expr;
-use rpassword::read_password;
+use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
@@ -113,6 +113,9 @@ struct Args {
 
     #[arg(long, default_value = "example salt")]
     salt: String,
+
+    #[arg(short, long)]
+    verbose: bool,
 }
 
 include!(concat!(env!("OUT_DIR"), "/wordlist.rs"));
@@ -155,12 +158,16 @@ fn main() -> Result<()> {
     let increment = site.map(|site| site.increment).unwrap_or(0);
     let expr = Expr::parse(schema).context("invalid schema")?;
     let sz = expr.size(EFF_WORDLIST.len() as u32);
-    eprintln!(
-        "schema has about {0} bits of entropy ({1} possible passwords)",
-        &sz.bits(),
-        &sz.to_string().trim_start_matches('0')
-    );
-    let password: Zeroizing<String> = read_password().context("failed reading password")?.into();
+    if args.verbose {
+        eprintln!(
+            "schema has about {0} bits of entropy ({1} possible passwords)",
+            &sz.bits(),
+            &sz.to_string().trim_start_matches('0')
+        );
+    }
+    let password: Zeroizing<String> = prompt_password("Master password: ")
+        .context("failed reading password")?
+        .into();
     let mut key_material = Zeroizing::new([0u8; 32]);
     Argon2::default()
         .hash_password_into(
@@ -178,6 +185,8 @@ fn main() -> Result<()> {
     let res: Zeroizing<String> = Zeroizing::new(expr.gen_at_index(EFF_WORDLIST, index)?);
     let mut stdout = stdout();
     stdout.write_all(res.as_bytes())?;
-    stdout.write_all(b"\n")?;
+    if stdout.is_terminal() {
+        writeln!(stdout)?;
+    }
     Ok(())
 }
