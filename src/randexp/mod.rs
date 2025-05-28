@@ -15,7 +15,7 @@ use nom::{
     sequence::{delimited, preceded, separated_pair},
 };
 use num_traits::{One, Zero};
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 /// Expr represents a subset of regular expressions that allows for literal strings, character
 /// classes, sequences, and counts. It also has a concept of a "Word", which is equivalent to a
@@ -116,7 +116,11 @@ impl Expr {
         Ok(expr)
     }
 
-    pub fn gen_at_index<T: AsRef<str>>(&self, words: &[T], mut index: U256) -> Result<String> {
+    pub fn gen_at_index<T: AsRef<str>>(&self, words: &[T], index: U256) -> Result<String> {
+        self.gen_at_index_zeroizing(words, Zeroizing::new(index))
+    }
+
+    fn gen_at_index_zeroizing<T: AsRef<str>>(&self, words: &[T], mut index: Zeroizing<U256>) -> Result<String> {
         let word_count = words.len() as u32;
         let res = match self {
             Expr::Word => words[u256_to_usize(&index)].as_ref().into(),
@@ -126,10 +130,10 @@ impl Expr {
                 for CharRange { start, end } in &cc.ranges {
                     let mut it = char_iter::new(*start, *end);
                     let n = Zeroizing::new(U256::from(it.len() as u32));
-                    if index < *n {
+                    if *index < *n {
                         return Ok(it.nth(u256_to_usize(&index)).unwrap().into());
                     }
-                    index -= *n;
+                    *index -= *n;
                 }
                 anyhow::bail!("index too big");
             }
@@ -138,9 +142,11 @@ impl Expr {
                 let mut acc = Zeroizing::new(Vec::new());
                 for expr in exprs {
                     let sz = NonZero::new(expr.size(word_count)).unwrap();
-                    let (next_index, j) = index.div_rem(&sz);
+                    let (mut next_index, mut j) = index.div_rem(&sz);
                     acc.push(expr.gen_at_index(words, j)?);
-                    index = next_index;
+                    *index = next_index;
+                    next_index.zeroize();
+                    j.zeroize();
                 }
                 acc.concat()
             }
@@ -150,15 +156,17 @@ impl Expr {
                 let base_size = Zeroizing::new(NonZero::new(expr.size(word_count)).unwrap());
                 for i in (*min..=*max).rev() {
                     let n = Zeroizing::new(u256_saturating_pow(&base_size, i));
-                    if index < *n || i == *min {
+                    if *index < *n || i == *min {
                         for _ in 0..i {
-                            let (next_index, j) = index.div_rem(&base_size);
+                            let (mut next_index, mut j) = index.div_rem(&base_size);
                             acc.push(expr.gen_at_index(words, j)?);
-                            index = next_index;
+                            *index = next_index;
+                            next_index.zeroize();
+                            j.zeroize();
                         }
                         return Ok(acc.concat());
                     }
-                    index -= *n;
+                    *index -= *n;
                 }
                 anyhow::bail!("index too big");
             }
