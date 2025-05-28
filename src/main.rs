@@ -173,18 +173,27 @@ fn main() -> Result<()> {
     let password: Zeroizing<String> = prompt_password("Master password: ")
         .context("failed reading password")?
         .into();
+    // XXX painful with this argon2 api...
+    let buf: Zeroizing<Vec<_>> = Zeroizing::new(
+        password
+            .as_bytes()
+            .iter()
+            .copied()
+            .chain(
+                increment
+                    .to_le_bytes()
+                    .iter()
+                    .copied()
+                    .chain(args.site.as_bytes().iter().copied()),
+            )
+            .collect(),
+    );
     let mut key_material = Zeroizing::new([0u8; 32]);
     Argon2::default()
-        .hash_password_into(
-            password.as_bytes(),
-            config.salt.as_bytes(),
-            &mut *key_material,
-        )
+        .hash_password_into(&buf, config.salt.as_bytes(), &mut *key_material)
         .map_err(|e| anyhow::anyhow!("argon2 failed: {e}"))?;
     let mut hasher = Zeroizing::new(blake3::Hasher::new());
     hasher.update(&*key_material);
-    hasher.update(&increment.to_le_bytes());
-    hasher.update(args.site.as_bytes());
     let mut rng = Blake3Rng(hasher.finalize_xof());
     let index = U256::random_mod(&mut rng, &NonZero::new(sz).unwrap());
     let res: Zeroizing<String> = Zeroizing::new(expr.gen_at_index(EFF_WORDLIST, index)?);
