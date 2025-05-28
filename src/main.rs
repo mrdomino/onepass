@@ -171,7 +171,12 @@ fn main() -> Result<()> {
         .into();
     let salt = format!("{0}:{1}", increment, &args.site);
     let mut key_material = Zeroizing::new([0u8; 32]);
-    Argon2::default()
+    let argon2 = Argon2::new(
+        argon2::Algorithm::Argon2d,
+        argon2::Version::V0x13,
+        argon2::Params::default(),
+    );
+    argon2
         .hash_password_into(password.as_bytes(), salt.as_bytes(), &mut *key_material)
         .map_err(|e| anyhow::anyhow!("argon2 failed: {e}"))?;
     let mut hasher = Zeroizing::new(blake3::Hasher::new());
