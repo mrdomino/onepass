@@ -124,11 +124,12 @@ impl Expr {
             Expr::CharClass(cc) => {
                 for CharRange { start, end } in &cc.ranges {
                     let mut it = char_iter::new(*start, *end);
-                    let n = U256::from(it.len() as u32);
+                    let mut n = U256::from(it.len() as u32);
                     if index < n {
                         return Ok(it.nth(u256_to_usize(&index)).unwrap().into());
                     }
                     index -= n;
+                    n.zeroize();
                 }
                 anyhow::bail!("index too big");
             }
@@ -141,24 +142,30 @@ impl Expr {
                     acc.push(expr.gen_at_index(words, j)?);
                     index = next_index;
                 }
+                // XXX zeroize?
                 acc.concat()
             }
 
             Expr::Repeat(expr, min, max) => {
                 let mut acc = Vec::new();
-                let base_size = NonZero::new(expr.size(word_count)).unwrap();
+                let mut base_size = NonZero::new(expr.size(word_count)).unwrap();
                 for i in (*min..=*max).rev() {
-                    let n = u256_saturating_pow(&base_size, i);
+                    let mut n = u256_saturating_pow(&base_size, i);
                     if index < n || i == *min {
                         for _ in 0..i {
                             let (next_index, j) = index.div_rem(&base_size);
                             acc.push(expr.gen_at_index(words, j)?);
                             index = next_index;
                         }
+                        n.zeroize();
+                        base_size.zeroize();
+                        // XXX zeroize?
                         return Ok(acc.concat());
                     }
                     index -= n;
+                    n.zeroize();
                 }
+                base_size.zeroize();
                 anyhow::bail!("index too big");
             }
         };
