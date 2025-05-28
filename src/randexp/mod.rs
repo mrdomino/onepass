@@ -27,6 +27,7 @@ use num_traits::{One, Zero};
 /// the half-open interval `[0, expr.size())`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum Expr {
+    // TODO [:Word:] for uppercase word?
     Word,
     Literal(String),
     CharClass(CharClass),

@@ -1,7 +1,7 @@
 mod randexp;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fs,
     hash::Hash,
     io::{Write, stdout},
@@ -28,7 +28,7 @@ struct Config {
     pub default_schema: String,
     #[serde(default)]
     pub aliases: HashMap<String, String>,
-    pub sites: HashSet<Site>,
+    pub sites: Vec<Site>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq)]
@@ -54,17 +54,18 @@ impl Default for Config {
             "[A-Z][:word:](-[:word:]){4}[!-/]".to_string(),
         );
         aliases.insert("mobile".to_string(), "[a-z0-9]{16}".to_string());
-        let mut sites = HashSet::new();
-        sites.insert(Site {
-            name: "apple.com".to_string(),
-            schema: "apple".to_string(),
-            increment: 0,
-        });
-        sites.insert(Site {
-            name: "google.com".to_string(),
-            schema: "strong".to_string(),
-            increment: 0,
-        });
+        let sites = vec![
+            Site {
+                name: "apple.com".to_string(),
+                schema: "apple".to_string(),
+                increment: 0,
+            },
+            Site {
+                name: "google.com".to_string(),
+                schema: "strong".to_string(),
+                increment: 0,
+            },
+        ];
         let default_schema = "[A-Za-z0-9_-]{16}".to_string();
         Config {
             default_schema,
@@ -111,9 +112,6 @@ struct Args {
 
     #[arg(long, default_value = "example salt")]
     salt: String,
-
-    #[arg(short, long)]
-    schema: Option<String>,
 }
 
 const WORDS: &[&str] = &["bob", "dole"];
@@ -149,14 +147,11 @@ fn main() -> Result<()> {
     let args = Args::parse();
     let config_file = shellexpand::tilde(&args.config);
     let config = Config::from_file(Path::new(config_file.as_ref())).unwrap_or_default();
-    let schema = &args.schema.unwrap_or_else(|| {
-        config
-            .sites
-            .iter()
-            .find(|&site| site.name == args.site)
-            .map(|site| site.schema.clone())
-            .unwrap_or(config.default_schema)
-    });
+    let site = config.sites.iter().find(|site| site.name == args.site);
+    let schema = site
+        .map(|site| &site.schema)
+        .unwrap_or(&config.default_schema);
+    let increment = site.map(|site| site.increment).unwrap_or(0);
     let expr = Expr::parse(schema).context("invalid schema")?;
     let sz = expr.size(WORDS.len() as u32);
     eprintln!(
@@ -175,6 +170,7 @@ fn main() -> Result<()> {
         .map_err(|e| anyhow::anyhow!("argon2 failed: {e}"))?;
     let mut hasher = Zeroizing::new(blake3::Hasher::new());
     hasher.update(&*key_material);
+    hasher.update(&increment.to_le_bytes());
     hasher.update(args.site.as_bytes());
     let mut rng = Blake3Rng(hasher.finalize_xof());
     let index = U256::random_mod(&mut rng, &NonZero::new(sz).unwrap());
