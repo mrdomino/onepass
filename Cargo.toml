@@ -6,6 +6,6 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.98"
 char-iter = "0.1.0"
+crypto-bigint = { version = "0.6.1", features = ["rand_core", "zeroize"] }
 nom = "8.0.0"
-num-bigint = "0.4.6"
 num-traits = "0.2.19"

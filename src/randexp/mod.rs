@@ -13,7 +13,7 @@ use nom::{
     multi::many1,
     sequence::{delimited, preceded, separated_pair},
 };
-use num_bigint::BigUint;
+use crypto_bigint::{zeroize::Zeroize, NonZero, U256};
 use num_traits::{One, Zero};
 
 /// Expr represents a subset of regular expressions that allows for literal strings, character
@@ -22,7 +22,7 @@ use num_traits::{One, Zero};
 /// execute time.
 ///
 /// This language subset is intended for use in password schemas; it allows the universe of strings
-/// matching the language to be mapped to a BigUint, producing a unique (assuming the language does
+/// matching the language to be mapped to a U256, producing a unique (assuming the language does
 /// not have multiple valid ways of recognizing a given string) string for each different number in
 /// the half-open interval `[0, expr.size())`.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -83,6 +83,27 @@ impl CharClass {
     }
 }
 
+fn u256_to_usize(n: &U256) -> usize {
+    n.as_limbs()[0].0 as usize
+}
+
+fn u256_saturating_pow(base: &U256, mut exp: u32) -> U256 {
+    let mut res = U256::ONE;
+    if exp == 0 {
+        return res;
+    }
+    let mut base = base.clone();
+    while exp > 0 {
+        if exp & 1 == 1 {
+            res = res.saturating_mul(&base);
+        }
+        exp >>= 1;
+        base = base.saturating_mul(&base);
+    }
+    base.zeroize();
+    res
+}
+
 impl Expr {
     pub fn parse(input: &str) -> Result<Self> {
         let (rem, expr) = Expr::parse_expr(input).finish().map_err(|e| {
@@ -94,18 +115,18 @@ impl Expr {
         Ok(expr)
     }
 
-    pub fn gen_at_index<T: AsRef<str>>(&self, words: &[T], mut index: BigUint) -> Result<String> {
+    pub fn gen_at_index<T: AsRef<str>>(&self, words: &[T], mut index: U256) -> Result<String> {
         let word_count = words.len() as u32;
         let res = match self {
-            Expr::Word => words[usize::try_from(index).unwrap()].as_ref().into(),
+            Expr::Word => words[u256_to_usize(&index)].as_ref().into(),
             Expr::Literal(s) => s.clone(),
 
             Expr::CharClass(cc) => {
                 for CharRange { start, end } in &cc.ranges {
                     let mut it = char_iter::new(*start, *end);
-                    let n = it.len().into();
+                    let n = U256::from(it.len() as u32);
                     if index < n {
-                        return Ok(it.nth(usize::try_from(index).unwrap()).unwrap().into());
+                        return Ok(it.nth(u256_to_usize(&index)).unwrap().into());
                     }
                     index -= n;
                 }
@@ -115,22 +136,24 @@ impl Expr {
             Expr::Sequence(exprs) => {
                 let mut acc = Vec::new();
                 for expr in exprs {
-                    let sz = expr.size(word_count);
-                    acc.push(expr.gen_at_index(words, &index % &sz)?);
-                    index /= sz;
+                    let sz = NonZero::new(expr.size(word_count)).unwrap();
+                    let (next_index, j) = index.div_rem(&sz);
+                    acc.push(expr.gen_at_index(words, j)?);
+                    index = next_index;
                 }
                 acc.concat()
             }
 
             Expr::Repeat(expr, min, max) => {
                 let mut acc = Vec::new();
-                let base_size = expr.size(word_count);
-                for i in (*max..=*min).rev() {
-                    let n = base_size.pow(i);
-                    if index < n {
+                let base_size = NonZero::new(expr.size(word_count)).unwrap();
+                for i in (*min..=*max).rev() {
+                    let n = u256_saturating_pow(&base_size, i);
+                    if index < n || i == *min {
                         for _ in 0..i {
-                            acc.push(expr.gen_at_index(words, &index % &base_size)?);
-                            index /= &base_size;
+                            let (next_index, j) = index.div_rem(&base_size);
+                            acc.push(expr.gen_at_index(words, j)?);
+                            index = next_index;
                         }
                         return Ok(acc.concat());
                     }
@@ -142,25 +165,25 @@ impl Expr {
         Ok(res)
     }
 
-    pub fn size(&self, word_count: u32) -> BigUint {
+    pub fn size(&self, word_count: u32) -> U256 {
         match self {
             Expr::Word => word_count.into(),
-            Expr::Literal(_) => BigUint::one(),
+            Expr::Literal(_) => U256::one(),
 
             Expr::CharClass(cc) => cc
                 .ranges
                 .iter()
-                .map(|CharRange { start, end }| char_iter::new(*start, *end).len())
-                .sum(),
+                .map(|CharRange { start, end }| char_iter::new(*start, *end).len() as u32)
+                .fold(U256::ZERO, |a, b| a.saturating_add(&U256::from(b))),
 
             Expr::Sequence(exprs) => exprs
                 .iter()
-                .fold(BigUint::one(), |acc, expr| acc * expr.size(word_count)),
+                .fold(U256::one(), |acc, expr| acc * expr.size(word_count)),
 
             Expr::Repeat(expr, min, max) => {
                 let base_size = expr.size(word_count);
-                (*min..=*max).fold(BigUint::zero(), |mut acc, i| {
-                    acc += base_size.pow(i);
+                (*min..=*max).fold(U256::zero(), |mut acc, i| {
+                    acc = acc.saturating_add(&u256_saturating_pow(&base_size, i));
                     acc
                 })
             }
@@ -278,6 +301,7 @@ impl Expr {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use crypto_bigint::CheckedSub;
     use num_traits::Num;
 
     use super::*;
@@ -373,10 +397,10 @@ mod tests {
     fn enumerate_full() -> Result<()> {
         let expr = Expr::parse("[123][:word:]")?;
         let sz = expr.size(2);
-        assert_eq!(BigUint::from(6u32), sz);
+        assert_eq!(U256::from(6u32), sz);
         let words = vec!["a", "b"];
         let strs: Vec<_> = (0u32..6)
-            .map(|i| expr.gen_at_index(&words, BigUint::from(i)).unwrap())
+            .map(|i| expr.gen_at_index(&words, U256::from(i)).unwrap())
             .collect();
         assert_eq!(vec!["1a", "2a", "3a", "1b", "2b", "3b"], strs);
         Ok(())
@@ -386,15 +410,15 @@ mod tests {
     fn enumerate_passphrase() -> Result<()> {
         let words: Vec<_> = (0..7776).map(|i| format!("({i})")).collect();
         let expr = Expr::parse("[:word:](-[:word:]){4}")?;
-        let sz = BigUint::from_str_radix("28430288029929701376", 10)?;
+        let sz = U256::from_str_radix("28430288029929701376", 10)?;
         assert_eq!(sz, expr.size(words.len() as u32));
         assert_eq!(
             "(0)-(0)-(0)-(0)-(0)",
-            expr.gen_at_index(&words, BigUint::zero())?
+            expr.gen_at_index(&words, U256::zero())?
         );
         assert_eq!(
             "(7775)-(7775)-(7775)-(7775)-(7775)",
-            expr.gen_at_index(&words, sz - 1u32)?
+            expr.gen_at_index(&words, sz.checked_sub(&U256::from(1u8)).unwrap())?
         );
         Ok(())
     }
