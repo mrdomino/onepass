@@ -92,7 +92,7 @@ fn u256_saturating_pow(base: &U256, mut exp: u32) -> U256 {
     if exp == 0 {
         return res;
     }
-    let mut base = base.clone();
+    let mut base = *base;
     while exp > 0 {
         if exp & 1 == 1 {
             res = res.saturating_mul(&base);
@@ -109,7 +109,7 @@ impl Expr {
         let (rem, expr) = Expr::parse_expr(input).finish().map_err(|e| {
             anyhow::anyhow!("Parse error at {}: {}", e.input.len(), e.code.description())
         })?;
-        if rem != "" {
+        if !rem.is_empty() {
             anyhow::bail!("leftover input: {rem}");
         }
         Ok(expr)
