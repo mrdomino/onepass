@@ -54,6 +54,7 @@ impl Default for Config {
             "[A-Z][:word:](-[:word:]){4}[!-/]".to_string(),
         );
         aliases.insert("mobile".to_string(), "[a-z0-9]{16}".to_string());
+        aliases.insert("phrase".to_string(), "[:word:](-[:word:]){4}".to_string());
         let sites = vec![
             Site {
                 name: "apple.com".to_string(),
@@ -114,7 +115,7 @@ struct Args {
     salt: String,
 }
 
-const WORDS: &[&str] = &["bob", "dole"];
+include!(concat!(env!("OUT_DIR"), "/wordlist.rs"));
 
 struct Blake3Rng(OutputReader);
 impl RngCore for Blake3Rng {
@@ -153,7 +154,7 @@ fn main() -> Result<()> {
         .unwrap_or(&config.default_schema);
     let increment = site.map(|site| site.increment).unwrap_or(0);
     let expr = Expr::parse(schema).context("invalid schema")?;
-    let sz = expr.size(WORDS.len() as u32);
+    let sz = expr.size(EFF_WORDLIST.len() as u32);
     eprintln!(
         "schema has about {0} bits of entropy ({1} possible passwords)",
         &sz.bits(),
@@ -174,7 +175,7 @@ fn main() -> Result<()> {
     hasher.update(args.site.as_bytes());
     let mut rng = Blake3Rng(hasher.finalize_xof());
     let index = U256::random_mod(&mut rng, &NonZero::new(sz).unwrap());
-    let res: Zeroizing<String> = Zeroizing::new(expr.gen_at_index(WORDS, index)?);
+    let res: Zeroizing<String> = Zeroizing::new(expr.gen_at_index(EFF_WORDLIST, index)?);
     let mut stdout = stdout();
     stdout.write_all(res.as_bytes())?;
     stdout.write_all(b"\n")?;
