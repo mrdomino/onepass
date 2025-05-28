@@ -23,10 +23,6 @@ fn default_schema() -> String {
     "[A-Za-z0-9]{16}".into()
 }
 
-fn default_salt() -> String {
-    "insecure salt".into()
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 struct Config {
     #[serde(default = "default_schema")]
@@ -34,8 +30,6 @@ struct Config {
     #[serde(default)]
     pub aliases: HashMap<String, String>,
     pub sites: Vec<Site>,
-    #[serde(default = "default_salt")]
-    pub salt: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq)]
@@ -75,12 +69,10 @@ impl Default for Config {
             },
         ];
         let default_schema = "[A-Za-z0-9_-]{16}".to_string();
-        let salt = "insecure salt".to_string();
         Config {
             default_schema,
             aliases,
             sites,
-            salt,
         }
     }
 }
@@ -177,14 +169,10 @@ fn main() -> Result<()> {
     let password: Zeroizing<String> = prompt_password("Master password: ")
         .context("failed reading password")?
         .into();
-    let mut buf: Zeroizing<Vec<u8>> =
-        Vec::with_capacity(password.len() + 4 + args.site.len()).into();
-    buf.extend(password.as_bytes());
-    buf.extend(increment.to_le_bytes());
-    buf.extend(args.site.as_bytes());
+    let salt = format!("{0}:{1}", increment, &args.site);
     let mut key_material = Zeroizing::new([0u8; 32]);
     Argon2::default()
-        .hash_password_into(&buf, config.salt.as_bytes(), &mut *key_material)
+        .hash_password_into(password.as_bytes(), salt.as_bytes(), &mut *key_material)
         .map_err(|e| anyhow::anyhow!("argon2 failed: {e}"))?;
     let mut hasher = Zeroizing::new(blake3::Hasher::new());
     hasher.update(&*key_material);
