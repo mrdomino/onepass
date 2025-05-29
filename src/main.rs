@@ -60,12 +60,13 @@ struct Site {
 impl Default for Config {
     fn default() -> Self {
         let mut aliases = HashMap::new();
-        aliases.insert("strong".to_string(), "[A-Za-z0-9]{18}".to_string());
+        aliases.insert("login".to_string(), "[!-~]{12}".to_string());
+        aliases.insert("alnum".to_string(), "[A-Za-z0-9]{18}".to_string());
         aliases.insert(
             "apple".to_string(),
             "[:Word:](-[:word:]){3}[0-9!-/]".to_string(),
         );
-        aliases.insert("mobile".to_string(), "[a-z0-9]{16}".to_string());
+        aliases.insert("mobile".to_string(), "[a-z0-9]{24}".to_string());
         aliases.insert("phrase".to_string(), "[:word:](-[:word:]){4}".to_string());
         aliases.insert("pin".to_string(), "[0-9]{8}".to_string());
         let sites = vec![
@@ -76,7 +77,7 @@ impl Default for Config {
             },
             Site {
                 name: "google.com".to_string(),
-                schema: "strong".to_string(),
+                schema: "mobile".to_string(),
                 increment: 0,
             },
             Site {
@@ -85,7 +86,7 @@ impl Default for Config {
                 increment: 0,
             },
         ];
-        let default_schema = "[A-Za-z0-9_-]{16}".to_string();
+        let default_schema = "login".to_string();
         Config {
             default_schema,
             aliases,
