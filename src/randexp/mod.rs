@@ -275,6 +275,12 @@ impl Quantifiable<Expr> for WordCount {
 
 pub(crate) struct Words<'a>(pub &'a [&'a str]);
 
+impl<'a> From<&'a [&'a str]> for Words<'a> {
+    fn from(value: &'a [&'a str]) -> Self {
+        Words(value)
+    }
+}
+
 impl Quantifiable<Expr> for Words<'_> {
     fn size(&self, node: &Expr) -> U256 {
         WordCount(self.0.len()).size(node)

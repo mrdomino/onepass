@@ -212,11 +212,11 @@ fn main() -> Result<()> {
     let words = words
         .as_ref()
         .map(|words| words.lines().map(|line| line.trim()).collect::<Box<[_]>>());
-    let words = words
+    let words: Words = words
         .as_ref()
         .map(|words| words.as_ref())
-        .unwrap_or(EFF_WORDLIST);
-    let words = Words(words);
+        .unwrap_or(EFF_WORDLIST)
+        .into();
 
     let site = config.sites.iter().find(|&site| site.name == args.site);
     let schema = args
