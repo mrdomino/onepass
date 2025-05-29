@@ -126,7 +126,7 @@ struct Args {
     config: Option<String>,
 
     #[arg(short, long, env = "PASSGEN_WORDS_FILE")]
-    words_file: Option<String>,
+    words: Option<String>,
 
     #[arg(short, long)]
     verbose: bool,
@@ -185,7 +185,7 @@ fn main() -> Result<()> {
     let config = Config::from_file(&config_path).unwrap_or_default();
 
     let words = args
-        .words_file
+        .words
         .as_ref()
         .map(|s| -> Result<Vec<String>> {
             let path = PathBuf::from(s).into_boxed_path();
