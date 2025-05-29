@@ -242,7 +242,7 @@ fn lookup_site<T: AsRef<str>>(config: &Config, args: &Args, words: &[T]) -> Resu
 
     if args.verbose {
         eprintln!(
-            "schema has about {0} bits of entropy ({1} possible passwords)",
+            "schema has about {0} bits of entropy (0x{1} possible passwords)",
             &sz.bits(),
             &sz.to_string().trim_start_matches('0')
         );
