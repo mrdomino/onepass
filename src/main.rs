@@ -18,7 +18,6 @@ use std::{
     collections::HashMap,
     env::{self},
     fs::{self, File},
-    hash::Hash,
     io::{BufRead, BufReader, IsTerminal, Write, stdout},
     path::{Path, PathBuf},
 };
@@ -56,12 +55,6 @@ struct Site {
     pub schema: String,
     #[serde(default)]
     pub increment: u32,
-}
-
-impl Hash for Site {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.name.hash(state)
-    }
 }
 
 impl Default for Config {
@@ -102,6 +95,7 @@ impl Default for Config {
 }
 
 impl Config {
+    // TODO: toml, figure out how to not emit 0 increments
     pub fn from_file(path: &Path) -> Result<Self> {
         let mut config = if path.exists() {
             serde_yaml::from_str(&fs::read_to_string(path)?)?
