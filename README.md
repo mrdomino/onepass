@@ -30,9 +30,9 @@ on the first run of the program. You can also see my current config here:
 
 ## Acknowledgements
 
-I was introduced to the idea of using deterministic passwords via [passacre][0],
-which I used for many years until switching to [lesspass][1] due to increasing
-infeasibility of installing passacre on newer versions of macOS.
+I was introduced to the idea of using deterministic passwords via [passacre][0]
+(thanks pi), which I used for many years until switching to [lesspass][1] due
+to increasing infeasibility of installing passacre on newer versions of macOS.
 
 The idea to use regex-like password schemas came from [xfbs/passgen][2].
 
