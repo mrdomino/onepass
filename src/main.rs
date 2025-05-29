@@ -17,8 +17,8 @@ mod randexp;
 use std::{
     collections::HashMap,
     env::{self},
-    fs::{self, File},
-    io::{BufRead, BufReader, IsTerminal, Write, stdout},
+    fs::{self},
+    io::{IsTerminal, Write, stdout},
     path::{Path, PathBuf},
 };
 
@@ -206,23 +206,17 @@ fn main() -> Result<()> {
     let words = args
         .words
         .as_ref()
-        .map(|s| -> Result<Vec<Box<str>>> {
-            let path = PathBuf::from(s).into_boxed_path();
-            let file = File::open(path).context("open failed")?;
-            let reader = BufReader::new(file);
-            let mut words = Vec::new();
-            for line in reader.lines() {
-                words.push(String::from(line?.trim()).into_boxed_str());
-            }
-            Ok(words)
-        })
+        .map(fs::read_to_string)
         .transpose()
-        .context("failed reading word list")?;
-
-    let wl = words
+        .context("failed reading words file")?;
+    let words = words
         .as_ref()
-        .map(|words| Words::from(&words[..]))
-        .unwrap_or_else(|| Words::from(EFF_WORDLIST));
+        .map(|words| words.lines().map(|line| line.trim()).collect::<Box<[_]>>());
+    let words = words
+        .as_ref()
+        .map(|words| words.as_ref())
+        .unwrap_or(EFF_WORDLIST);
+    let words = Words(words);
 
     let site = config.sites.iter().find(|&site| site.name == args.site);
     let schema = args
@@ -235,7 +229,7 @@ fn main() -> Result<()> {
         });
     let increment = site.map(|site| site.increment).unwrap_or(0);
     let expr = Expr::parse(schema).context("invalid schema")?;
-    let sz = wl.size(&expr);
+    let sz = words.size(&expr);
 
     if args.verbose {
         eprintln!(
@@ -263,7 +257,7 @@ fn main() -> Result<()> {
     hasher.update(&*key_material);
     let mut rng = Blake3Rng(Zeroizing::new(hasher.finalize_xof()));
     let index = U256::random_mod(&mut rng, &NonZero::new(sz).unwrap());
-    let res = wl.gen_at(&expr, index)?;
+    let res = words.gen_at(&expr, index)?;
     let mut stdout = stdout();
     stdout.write_all(res.as_bytes())?;
     if stdout.is_terminal() {
