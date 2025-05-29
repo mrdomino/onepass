@@ -1,7 +1,13 @@
 [package]
 name = "onepass"
 version = "0.1.0"
+categories = ["command-line-utilities"]
 edition = "2024"
+keywords = ["password", "cryptography", "deterministic"]
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/mrdomino/onepass"
+description = "A mostly-stateless deterministic password manager"
 
 [dependencies]
 anyhow = "1.0.98"
