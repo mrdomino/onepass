@@ -229,13 +229,13 @@ fn main() -> Result<()> {
         });
     let increment = site.map(|site| site.increment).unwrap_or(0);
     let expr = Expr::parse(schema).context("invalid schema")?;
-    let sz = words.size(&expr);
+    let size = words.size(&expr);
 
     if args.verbose {
         eprintln!(
             "schema has about {0} bits of entropy (0x{1} possible passwords)",
-            &sz.bits(),
-            &sz.to_string().trim_start_matches('0')
+            &size.bits(),
+            &size.to_string().trim_start_matches('0')
         );
     }
 
@@ -256,7 +256,7 @@ fn main() -> Result<()> {
     let mut hasher = Zeroizing::new(blake3::Hasher::new());
     hasher.update(&*key_material);
     let mut rng = Blake3Rng(Zeroizing::new(hasher.finalize_xof()));
-    let index = U256::random_mod(&mut rng, &NonZero::new(sz).unwrap());
+    let index = U256::random_mod(&mut rng, &NonZero::new(size).unwrap());
     let res = words.gen_at(&expr, index)?;
     let mut stdout = stdout();
     stdout.write_all(res.as_bytes())?;
