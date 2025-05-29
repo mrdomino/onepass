@@ -227,10 +227,14 @@ fn main() -> Result<()> {
 
 fn lookup_site<T: AsRef<str>>(config: &Config, args: &Args, words: &[T]) -> Result<()> {
     let site = config.sites.iter().find(|&site| site.name == args.site);
-    let schema = args.schema.as_ref().unwrap_or_else(|| {
-        site.map(|site| &site.schema)
-            .unwrap_or(&config.default_schema)
-    });
+    let schema = args
+        .schema
+        .as_ref()
+        .map(|schema| config.aliases.get(schema).unwrap_or(schema))
+        .unwrap_or_else(|| {
+            site.map(|site| &site.schema)
+                .unwrap_or(&config.default_schema)
+        });
     let increment = site.map(|site| site.increment).unwrap_or(0);
     let expr = Expr::parse(schema).context("invalid schema")?;
     let wl = WordList(words);
