@@ -2,7 +2,7 @@ pub(crate) mod quantifiable;
 
 use std::cmp;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use crypto_bigint::{NonZero, U256};
 use nom::{
     Finish, IResult, Input, Parser,
@@ -30,8 +30,8 @@ use zeroize::Zeroizing;
 /// the half-open interval `[0, expr.size())`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum Expr {
-    // TODO [:Word:] for uppercase word?
     Word,
+    WOrd,
     Literal(String),
     CharClass(CharClass),
     Sequence(Vec<Expr>),
@@ -119,7 +119,10 @@ impl Expr {
     }
 
     fn parse_word(input: &str) -> IResult<&str, Expr> {
-        value(Expr::Word, tag("[:word:]")).parse(input)
+        alt((
+            value(Expr::Word, tag("[:word:]")),
+            value(Expr::WOrd, tag("[:Word:]")),
+        )).parse(input)
     }
 
     fn parse_literal(input: &str) -> IResult<&str, Expr> {
@@ -231,7 +234,7 @@ pub(crate) struct WordCount(pub usize);
 impl Quantifiable<Expr> for WordCount {
     fn size(&self, expr: &Expr) -> U256 {
         match expr {
-            Expr::Word => U256::from(self.0 as u64),
+            Expr::Word | Expr::WOrd => U256::from(self.0 as u64),
             Expr::Literal(_) => U256::ONE,
 
             Expr::CharClass(cc) => cc
@@ -267,7 +270,12 @@ impl<T: AsRef<str>> Enumerable<Expr> for WordList<'_, T> {
     fn gen_at(&self, expr: &Expr, index: U256) -> Result<Zeroizing<String>> {
         let mut index = Zeroizing::new(index);
         let res = match expr {
-            Expr::Word => self.0[u256_to_usize(&index)].as_ref().into(),
+            Expr::Word => String::from(self.0[u256_to_usize(&index)].as_ref()),
+            Expr::WOrd => {
+                let mut chars = self.0[u256_to_usize(&index)].as_ref().chars();
+                let first = chars.next().context("empty word")?.to_uppercase();
+                first.chain(chars).collect()
+            }
             Expr::Literal(s) => s.clone(),
 
             Expr::CharClass(cc) => {
@@ -458,6 +466,15 @@ mod tests {
             "(7775)-(7775)-(7775)-(7775)-(7775)",
             *wl.gen_at(&expr, sz.checked_sub(&U256::ONE).unwrap())?
         );
+        Ok(())
+    }
+
+    #[test]
+    fn enumerate_uppercase() -> Result<()> {
+        let words = vec!["bob", "dole"];
+        let wl = WordList(&words);
+        let expr = Expr::parse("[:Word:]")?;
+        assert_eq!("Bob", *wl.gen_at(&expr, U256::ZERO)?);
         Ok(())
     }
 }
