@@ -152,7 +152,7 @@ struct Args {
 
 include!(concat!(env!("OUT_DIR"), "/wordlist.rs"));
 
-struct Blake3Rng(OutputReader);
+struct Blake3Rng(Zeroizing<OutputReader>);
 impl RngCore for Blake3Rng {
     fn next_u32(&mut self) -> u32 {
         let mut bytes = [0u8; 4];
@@ -264,7 +264,7 @@ fn lookup_site<T: AsRef<str>>(config: &Config, args: &Args, words: &[T]) -> Resu
 
     let mut hasher = Zeroizing::new(blake3::Hasher::new());
     hasher.update(&*key_material);
-    let mut rng = Blake3Rng(hasher.finalize_xof());
+    let mut rng = Blake3Rng(Zeroizing::new(hasher.finalize_xof()));
     let index = U256::random_mod(&mut rng, &NonZero::new(sz).unwrap());
     let res = wl.gen_at(&expr, index)?;
     let mut stdout = stdout();
