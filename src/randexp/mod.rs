@@ -136,7 +136,8 @@ impl Expr {
         alt((
             value(Expr::Word, tag("[:word:]")),
             value(Expr::WOrd, tag("[:Word:]")),
-        )).parse(input)
+        ))
+        .parse(input)
     }
 
     fn parse_literal(input: &str) -> IResult<&str, Expr> {

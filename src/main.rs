@@ -133,17 +133,27 @@ impl Config {
 }
 
 #[derive(Debug, Parser)]
+#[command(version, about)]
 struct Args {
+    /// The site for which to generate a password
     site: String,
 
-    #[arg(short, long)]
+    /// Override the path of the config file (default: ~/.config/onepass/config.yaml)
+    #[arg(short, long, env = "PASSGEN_CONFIG_FILE")]
     config: Option<String>,
 
+    /// Read words from the specified newline-separated dictionary file (by default, uses words
+    /// from the EFF large word list)
     #[arg(short, long, env = "PASSGEN_WORDS_FILE")]
     words: Option<String>,
 
+    /// Print verbose password entropy output
     #[arg(short, long)]
     verbose: bool,
+
+    /// Override schema to use for this site (may be a configured alias)
+    #[arg(short, long)]
+    schema: Option<String>,
 }
 
 include!(concat!(env!("OUT_DIR"), "/wordlist.rs"));
@@ -223,9 +233,11 @@ fn main() -> Result<()> {
 
 fn lookup_site<T: AsRef<str>>(config: &Config, args: &Args, words: &[T]) -> Result<()> {
     let site = config.sites.iter().find(|&site| site.name == args.site);
-    let (schema, increment) = site
-        .map(|site| (&site.schema, &site.increment))
-        .unwrap_or((&config.default_schema, &0));
+    let schema = args.schema.as_ref().unwrap_or_else(|| {
+        site.map(|site| &site.schema)
+            .unwrap_or(&config.default_schema)
+    });
+    let increment = site.map(|site| site.increment).unwrap_or(0);
     let expr = Expr::parse(schema).context("invalid schema")?;
     let wl = WordList(words);
     let sz = wl.size(&expr);
