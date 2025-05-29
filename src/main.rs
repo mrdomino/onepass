@@ -56,7 +56,7 @@ impl Default for Config {
         aliases.insert("strong".to_string(), "[A-Za-z0-9]{18}".to_string());
         aliases.insert(
             "apple".to_string(),
-            "[A-Z][:word:](-[:word:]){4}[!-/]".to_string(),
+            "[:Word:](-[:word:]){3}[0-9!-/]".to_string(),
         );
         aliases.insert("mobile".to_string(), "[a-z0-9]{16}".to_string());
         aliases.insert("phrase".to_string(), "[:word:](-[:word:]){4}".to_string());
