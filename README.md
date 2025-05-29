@@ -39,6 +39,8 @@ The idea to use regex-like password schemas came from [xfbs/passgen][2].
 Recommendations on crypto primitives (BLAKE2 and Argon2 in particular) were due
 to Justine Tunney.
 
+The default embedded word list is of course from [the EFF][3].
+
 ## Approach
 
 We derive a key from your master password using argon2d, salted by your URL and
@@ -93,7 +95,7 @@ you.
 
 This package uses blake3 instead of blake2, even though it also uses argon2,
 which internally uses blake2. It would be simpler and involve fewer moving parts
-cryptographically/mathematically if it could use [BLAKE2X][3], but I haven’t
+cryptographically/mathematically if it could use [BLAKE2X][4], but I haven’t
 found that in a crate yet and I haven’t wanted to hand-roll an implementation
 of it. The reason I chose blake3 for this was solely that it already had an
 off-the-shelf XOF in the crate.
@@ -105,4 +107,5 @@ like endianness are agreeable to me.
 [0]: https://github.com/habnabit/passacre
 [1]: https://lesspass.com
 [2]: https://github.com/xfbs/passgen
-[3]: https://www.blake2.net/blake2x.pdf
+[3]: https://www.eff.org/dice
+[4]: https://www.blake2.net/blake2x.pdf
