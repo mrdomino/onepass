@@ -1,9 +1,11 @@
+pub(crate) mod quantifiable;
+
 use std::cmp;
 
 use anyhow::Result;
 use crypto_bigint::{NonZero, U256};
 use nom::{
-    Finish, IResult, Parser,
+    Finish, IResult, Input, Parser,
     branch::alt,
     bytes::complete::tag,
     character::{
@@ -14,8 +16,8 @@ use nom::{
     multi::many1,
     sequence::{delimited, preceded, separated_pair},
 };
-use num_traits::{One, Zero};
-use zeroize::{Zeroize, Zeroizing};
+use quantifiable::{Enumerable, Quantifiable};
+use zeroize::Zeroizing;
 
 /// Expr represents a subset of regular expressions that allows for literal strings, character
 /// classes, sequences, and counts. It also has a concept of a "Word", which is equivalent to a
@@ -114,92 +116,6 @@ impl Expr {
             anyhow::bail!("leftover input: {rem}");
         }
         Ok(expr)
-    }
-
-    pub fn gen_at_index<T: AsRef<str>>(&self, words: &[T], index: U256) -> Result<String> {
-        self.gen_at_index_zeroizing(words, Zeroizing::new(index))
-    }
-
-    fn gen_at_index_zeroizing<T: AsRef<str>>(&self, words: &[T], mut index: Zeroizing<U256>) -> Result<String> {
-        let word_count = words.len() as u32;
-        let res = match self {
-            Expr::Word => words[u256_to_usize(&index)].as_ref().into(),
-            Expr::Literal(s) => s.clone(),
-
-            Expr::CharClass(cc) => {
-                for CharRange { start, end } in &cc.ranges {
-                    let mut it = char_iter::new(*start, *end);
-                    let n = Zeroizing::new(U256::from(it.len() as u32));
-                    if *index < *n {
-                        let c = it.nth(u256_to_usize(&index)).unwrap();
-                        // "zeroize" it...
-                        while it.next().is_some() { }
-                        return Ok(c.into());
-                    }
-                    *index -= *n;
-                }
-                anyhow::bail!("index too big");
-            }
-
-            Expr::Sequence(exprs) => {
-                let mut acc = Zeroizing::new(Vec::new());
-                for expr in exprs {
-                    let sz = NonZero::new(expr.size(word_count)).unwrap();
-                    let (mut next_index, mut j) = index.div_rem(&sz);
-                    acc.push(expr.gen_at_index(words, j)?);
-                    *index = next_index;
-                    next_index.zeroize();
-                    j.zeroize();
-                }
-                acc.concat()
-            }
-
-            Expr::Repeat(expr, min, max) => {
-                let mut acc = Zeroizing::new(Vec::new());
-                let base_size = Zeroizing::new(NonZero::new(expr.size(word_count)).unwrap());
-                for i in (*min..=*max).rev() {
-                    let n = Zeroizing::new(u256_saturating_pow(&base_size, i));
-                    if *index < *n || i == *min {
-                        for _ in 0..i {
-                            let (mut next_index, mut j) = index.div_rem(&base_size);
-                            acc.push(expr.gen_at_index(words, j)?);
-                            *index = next_index;
-                            next_index.zeroize();
-                            j.zeroize();
-                        }
-                        return Ok(acc.concat());
-                    }
-                    *index -= *n;
-                }
-                anyhow::bail!("index too big");
-            }
-        };
-        Ok(res)
-    }
-
-    pub fn size(&self, word_count: u32) -> U256 {
-        match self {
-            Expr::Word => word_count.into(),
-            Expr::Literal(_) => U256::one(),
-
-            Expr::CharClass(cc) => cc
-                .ranges
-                .iter()
-                .map(|CharRange { start, end }| char_iter::new(*start, *end).len() as u32)
-                .fold(U256::ZERO, |a, b| a.saturating_add(&U256::from(b))),
-
-            Expr::Sequence(exprs) => exprs
-                .iter()
-                .fold(U256::one(), |acc, expr| acc * expr.size(word_count)),
-
-            Expr::Repeat(expr, min, max) => {
-                let base_size = expr.size(word_count);
-                (*min..=*max).fold(U256::zero(), |mut acc, i| {
-                    acc = acc.saturating_add(&u256_saturating_pow(&base_size, i));
-                    acc
-                })
-            }
-        }
     }
 
     fn parse_word(input: &str) -> IResult<&str, Expr> {
@@ -310,6 +226,111 @@ impl Expr {
     }
 }
 
+pub(crate) struct WordCount(pub usize);
+
+impl Quantifiable<Expr> for WordCount {
+    fn size(&self, expr: &Expr) -> U256 {
+        match expr {
+            Expr::Word => U256::from(self.0 as u64),
+            Expr::Literal(_) => U256::ONE,
+
+            Expr::CharClass(cc) => cc
+                .ranges
+                .iter()
+                .map(|CharRange { start, end }| char_iter::new(*start, *end).len() as u32)
+                .fold(U256::ZERO, |a, b| a.saturating_add(&U256::from(b))),
+
+            Expr::Sequence(exprs) => exprs
+                .iter()
+                .fold(U256::ONE, |acc, expr| acc * self.size(expr)),
+
+            Expr::Repeat(expr, min, max) => {
+                let base_size = self.size(expr);
+                (*min..=*max).fold(U256::ZERO, |mut acc, i| {
+                    acc = acc.saturating_add(&u256_saturating_pow(&base_size, i));
+                    acc
+                })
+            }
+        }
+    }
+}
+
+pub(crate) struct WordList<'a, T: AsRef<str>>(pub &'a [T]);
+
+impl<T: AsRef<str>> Quantifiable<Expr> for WordList<'_, T> {
+    fn size(&self, node: &Expr) -> U256 {
+        WordCount(self.0.len()).size(node)
+    }
+}
+
+impl<T: AsRef<str>> Enumerable<Expr> for WordList<'_, T> {
+    fn gen_at(&self, expr: &Expr, index: U256) -> Result<Zeroizing<String>> {
+        let mut index = Zeroizing::new(index);
+        let res = match expr {
+            Expr::Word => self.0[u256_to_usize(&index)].as_ref().into(),
+            Expr::Literal(s) => s.clone(),
+
+            Expr::CharClass(cc) => {
+                for CharRange { start, end } in &cc.ranges {
+                    let mut it = char_iter::new(*start, *end);
+                    let n = Zeroizing::new(U256::from(it.len() as u32));
+                    if *index < *n {
+                        let c = it.nth(u256_to_usize(&index)).unwrap();
+                        // "zeroize" it...
+                        while it.next().is_some() {}
+                        return Ok(Zeroizing::new(c.into()));
+                    }
+                    *index -= *n;
+                }
+                anyhow::bail!("index too big");
+            }
+
+            Expr::Sequence(exprs) => {
+                let mut acc = Zeroizing::new(Vec::with_capacity(exprs.len()));
+                for expr in exprs {
+                    let sz = NonZero::new(self.size(expr)).unwrap();
+                    let (next_index, j) = index.div_rem(&sz);
+                    let (mut next_index, j) = (Zeroizing::new(next_index), Zeroizing::new(j));
+                    acc.push(self.gen_at(expr, *j)?);
+                    std::mem::swap(&mut index, &mut next_index);
+                }
+                let n: usize = acc.iter().map(|s| s.len()).sum();
+                let mut ret = String::with_capacity(n);
+                for s in acc.iter() {
+                    ret.extend(s.as_str().iter_elements());
+                }
+                ret
+            }
+
+            Expr::Repeat(expr, min, max) => {
+                let base_size = Zeroizing::new(NonZero::new(self.size(expr)).unwrap());
+                for i in (*min..=*max).rev() {
+                    let n = Zeroizing::new(u256_saturating_pow(&base_size, i));
+                    if *index < *n {
+                        let mut acc = Zeroizing::new(Vec::with_capacity(i as usize));
+                        for _ in 0..i {
+                            let (next_index, j) = index.div_rem(&base_size);
+                            let (mut next_index, j) =
+                                (Zeroizing::new(next_index), Zeroizing::new(j));
+                            acc.push(self.gen_at(expr, *j)?);
+                            std::mem::swap(&mut index, &mut next_index);
+                        }
+                        let n: usize = acc.iter().map(|s| s.len()).sum();
+                        let mut ret = Zeroizing::new(String::with_capacity(n));
+                        for s in acc.iter() {
+                            ret.extend(s.as_str().iter_elements());
+                        }
+                        return Ok(ret);
+                    }
+                    *index -= *n;
+                }
+                anyhow::bail!("index too big");
+            }
+        };
+        Ok(Zeroizing::new(res))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
@@ -408,29 +429,34 @@ mod tests {
     #[test]
     fn enumerate_full() -> Result<()> {
         let expr = Expr::parse("[123][:word:]")?;
-        let sz = expr.size(2);
+        let sz = WordCount(2).size(&expr);
         assert_eq!(U256::from(6u32), sz);
         let words = vec!["a", "b"];
+        let wl = WordList(&words);
         let strs: Vec<_> = (0u32..6)
-            .map(|i| expr.gen_at_index(&words, U256::from(i)).unwrap())
+            .map(|i| wl.gen_at(&expr, i.into()).unwrap())
             .collect();
-        assert_eq!(vec!["1a", "2a", "3a", "1b", "2b", "3b"], strs);
+        assert_eq!(
+            vec!["1a", "2a", "3a", "1b", "2b", "3b"]
+                .into_iter()
+                .map(|s| Zeroizing::new(String::from(s)))
+                .collect::<Vec<_>>(),
+            strs
+        );
         Ok(())
     }
 
     #[test]
     fn enumerate_passphrase() -> Result<()> {
         let words: Vec<_> = (0..7776).map(|i| format!("({i})")).collect();
+        let wl = WordList(&words);
         let expr = Expr::parse("[:word:](-[:word:]){4}")?;
         let sz = U256::from_str_radix("28430288029929701376", 10)?;
-        assert_eq!(sz, expr.size(words.len() as u32));
-        assert_eq!(
-            "(0)-(0)-(0)-(0)-(0)",
-            expr.gen_at_index(&words, U256::zero())?
-        );
+        assert_eq!(sz, wl.size(&expr));
+        assert_eq!("(0)-(0)-(0)-(0)-(0)", *wl.gen_at(&expr, U256::ZERO)?);
         assert_eq!(
             "(7775)-(7775)-(7775)-(7775)-(7775)",
-            expr.gen_at_index(&words, sz.checked_sub(&U256::from(1u8)).unwrap())?
+            *wl.gen_at(&expr, sz.checked_sub(&U256::ONE).unwrap())?
         );
         Ok(())
     }

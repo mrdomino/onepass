@@ -14,7 +14,10 @@ use blake3::OutputReader;
 use clap::Parser;
 use crypto_bigint::{NonZero, RandomMod, U256};
 use rand_core::RngCore;
-use randexp::Expr;
+use randexp::{
+    Expr, WordList,
+    quantifiable::{Enumerable, Quantifiable},
+};
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
@@ -158,7 +161,8 @@ fn main() -> Result<()> {
         .unwrap_or(&config.default_schema);
     let increment = site.map(|site| site.increment).unwrap_or(0);
     let expr = Expr::parse(schema).context("invalid schema")?;
-    let sz = expr.size(EFF_WORDLIST.len() as u32);
+    let wl = WordList(EFF_WORDLIST);
+    let sz = wl.size(&expr);
     if args.verbose {
         eprintln!(
             "schema has about {0} bits of entropy ({1} possible passwords)",
@@ -183,7 +187,7 @@ fn main() -> Result<()> {
     hasher.update(&*key_material);
     let mut rng = Blake3Rng(hasher.finalize_xof());
     let index = U256::random_mod(&mut rng, &NonZero::new(sz).unwrap());
-    let res: Zeroizing<String> = Zeroizing::new(expr.gen_at_index(EFF_WORDLIST, index)?);
+    let res = wl.gen_at(&expr, index)?;
     let mut stdout = stdout();
     stdout.write_all(res.as_bytes())?;
     if stdout.is_terminal() {
