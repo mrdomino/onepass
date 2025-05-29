@@ -275,7 +275,7 @@ impl Quantifiable<Expr> for WordCount {
 
 pub(crate) enum Words<'a> {
     Direct(&'a [&'a str]),
-    Owned(&'a [String]),
+    Owned(&'a [Box<str>]),
 }
 
 impl<'a> Words<'a> {
@@ -300,8 +300,8 @@ impl<'a> From<&'a [&'a str]> for Words<'a> {
     }
 }
 
-impl<'a> From<&'a [String]> for Words<'a> {
-    fn from(value: &'a [String]) -> Self {
+impl<'a> From<&'a [Box<str>]> for Words<'a> {
+    fn from(value: &'a [Box<str>]) -> Self {
         Words::Owned(value)
     }
 }
@@ -502,7 +502,7 @@ mod tests {
 
     #[test]
     fn enumerate_passphrase() -> Result<()> {
-        let words: Vec<_> = (0..7776).map(|i| format!("({i})")).collect();
+        let words: Vec<_> = (0..7776).map(|i| format!("({i})").into_boxed_str()).collect();
         let wl = Words::from(&words[..]);
         let expr = Expr::parse("[:word:](-[:word:]){4}")?;
         let sz = U256::from_str_radix("28430288029929701376", 10)?;

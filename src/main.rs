@@ -206,13 +206,13 @@ fn main() -> Result<()> {
     let words = args
         .words
         .as_ref()
-        .map(|s| -> Result<Vec<String>> {
+        .map(|s| -> Result<Vec<Box<str>>> {
             let path = PathBuf::from(s).into_boxed_path();
             let file = File::open(path).context("open failed")?;
             let reader = BufReader::new(file);
             let mut words = Vec::new();
             for line in reader.lines() {
-                words.push(String::from(line?.trim()));
+                words.push(String::from(line?.trim()).into_boxed_str());
             }
             Ok(words)
         })
