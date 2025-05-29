@@ -9,6 +9,25 @@ a random number bounded by the size of your password schema’s universe.
 This lets you not need to use a password manager, only need to memorize a single
 password, and yet use unique passwords for all of your sites.
 
+## Installation
+
+For now just use cargo:
+
+```sh
+cargo install onepass
+```
+
+Or build from source:
+
+```sh
+cargo build --release && install target/release/onepass ~/bin/onepass
+```
+
+A default config is generated at `${XDG_CONFIG_DIR:-$HOME/.config}/onepass/config.yaml`
+on the first run of the program. You can also see my current config here:
+
+<https://github.com/mrdomino/dotconfig/blob/main/onepass/config.yaml>
+
 ## Approach
 
 We derive a key from your master password using argon2d, salted by your URL and
