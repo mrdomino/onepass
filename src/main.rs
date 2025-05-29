@@ -2,10 +2,11 @@ mod randexp;
 
 use std::{
     collections::HashMap,
-    fs,
+    env::{self},
+    fs::{self, File},
     hash::Hash,
-    io::{IsTerminal, Write, stdout},
-    path::Path,
+    io::{BufRead, BufReader, IsTerminal, Write, stdout},
+    path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result};
@@ -121,8 +122,11 @@ impl Config {
 struct Args {
     site: String,
 
-    #[arg(short, long, default_value = "~/.config/passgen/config.yaml")]
-    config: String,
+    #[arg(short, long)]
+    config: Option<String>,
+
+    #[arg(short, long, env = "PASSGEN_WORDS_FILE")]
+    words_file: Option<String>,
 
     #[arg(short, long)]
     verbose: bool,
@@ -157,18 +161,61 @@ impl RngCore for Blake3Rng {
     }
 }
 
+fn default_config_path() -> Result<Box<Path>> {
+    let mut config_dir = match env::var("XDG_CONFIG_DIR") {
+        Err(env::VarError::NotPresent) => {
+            env::var("HOME").map(|home| PathBuf::from(home).join(".config"))
+        }
+        r => r.map(|config| config.into()),
+    }
+    .context("failed finding config dir")?;
+    config_dir.push("onepass");
+    config_dir.push("config.yaml");
+    Ok(config_dir.into_boxed_path())
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
-    let config_file = shellexpand::tilde(&args.config);
-    let config = Config::from_file(Path::new(config_file.as_ref())).unwrap_or_default();
-    let site = config.sites.iter().find(|site| site.name == args.site);
-    let schema = site
-        .map(|site| &site.schema)
-        .unwrap_or(&config.default_schema);
-    let increment = site.map(|site| site.increment).unwrap_or(0);
+
+    let config_path = args
+        .config
+        .as_ref()
+        .map(|s| -> Result<Box<Path>> { Ok(PathBuf::from(s).into()) })
+        .unwrap_or_else(default_config_path)?;
+    let config = Config::from_file(&config_path).unwrap_or_default();
+
+    let words = args
+        .words_file
+        .as_ref()
+        .map(|s| -> Result<Vec<String>> {
+            let path = PathBuf::from(s).into_boxed_path();
+            let file = File::open(path).context("open failed")?;
+            let reader = BufReader::new(file);
+            let mut words = Vec::new();
+            for line in reader.lines() {
+                words.push(String::from(line?.trim()));
+            }
+            Ok(words)
+        })
+        .transpose()
+        .context("failed reading word list")?;
+
+    if let Some(words) = &words {
+        lookup_site(&config, &args, words)
+    } else {
+        lookup_site(&config, &args, EFF_WORDLIST)
+    }
+}
+
+fn lookup_site<T: AsRef<str>>(config: &Config, args: &Args, words: &[T]) -> Result<()> {
+    let site = config.sites.iter().find(|&site| site.name == args.site);
+    let (schema, increment) = site
+        .map(|site| (&site.schema, &site.increment))
+        .unwrap_or((&config.default_schema, &0));
     let expr = Expr::parse(schema).context("invalid schema")?;
-    let wl = WordList(EFF_WORDLIST);
+    let wl = WordList(words);
     let sz = wl.size(&expr);
+
     if args.verbose {
         eprintln!(
             "schema has about {0} bits of entropy ({1} possible passwords)",
@@ -176,6 +223,7 @@ fn main() -> Result<()> {
             &sz.to_string().trim_start_matches('0')
         );
     }
+
     let password: Zeroizing<String> = prompt_password("Master password: ")
         .context("failed reading password")?
         .into();
@@ -189,6 +237,7 @@ fn main() -> Result<()> {
     argon2
         .hash_password_into(password.as_bytes(), salt.as_bytes(), &mut *key_material)
         .map_err(|e| anyhow::anyhow!("argon2 failed: {e}"))?;
+
     let mut hasher = Zeroizing::new(blake3::Hasher::new());
     hasher.update(&*key_material);
     let mut rng = Blake3Rng(hasher.finalize_xof());
