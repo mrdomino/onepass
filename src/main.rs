@@ -17,7 +17,7 @@ mod randexp;
 use std::{
     collections::HashMap,
     env::{self},
-    fs::{self},
+    fs::{create_dir_all, read_to_string, write},
     io::{IsTerminal, Write, stdout},
     path::{Path, PathBuf},
 };
@@ -99,11 +99,11 @@ impl Config {
     // TODO: toml, figure out how to not emit 0 increments
     pub fn from_file(path: &Path) -> Result<Self> {
         let mut config = if path.exists() {
-            serde_yaml::from_str(&fs::read_to_string(path)?)?
+            serde_yaml::from_str(&read_to_string(path)?)?
         } else {
-            fs::create_dir_all(path.parent().context("invalid file path")?)?;
+            create_dir_all(path.parent().context("invalid file path")?)?;
             let default_config = Config::default();
-            fs::write(path, serde_yaml::to_string(&default_config)?)?;
+            write(path, serde_yaml::to_string(&default_config)?)?;
             default_config
         };
         if let Some(schema) = config.aliases.get(&config.default_schema) {
@@ -206,7 +206,7 @@ fn main() -> Result<()> {
     let words = args
         .words
         .as_ref()
-        .map(fs::read_to_string)
+        .map(|p| read_to_string(p).map(|s| s.into_boxed_str()))
         .transpose()
         .context("failed reading words file")?;
     let words = words
