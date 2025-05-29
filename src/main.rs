@@ -59,6 +59,7 @@ impl Default for Config {
         );
         aliases.insert("mobile".to_string(), "[a-z0-9]{16}".to_string());
         aliases.insert("phrase".to_string(), "[:word:](-[:word:]){4}".to_string());
+        aliases.insert("pin".to_string(), "[0-9]{8}".to_string());
         let sites = vec![
             Site {
                 name: "apple.com".to_string(),
@@ -68,6 +69,11 @@ impl Default for Config {
             Site {
                 name: "google.com".to_string(),
                 schema: "strong".to_string(),
+                increment: 0,
+            },
+            Site {
+                name: "iphone.local".to_string(),
+                schema: "pin".to_string(),
                 increment: 0,
             },
         ];
