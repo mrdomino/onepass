@@ -133,21 +133,21 @@ struct Args {
     site: String,
 
     /// Override the path of the config file (default: ~/.config/onepass/config.yaml)
-    #[arg(short, long, env = "PASSGEN_CONFIG_FILE")]
+    #[arg(short, long, env = "PASSGEN_CONFIG_FILE", value_name = "CONFIG_FILE")]
     config: Option<String>,
 
     /// Read words from the specified newline-separated dictionary file (by default, uses words
     /// from the EFF large word list)
-    #[arg(short, long, env = "PASSGEN_WORDS_FILE")]
+    #[arg(short, long, env = "PASSGEN_WORDS_FILE", value_name = "WORDS_FILE")]
     words: Option<String>,
-
-    /// Print verbose password entropy output
-    #[arg(short, long)]
-    verbose: bool,
 
     /// Override schema to use for this site (may be a configured alias)
     #[arg(short, long)]
     schema: Option<String>,
+
+    /// Print verbose password entropy output
+    #[arg(short, long)]
+    verbose: bool,
 }
 
 include!(concat!(env!("OUT_DIR"), "/wordlist.rs"));
