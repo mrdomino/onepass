@@ -29,7 +29,7 @@ use clap::Parser;
 use crypto_bigint::{NonZero, RandomMod, U256};
 use rand_core::RngCore;
 use randexp::{
-    Expr, WordList,
+    Expr, Words,
     quantifiable::{Enumerable, Quantifiable},
 };
 use rpassword::prompt_password;
@@ -219,14 +219,11 @@ fn main() -> Result<()> {
         .transpose()
         .context("failed reading word list")?;
 
-    if let Some(words) = &words {
-        lookup_site(&config, &args, words)
-    } else {
-        lookup_site(&config, &args, EFF_WORDLIST)
-    }
-}
+    let wl = words
+        .as_ref()
+        .map(|words| Words::from(&words[..]))
+        .unwrap_or_else(|| Words::from(EFF_WORDLIST));
 
-fn lookup_site<T: AsRef<str>>(config: &Config, args: &Args, words: &[T]) -> Result<()> {
     let site = config.sites.iter().find(|&site| site.name == args.site);
     let schema = args
         .schema
@@ -238,7 +235,6 @@ fn lookup_site<T: AsRef<str>>(config: &Config, args: &Args, words: &[T]) -> Resu
         });
     let increment = site.map(|site| site.increment).unwrap_or(0);
     let expr = Expr::parse(schema).context("invalid schema")?;
-    let wl = WordList(words);
     let sz = wl.size(&expr);
 
     if args.verbose {

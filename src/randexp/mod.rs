@@ -273,21 +273,52 @@ impl Quantifiable<Expr> for WordCount {
     }
 }
 
-pub(crate) struct WordList<'a, T: AsRef<str>>(pub &'a [T]);
+pub(crate) enum Words<'a> {
+    Direct(&'a [&'a str]),
+    Owned(&'a [String]),
+}
 
-impl<T: AsRef<str>> Quantifiable<Expr> for WordList<'_, T> {
-    fn size(&self, node: &Expr) -> U256 {
-        WordCount(self.0.len()).size(node)
+impl<'a> Words<'a> {
+    fn len(&self) -> usize {
+        match self {
+            Words::Direct(a) => a.len(),
+            Words::Owned(a) => a.len(),
+        }
+    }
+
+    fn at(&self, i: usize) -> &str {
+        match self {
+            Words::Direct(a) => a[i],
+            Words::Owned(a) => &a[i],
+        }
     }
 }
 
-impl<T: AsRef<str>> Enumerable<Expr> for WordList<'_, T> {
+impl<'a> From<&'a [&'a str]> for Words<'a> {
+    fn from(value: &'a [&'a str]) -> Self {
+        Words::Direct(value)
+    }
+}
+
+impl<'a> From<&'a [String]> for Words<'a> {
+    fn from(value: &'a [String]) -> Self {
+        Words::Owned(value)
+    }
+}
+
+impl<'a> Quantifiable<Expr> for Words<'a> {
+    fn size(&self, node: &Expr) -> U256 {
+        WordCount(self.len()).size(node)
+    }
+}
+
+impl<'a> Enumerable<Expr> for Words<'a> {
     fn gen_at(&self, expr: &Expr, index: U256) -> Result<Zeroizing<String>> {
         let mut index = Zeroizing::new(index);
         let res = match expr {
-            Expr::Word => String::from(self.0[u256_to_usize(&index)].as_ref()),
+            Expr::Word => String::from(self.at(u256_to_usize(&index))),
             Expr::WOrd => {
-                let mut chars = self.0[u256_to_usize(&index)].as_ref().chars();
+                let mut chars = self.at(u256_to_usize(&index)).chars();
                 let first = chars.next().context("empty word")?.to_uppercase();
                 first.chain(chars).collect()
             }
@@ -454,8 +485,8 @@ mod tests {
         let expr = Expr::parse("[123][:word:]")?;
         let sz = WordCount(2).size(&expr);
         assert_eq!(U256::from(6u32), sz);
-        let words = vec!["a", "b"];
-        let wl = WordList(&words);
+        let words = ["a", "b"];
+        let wl = Words::from(&words[..]);
         let strs: Vec<_> = (0u32..6)
             .map(|i| wl.gen_at(&expr, i.into()).unwrap())
             .collect();
@@ -472,7 +503,7 @@ mod tests {
     #[test]
     fn enumerate_passphrase() -> Result<()> {
         let words: Vec<_> = (0..7776).map(|i| format!("({i})")).collect();
-        let wl = WordList(&words);
+        let wl = Words::from(&words[..]);
         let expr = Expr::parse("[:word:](-[:word:]){4}")?;
         let sz = U256::from_str_radix("28430288029929701376", 10)?;
         assert_eq!(sz, wl.size(&expr));
@@ -486,8 +517,8 @@ mod tests {
 
     #[test]
     fn enumerate_uppercase() -> Result<()> {
-        let words = vec!["bob", "dole"];
-        let wl = WordList(&words);
+        let words = ["bob", "dole"];
+        let wl = Words::from(&words[..]);
         let expr = Expr::parse("[:Word:]")?;
         assert_eq!("Bob", *wl.gen_at(&expr, U256::ZERO)?);
         Ok(())
