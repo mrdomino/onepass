@@ -28,6 +28,17 @@ on the first run of the program. You can also see my current config here:
 
 <https://github.com/mrdomino/dotconfig/blob/main/onepass/config.yaml>
 
+## Acknowledgements
+
+I was introduced to the idea of using deterministic passwords via [passacre][0],
+which I used for many years until switching to [lesspass][1] due to increasing
+infeasibility of installing passacre on newer versions of macOS.
+
+The idea to use regex-like password schemas came from [xfbs/passgen][2].
+
+Recommendations on crypto primitives (BLAKE2 and Argon2 in particular) were due
+to Justine Tunney.
+
 ## Approach
 
 We derive a key from your master password using argon2d, salted by your URL and
@@ -82,7 +93,7 @@ you.
 
 This package uses blake3 instead of blake2, even though it also uses argon2,
 which internally uses blake2. It would be simpler and involve fewer moving parts
-cryptographically/mathematically if it could use [BLAKE2X][0], but I haven’t
+cryptographically/mathematically if it could use [BLAKE2X][3], but I haven’t
 found that in a crate yet and I haven’t wanted to hand-roll an implementation
 of it. The reason I chose blake3 for this was solely that it already had an
 off-the-shelf XOF in the crate.
@@ -91,4 +102,7 @@ I have not yet carefully vetted the way that `RngCore` and `crypto-bigint`
 construct random numbers, and do not yet know if their choices around things
 like endianness are agreeable to me.
 
-[0]: https://www.blake2.net/blake2x.pdf
+[0]: https://github.com/habnabit/passacre
+[1]: https://lesspass.com
+[2]: https://github.com/xfbs/passgen
+[3]: https://www.blake2.net/blake2x.pdf
