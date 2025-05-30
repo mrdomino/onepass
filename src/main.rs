@@ -214,7 +214,7 @@ fn main() -> Result<()> {
         .config_path
         .as_ref()
         .map_or_else(default_config_path, |s| Ok(PathBuf::from(s).into()))?;
-    let config = Config::from_file(&config_path).unwrap_or_default();
+    let config = Config::from_file(&config_path).context("failed to read config")?;
 
     let words = args
         .words_path
