@@ -134,13 +134,23 @@ struct Args {
     site: String,
 
     /// Override the path of the config file (default: ~/.config/onepass/config.yaml)
-    #[arg(short, long, env = "PASSGEN_CONFIG_FILE", value_name = "CONFIG_FILE")]
-    config: Option<String>,
+    #[arg(
+        short,
+        long = "config",
+        env = "ONEPASS_CONFIG_FILE",
+        value_name = "CONFIG_FILE"
+    )]
+    config_path: Option<String>,
 
     /// Read words from the specified newline-separated dictionary file (by default, uses words
     /// from the EFF large word list)
-    #[arg(short, long, env = "PASSGEN_WORDS_FILE", value_name = "WORDS_FILE")]
-    words: Option<String>,
+    #[arg(
+        short,
+        long = "words",
+        env = "ONEPASS_WORDS_FILE",
+        value_name = "WORDS_FILE"
+    )]
+    words_path: Option<String>,
 
     /// Override schema to use for this site (may be a configured alias)
     #[arg(short, long)]
@@ -197,16 +207,16 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     let config_path = args
-        .config
+        .config_path
         .as_ref()
         .map(|s| -> Result<Box<Path>> { Ok(PathBuf::from(s).into()) })
         .unwrap_or_else(default_config_path)?;
     let config = Config::from_file(&config_path).unwrap_or_default();
 
     let words = args
-        .words
+        .words_path
         .as_ref()
-        .map(|p| read_to_string(p).map(|s| s.into_boxed_str()))
+        .map(|path| read_to_string(path).map(|s| s.into_boxed_str()))
         .transpose()
         .context("failed reading words file")?;
     let words = words
