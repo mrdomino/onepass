@@ -209,8 +209,7 @@ fn main() -> Result<()> {
     let config_path = args
         .config_path
         .as_ref()
-        .map(|s| -> Result<Box<Path>> { Ok(PathBuf::from(s).into()) })
-        .unwrap_or_else(default_config_path)?;
+        .map_or_else(default_config_path, |s| Ok(PathBuf::from(s).into()))?;
     let config = Config::from_file(&config_path).unwrap_or_default();
 
     let words = args
@@ -222,11 +221,7 @@ fn main() -> Result<()> {
     let words = words
         .as_ref()
         .map(|words| words.lines().map(|line| line.trim()).collect::<Box<[_]>>());
-    let words: Words = words
-        .as_ref()
-        .map(|words| words.as_ref())
-        .unwrap_or(EFF_WORDLIST)
-        .into();
+    let words: Words = words.as_ref().map_or(EFF_WORDLIST, |words| words).into();
 
     let site = config.sites.iter().find(|&site| site.name == args.site);
     let schema = args
