@@ -40,6 +40,10 @@ fn default_schema() -> String {
     "[A-Za-z0-9]{16}".into()
 }
 
+fn is_zero(value: &u32) -> bool {
+    *value == 0
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 struct Config {
     #[serde(default = "default_schema")]
@@ -53,7 +57,7 @@ struct Config {
 struct Site {
     pub name: String,
     pub schema: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_zero")]
     pub increment: u32,
 }
 
@@ -83,7 +87,7 @@ impl Default for Config {
             Site {
                 name: "iphone.local".to_string(),
                 schema: "pin".to_string(),
-                increment: 0,
+                increment: 1,
             },
         ];
         let default_schema = "login".to_string();
@@ -96,7 +100,7 @@ impl Default for Config {
 }
 
 impl Config {
-    // TODO: toml, figure out how to not emit 0 increments
+    // TODO: toml
     pub fn from_file(path: &Path) -> Result<Self> {
         let mut config = if path.exists() {
             serde_yaml::from_str(&read_to_string(path)?)?
