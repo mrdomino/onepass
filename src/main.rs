@@ -160,6 +160,10 @@ struct Args {
     #[arg(short, long)]
     schema: Option<String>,
 
+    /// Override increment to use for this site
+    #[arg(short, long)]
+    increment: Option<u32>,
+
     /// Print verbose password entropy output
     #[arg(short, long)]
     verbose: bool,
@@ -212,13 +216,11 @@ fn main() -> Result<()> {
 
     let config_path = args
         .config_path
-        .as_ref()
         .map_or_else(default_config_path, |s| Ok(PathBuf::from(s).into()))?;
     let config = Config::from_file(&config_path).context("failed to read config")?;
 
     let words = args
         .words_path
-        .as_ref()
         .map(|path| read_to_string(path).map(|s| s.into_boxed_str()))
         .transpose()
         .context("failed reading words file")?;
@@ -228,15 +230,13 @@ fn main() -> Result<()> {
     let words: Words = words.as_ref().map_or(EFF_WORDLIST, |words| words).into();
 
     let site = config.sites.iter().find(|&site| site.name == args.site);
-    let schema = args
-        .schema
-        .as_ref()
-        .map(|schema| config.aliases.get(schema).unwrap_or(schema))
-        .unwrap_or_else(|| {
-            site.map(|site| &site.schema)
-                .unwrap_or(&config.default_schema)
-        });
-    let increment = site.map(|site| site.increment).unwrap_or(0);
+    let schema = args.schema.as_ref().map_or_else(
+        || site.map_or(&config.default_schema, |site| &site.schema),
+        |schema| config.aliases.get(schema).unwrap_or(schema),
+    );
+    let increment = args
+        .increment
+        .unwrap_or_else(|| site.map_or(0, |site| site.increment));
     let expr = Expr::parse(schema).context("invalid schema")?;
     let size = words.size(&expr);
 
