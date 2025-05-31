@@ -136,7 +136,7 @@ struct Args {
 
     /// Override the path of the config file (default: ~/.config/onepass/config.yaml)
     #[arg(
-        short,
+        short = 'f',
         long = "config",
         env = "ONEPASS_CONFIG_FILE",
         value_name = "CONFIG_FILE"
@@ -160,6 +160,10 @@ struct Args {
     /// Override increment to use for this site
     #[arg(short, long)]
     increment: Option<u32>,
+
+    /// Confirm master password
+    #[arg(short, long)]
+    confirm: bool,
 
     /// Print verbose password entropy output
     #[arg(short, long)]
@@ -248,6 +252,14 @@ fn main() -> Result<()> {
     let password: Zeroizing<String> = prompt_password("Master password: ")
         .context("failed reading password")?
         .into();
+    if args.confirm {
+        let confirmed: Zeroizing<String> = prompt_password("Confirm: ")
+            .context("failed reading confirmation")?
+            .into();
+        if *confirmed != *password {
+            anyhow::bail!("Passwords don’t match");
+        }
+    }
     let salt = format!("{0}:{1}", increment, &args.site);
     let mut key_material = Zeroizing::new([0u8; 32]);
     let argon2 = Argon2::new(
