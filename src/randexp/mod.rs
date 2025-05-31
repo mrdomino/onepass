@@ -60,14 +60,6 @@ pub(crate) struct CharClass {
     ranges: Vec<CharRange>,
 }
 
-pub(crate) trait Quantifiable<Node> {
-    fn size(&self, node: &Node) -> U256;
-}
-
-pub(crate) trait Enumerable<Node>: Quantifiable<Node> {
-    fn gen_at(&self, node: &Node, index: U256) -> Result<Zeroizing<String>>;
-}
-
 impl CharRange {
     fn try_merge(&self, other: &CharRange) -> Option<CharRange> {
         let self_start = self.start as u32;
@@ -249,6 +241,14 @@ impl Expr {
     }
 }
 
+pub(crate) trait Quantifiable<Node> {
+    fn size(&self, node: &Node) -> U256;
+}
+
+pub(crate) trait Enumerable<Node>: Quantifiable<Node> {
+    fn gen_at(&self, node: &Node, index: U256) -> Result<Zeroizing<String>>;
+}
+
 pub(crate) struct WordCount(pub usize);
 
 impl Quantifiable<Expr> for WordCount {
@@ -279,12 +279,6 @@ impl Quantifiable<Expr> for WordCount {
 }
 
 pub(crate) struct Words<'a>(pub &'a [&'a str]);
-
-impl<'a> From<&'a [&'a str]> for Words<'a> {
-    fn from(value: &'a [&'a str]) -> Self {
-        Words(value)
-    }
-}
 
 impl Quantifiable<Expr> for Words<'_> {
     fn size(&self, node: &Expr) -> U256 {
@@ -362,6 +356,12 @@ impl Enumerable<Expr> for Words<'_> {
             }
         };
         Ok(Zeroizing::new(res))
+    }
+}
+
+impl<'a> From<&'a [&'a str]> for Words<'a> {
+    fn from(value: &'a [&'a str]) -> Self {
+        Words(value)
     }
 }
 
