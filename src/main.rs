@@ -219,15 +219,15 @@ fn main() -> Result<()> {
         .map_or_else(default_config_path, |s| Ok(PathBuf::from(s).into()))?;
     let config = Config::from_file(&config_path).context("failed to read config")?;
 
-    let words = args
+    let words_string = args
         .words_path
         .map(|path| read_to_string(path).map(|s| s.into_boxed_str()))
         .transpose()
         .context("failed reading words file")?;
-    let words = words
+    let words_list = words_string
         .as_ref()
         .map(|words| words.lines().map(|line| line.trim()).collect::<Box<[_]>>());
-    let words: Words = words.as_ref().map_or(EFF_WORDLIST, |words| words).into();
+    let words = Words::from(words_list.as_ref().map_or(EFF_WORDLIST, |x| x));
 
     let site = config.sites.iter().find(|&site| site.name == args.site);
     let schema = args.schema.as_ref().map_or_else(
