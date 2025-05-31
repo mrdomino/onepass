@@ -158,7 +158,7 @@ struct Args {
     schema: Option<String>,
 
     /// Override increment to use for this site
-    #[arg(short, long)]
+    #[arg(short, long, value_name = "NUM")]
     increment: Option<u32>,
 
     /// Confirm master password
