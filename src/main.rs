@@ -28,10 +28,7 @@ use blake3::OutputReader;
 use clap::Parser;
 use crypto_bigint::{NonZero, RandomMod, U256};
 use rand_core::RngCore;
-use randexp::{
-    Expr, Words,
-    quantifiable::{Enumerable, Quantifiable},
-};
+use randexp::{Enumerable, Expr, Quantifiable, Words};
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;

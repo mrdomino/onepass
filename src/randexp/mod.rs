@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub(crate) mod quantifiable;
-
 use std::cmp;
 
 use anyhow::{Context, Result};
@@ -30,7 +28,6 @@ use nom::{
     multi::many1,
     sequence::{delimited, preceded, separated_pair},
 };
-use quantifiable::{Enumerable, Quantifiable};
 use zeroize::Zeroizing;
 
 /// Expr represents a subset of regular expressions that allows for literal strings, character
@@ -61,6 +58,14 @@ pub(crate) struct CharRange {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct CharClass {
     ranges: Vec<CharRange>,
+}
+
+pub(crate) trait Quantifiable<Node> {
+    fn size(&self, node: &Node) -> U256;
+}
+
+pub(crate) trait Enumerable<Node>: Quantifiable<Node> {
+    fn gen_at(&self, node: &Node, index: U256) -> Result<Zeroizing<String>>;
 }
 
 impl CharRange {
