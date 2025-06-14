@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod config;
 mod randexp;
+mod url;
 
 use std::{
-    collections::HashMap,
     env::{self},
-    fs::{create_dir_all, read_to_string, write},
+    fs::read_to_string,
     io::{IsTerminal, Write, stdout},
     path::{Path, PathBuf},
 };
@@ -26,107 +27,13 @@ use anyhow::{Context, Result};
 use argon2::Argon2;
 use blake3::OutputReader;
 use clap::Parser;
+use config::Config;
 use crypto_bigint::{NonZero, RandomMod, U256};
 use rand_core::RngCore;
 use randexp::{Enumerable, Expr, Quantifiable, Words};
 use rpassword::prompt_password;
-use serde::{Deserialize, Serialize};
+use url::canonicalize;
 use zeroize::Zeroizing;
-
-fn default_schema() -> String {
-    "[A-Za-z0-9]{16}".into()
-}
-
-fn is_zero(value: &u32) -> bool {
-    *value == 0
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct Config {
-    #[serde(default = "default_schema")]
-    pub default_schema: String,
-    #[serde(default)]
-    pub aliases: HashMap<String, String>,
-    pub sites: Vec<Site>,
-}
-
-#[derive(Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct Site {
-    pub name: String,
-    pub schema: String,
-    #[serde(default, skip_serializing_if = "is_zero")]
-    pub increment: u32,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        let mut aliases = HashMap::new();
-        aliases.insert("alnum".to_string(), "[A-Za-z0-9]{18}".to_string());
-        aliases.insert(
-            "apple".to_string(),
-            "[:Word:](-[:word:]){3}[0-9!-/]".to_string(),
-        );
-        aliases.insert("login".to_string(), "[!-~]{12}".to_string());
-        aliases.insert("mobile".to_string(), "[a-z0-9]{24}".to_string());
-        aliases.insert("phrase".to_string(), "[:word:](-[:word:]){4}".to_string());
-        aliases.insert("pin".to_string(), "[0-9]{8}".to_string());
-        let sites = vec![
-            Site {
-                name: "apple.com".to_string(),
-                schema: "apple".to_string(),
-                increment: 0,
-            },
-            Site {
-                name: "google.com".to_string(),
-                schema: "mobile".to_string(),
-                increment: 0,
-            },
-            Site {
-                name: "iphone.local".to_string(),
-                schema: "pin".to_string(),
-                increment: 1,
-            },
-        ];
-        let default_schema = "login".to_string();
-        Config {
-            default_schema,
-            aliases,
-            sites,
-        }
-    }
-}
-
-impl Config {
-    // TODO: toml
-    pub fn from_file(path: &Path) -> Result<Self> {
-        let mut config = if path.exists() {
-            serde_yaml::from_str(&read_to_string(path)?)?
-        } else {
-            create_dir_all(path.parent().context("invalid file path")?)?;
-            let default_config = Config::default();
-            write(path, serde_yaml::to_string(&default_config)?)?;
-            default_config
-        };
-        if let Some(schema) = config.aliases.get(&config.default_schema) {
-            config.default_schema = schema.clone();
-        }
-        config.sites = config
-            .sites
-            .into_iter()
-            .map(|site| {
-                if let Some(schema) = config.aliases.get(&site.schema) {
-                    Site {
-                        schema: schema.clone(),
-                        ..site
-                    }
-                } else {
-                    site
-                }
-            })
-            .collect();
-        Ok(config)
-    }
-}
 
 #[derive(Debug, Parser)]
 #[command(version, about)]
@@ -141,7 +48,7 @@ struct Args {
         env = "ONEPASS_CONFIG_FILE",
         value_name = "CONFIG_FILE"
     )]
-    config_path: Option<String>,
+    config_path: Option<Box<Path>>,
 
     /// Read words from the specified newline-separated dictionary file (by default, uses words
     /// from the EFF large word list)
@@ -151,7 +58,7 @@ struct Args {
         env = "ONEPASS_WORDS_FILE",
         value_name = "WORDS_FILE"
     )]
-    words_path: Option<String>,
+    words_path: Option<Box<Path>>,
 
     /// Override schema to use for this site (may be a configured alias)
     #[arg(short, long)]
@@ -215,9 +122,7 @@ fn default_config_path() -> Result<Box<Path>> {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let config_path = args
-        .config_path
-        .map_or_else(default_config_path, |s| Ok(PathBuf::from(s).into()))?;
+    let config_path = args.config_path.map_or_else(default_config_path, Ok)?;
     let config = Config::from_file(&config_path).context("failed to read config")?;
 
     let words_string = args
@@ -230,16 +135,28 @@ fn main() -> Result<()> {
         .map(|words| words.lines().map(|line| line.trim()).collect::<Box<[_]>>());
     let words = Words::from(words_list.as_ref().map_or(EFF_WORDLIST, |x| x));
 
-    let site = config.sites.iter().find(|&site| site.name == args.site);
+    let site = config.find_site(&args.site)?;
+    let url = site
+        .as_ref()
+        .map_or_else(
+            || -> Result<String> { canonicalize(&args.site, None) },
+            |(url, _)| Ok(url.clone()),
+        )
+        .context("invalid url")?;
     let schema = args.schema.as_ref().map_or_else(
-        || site.map_or(&config.default_schema, |site| &site.schema),
+        || {
+            site.as_ref()
+                .map_or(&config.default_schema, |(_, site)| &site.schema)
+        },
         |schema| config.aliases.get(schema).unwrap_or(schema),
     );
     let increment = args
         .increment
-        .unwrap_or_else(|| site.map_or(0, |site| site.increment));
+        .unwrap_or_else(|| site.map_or(0, |(_, site)| site.increment));
     let expr = Expr::parse(schema).context("invalid schema")?;
     let size = words.size(&expr);
+
+    let salt = format!("{0},{1}", increment, &url);
 
     if args.verbose {
         eprintln!(
@@ -247,6 +164,7 @@ fn main() -> Result<()> {
             &size.bits(),
             &size.to_string().trim_start_matches('0')
         );
+        eprintln!("salt: {salt:?}");
     }
 
     let password: Zeroizing<String> = prompt_password("Master password: ")
@@ -260,7 +178,6 @@ fn main() -> Result<()> {
             anyhow::bail!("Passwords don’t match");
         }
     }
-    let salt = format!("{0}:{1}", increment, &args.site);
     let mut key_material = Zeroizing::new([0u8; 32]);
     let argon2 = Argon2::new(
         argon2::Algorithm::Argon2d,
