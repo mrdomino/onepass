@@ -112,6 +112,7 @@ fn main() -> Result<()> {
 
     let words_string = args
         .words_path
+        .or_else(|| config.words_path())
         .map(|path| read_to_string(path).map(|s| s.into_boxed_str()))
         .transpose()
         .context("failed reading words file")?;

@@ -25,6 +25,7 @@ use serde::{Deserialize, Serialize};
 use crate::url::canonicalize;
 
 pub(crate) struct Config {
+    pub words_path: Option<Box<Path>>,
     pub default_schema: String,
     pub aliases: HashMap<String, String>,
     pub sites: HashMap<String, SiteConfig>,
@@ -67,7 +68,18 @@ impl Config {
         Ok(Some((url, site)))
     }
 
+    pub fn words_path(&self) -> Option<Box<Path>> {
+        let path = self.words_path.as_deref()?;
+        if path.is_relative() {
+            let config_path = self.config_path.as_deref()?.parent()?;
+            Some(config_path.join(path).into())
+        } else {
+            Some(path.into())
+        }
+    }
+
     fn from_ser_config(config: SerConfig) -> Self {
+        let words_path = config.words_path;
         let default_schema = config.default_schema;
         let aliases = config.aliases;
         let sites = config
@@ -85,6 +97,7 @@ impl Config {
             })
             .collect();
         Config {
+            words_path,
             default_schema,
             aliases,
             sites,
@@ -109,6 +122,8 @@ impl Config {
 
 #[derive(Debug, Deserialize)]
 struct SerConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub words_path: Option<Box<Path>>,
     #[serde(default = "default_schema")]
     pub default_schema: String,
     #[serde(default)]
@@ -149,6 +164,7 @@ impl SerConfig {
         .collect();
         let default_schema = "login".to_string();
         SerConfig {
+            words_path: None,
             default_schema,
             aliases,
             sites,
