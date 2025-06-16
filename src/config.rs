@@ -14,8 +14,9 @@
 
 use std::{
     collections::HashMap,
+    env,
     fs::{create_dir_all, read_to_string, write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result};
@@ -27,6 +28,8 @@ pub(crate) struct Config {
     pub default_schema: String,
     pub aliases: HashMap<String, String>,
     pub sites: HashMap<String, SiteConfig>,
+
+    config_path: Option<Box<Path>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -39,12 +42,15 @@ pub(crate) struct SiteConfig {
 }
 
 impl Config {
-    pub fn from_file(p: &Path) -> Result<Self> {
-        if !p.exists() {
-            create_dir_all(p.parent().context("invalid config path")?)?;
-            write(p, serde_yaml::to_string(&SerConfig::example())?)?;
+    pub fn from_file(path: Option<&Path>) -> Result<Self> {
+        let path = path.map_or_else(Self::default_path, |p| Ok(p.into()))?;
+        if !path.exists() {
+            create_dir_all(path.parent().context("invalid config path")?)?;
+            write(&path, serde_yaml::to_string(&SerConfig::example())?)?;
         }
-        Self::from_str(&read_to_string(p)?)
+        let mut config = Self::from_str(&read_to_string(&path)?)?;
+        config.config_path = Some(path);
+        Ok(config)
     }
 
     pub fn from_str(s: &str) -> Result<Self> {
@@ -82,7 +88,22 @@ impl Config {
             default_schema,
             aliases,
             sites,
+
+            config_path: None,
         }
+    }
+
+    fn default_path() -> Result<Box<Path>> {
+        let mut config_dir = match env::var("XDG_CONFIG_DIR") {
+            Err(env::VarError::NotPresent) => {
+                env::var("HOME").map(|home| PathBuf::from(home).join(".config"))
+            }
+            r => r.map(|config| config.into()),
+        }
+        .context("failed finding config dir")?;
+        config_dir.push("onepass");
+        config_dir.push("config.yaml");
+        Ok(config_dir.into_boxed_path())
     }
 }
 

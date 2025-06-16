@@ -17,10 +17,9 @@ mod randexp;
 mod url;
 
 use std::{
-    env::{self},
     fs::read_to_string,
     io::{IsTerminal, Write, stdout},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use anyhow::{Context, Result};
@@ -106,24 +105,10 @@ impl RngCore for Blake3Rng {
     }
 }
 
-fn default_config_path() -> Result<Box<Path>> {
-    let mut config_dir = match env::var("XDG_CONFIG_DIR") {
-        Err(env::VarError::NotPresent) => {
-            env::var("HOME").map(|home| PathBuf::from(home).join(".config"))
-        }
-        r => r.map(|config| config.into()),
-    }
-    .context("failed finding config dir")?;
-    config_dir.push("onepass");
-    config_dir.push("config.yaml");
-    Ok(config_dir.into_boxed_path())
-}
-
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let config_path = args.config_path.map_or_else(default_config_path, Ok)?;
-    let config = Config::from_file(&config_path).context("failed to read config")?;
+    let config = Config::from_file(args.config_path.as_deref()).context("failed to read config")?;
 
     let words_string = args
         .words_path
