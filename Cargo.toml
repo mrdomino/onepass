@@ -16,6 +16,7 @@ blake3 = { version = "1.8.2", features = ["zeroize"] }
 char-iter = "0.1.0"
 clap = { version = "4.5.39", features = ["derive", "env", "unicode", "wrap_help"] }
 crypto-bigint = { version = "0.6.1", features = ["rand_core", "zeroize"] }
+home-dir = "0.1.0"
 nom = "8.0.0"
 rand_core = "0.6.4"
 rpassword = "7.4.0"

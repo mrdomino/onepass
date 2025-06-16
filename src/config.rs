@@ -20,6 +20,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use home_dir::HomeDirExt;
 use serde::{Deserialize, Serialize};
 
 use crate::url::canonicalize;
@@ -70,6 +71,7 @@ impl Config {
 
     pub fn words_path(&self) -> Option<Box<Path>> {
         let path = self.words_path.as_deref()?;
+        let path = path.expand_home().ok()?;
         if path.is_relative() {
             let config_path = self.config_path.as_deref()?.parent()?;
             Some(config_path.join(path).into())
