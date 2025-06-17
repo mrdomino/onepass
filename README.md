@@ -62,11 +62,11 @@ expression–like language; specifically, we support character classes, counts,
 groups, and — as an extension to common regular expression syntax — words from a
 word list. So:
 
-- Character classes: `[A-Z]` for capital letters, `[A-Za-z0-9]` for alphanumeric
-  characters.
+- Character classes: e.g. `[A-Z]` for capital letters, `[A-Za-z0-9]` for
+  alphanumeric characters.
 - Counts: `[A-Z]{12}` for 12 uppercase letters.
 - Groups: `([A-Za-z][0-9][A-Za-z]){3}` for 3 sequences of a letter, then a
-  digit, then a letter, e.g. `"a0bc2d"`.
+  digit, then a letter, e.g. `"a0bc2de3f"`.
 - Words: `[:word:]` will be replaced with a pseudorandomly chosen word from a
   configured word list. (`[:Word:]` is the same, but with the first character
   transformed to upper case.)
