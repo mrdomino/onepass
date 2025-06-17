@@ -67,6 +67,10 @@ struct Args {
     #[arg(short, long, value_name = "NUM")]
     increment: Option<u32>,
 
+    /// Override username to use for this site
+    #[arg(short, long)]
+    username: Option<String>,
+
     /// Confirm master password
     #[arg(short, long)]
     confirm: bool,
@@ -122,13 +126,8 @@ fn main() -> Result<()> {
     let words = Words::from(words.as_ref().map_or(EFF_WORDLIST, |x| x));
 
     let site = config.find_site(&args.site)?;
-    let url = site
-        .as_ref()
-        .map_or_else(
-            || -> Result<String> { canonicalize(&args.site, None) },
-            |(url, _)| Ok(url.clone()),
-        )
-        .context("invalid url")?;
+    let url = site.as_ref().map_or(&args.site, |(url, _)| url);
+    let url = canonicalize(url, args.username.as_deref()).context("invalid url")?;
     let schema = args.schema.as_ref().map_or_else(
         || {
             site.as_ref()
