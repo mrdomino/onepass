@@ -123,7 +123,7 @@ fn main() -> Result<()> {
     let words: Option<Box<[&str]>> = words
         .as_ref()
         .map(|words| words.lines().map(|line| line.trim()).collect());
-    let words = Words::from(words.as_ref().map_or(EFF_WORDLIST, |x| x));
+    let words = Words::from(words.as_deref().unwrap_or(EFF_WORDLIST));
 
     let site = config.find_site(&args.site)?;
     let url = site.as_ref().map_or(&args.site, |(url, _)| url);
