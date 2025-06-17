@@ -144,7 +144,7 @@ impl SerConfig {
             ("login", "[!-~]{12}"),
             ("mobile", "[a-z0-9]{24}"),
             ("phrase", "[:word:](-[:word:]){4}"),
-            ("pin", "0-9]{8}"),
+            ("pin", "[0-9]{8}"),
         ]
         .into_iter()
         .map(|(k, v)| (k.into(), v.into()))

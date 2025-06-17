@@ -1,6 +1,6 @@
 default_schema: login
 aliases:
-  pin: 0-9]{8}
+  pin: '[0-9]{8}'
   phrase: '[:word:](-[:word:]){4}'
   alnum: '[A-Za-z0-9]{18}'
   mobile: '[a-z0-9]{24}'
