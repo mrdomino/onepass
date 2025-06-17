@@ -82,8 +82,10 @@ impl Config {
 
     fn from_ser_config(config: SerConfig) -> Self {
         let words_path = config.words_path;
-        let default_schema = config.default_schema;
         let aliases = config.aliases;
+        let default_schema = aliases
+            .get(&config.default_schema)
+            .map_or(config.default_schema, String::clone);
         let sites = config
             .sites
             .into_iter()
