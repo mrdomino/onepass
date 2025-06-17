@@ -85,7 +85,7 @@ impl Config {
         let aliases = config.aliases;
         let default_schema = aliases
             .get(&config.default_schema)
-            .map_or(config.default_schema, String::clone);
+            .map_or(config.default_schema, Clone::clone);
         let sites = config
             .sites
             .into_iter()
