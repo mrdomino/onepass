@@ -127,7 +127,14 @@ fn main() -> Result<()> {
 
     let site = config.find_site(&args.site)?;
     let url = site.as_ref().map_or(&args.site, |(url, _)| url);
-    let url = canonicalize(url, args.username.as_deref()).context("invalid url")?;
+    let url = canonicalize(
+        url,
+        args.username.as_deref().or_else(|| {
+            site.as_ref()
+                .map(|(_, site)| site.username.as_deref())
+                .flatten()
+        }),
+    )?;
     let schema = args.schema.as_ref().map_or_else(
         || {
             site.as_ref()
