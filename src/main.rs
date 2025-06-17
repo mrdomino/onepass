@@ -110,16 +110,16 @@ fn main() -> Result<()> {
 
     let config = Config::from_file(args.config_path.as_deref()).context("failed to read config")?;
 
-    let words_string = args
+    let words: Option<Box<str>> = args
         .words_path
         .or_else(|| config.words_path())
-        .map(|path| read_to_string(path).map(|s| s.into_boxed_str()))
+        .map(|path| read_to_string(path).map(|s| s.into()))
         .transpose()
         .context("failed reading words file")?;
-    let words_list = words_string
+    let words: Option<Box<[&str]>> = words
         .as_ref()
-        .map(|words| words.lines().map(|line| line.trim()).collect::<Box<[_]>>());
-    let words = Words::from(words_list.as_ref().map_or(EFF_WORDLIST, |x| x));
+        .map(|words| words.lines().map(|line| line.trim()).collect());
+    let words = Words::from(words.as_ref().map_or(EFF_WORDLIST, |x| x));
 
     let site = config.find_site(&args.site)?;
     let url = site
