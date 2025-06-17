@@ -1,6 +1,6 @@
 [package]
 name = "onepass"
-version = "0.5.1"
+version = "0.6.0"
 categories = ["command-line-utilities"]
 edition = "2024"
 keywords = ["password", "cryptography", "deterministic"]
@@ -10,6 +10,7 @@ repository = "https://github.com/mrdomino/onepass"
 description = "A mostly-stateless deterministic password manager"
 
 exclude = [
+    ".gitignore",
     "example/**",
 ]
 
