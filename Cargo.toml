@@ -9,6 +9,10 @@ readme = "README.md"
 repository = "https://github.com/mrdomino/onepass"
 description = "A mostly-stateless deterministic password manager"
 
+exclude = [
+    "example/**",
+]
+
 [dependencies]
 anyhow = "1.0.98"
 argon2 = { version = "0.5.3", features = ["zeroize"] }
