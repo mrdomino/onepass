@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yaml
+    with:
+      release: true
+
+  publish:
+    name: Publish to crates.io
+    needs: build
+    runs-on: ubuntu-latest
+    environment: crates-io
+    steps:
+    - uses: actions/checkout@v4
+    - run: cargo publish --no-verify --locked
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  macos-release:
+    name: macOS Release
+    needs: build
+    runs-on: macos-latest
+    environment: macos
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+      with:
+        name: onepass-aarch64-apple-darwin
+    - name: Install Apple certificate
+      env:
+        APPLICATION_CERT_B64: ${{ secrets.APPLICATION_CERT_B64 }}
+        INSTALLER_CERT_B64: ${{ secrets.INSTALLER_CERT_B64 }}
+        P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+        KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      run: |
+        APPLICATION_CERT_PATH=$RUNNER_TEMP/application.p12
+        INSTALLER_CERT_PATH=$RUNNER_TEMP/installer.p12
+        KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+        echo -n "$APPLICATION_CERT_B64" | base64 --decode -o "$APPLICATION_CERT_PATH"
+        echo -n "$INSTALLER_CERT_B64" | base64 --decode -o "$INSTALLER_CERT_PATH"
+
+        security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+        security import "$APPLICATION_CERT_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+        security import "$INSTALLER_CERT_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k"$KEYCHAIN_PATH"
+        security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        security list-keychain -d user -s "$KEYCHAIN_PATH"
+    - name: Make signed binary and installer
+      run: security find-identity -p codesigning -v
