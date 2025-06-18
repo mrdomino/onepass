@@ -10,22 +10,19 @@ on:
         type: boolean
         default: false
 
-env:
-  publish: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.publish }}
-
 jobs:
   build:
     uses: ./.github/workflows/build.yaml
     with:
       release: true
-      publish: ${{ env.publish }}
+      publish: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.publish }}
 
   publish:
     name: Publish to crates.io
     needs: build
     runs-on: ubuntu-latest
     environment: crates-io
-    if: ${{ env.publish }}
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
     steps:
     - uses: actions/checkout@v4
     - run: cargo publish --no-verify --locked
