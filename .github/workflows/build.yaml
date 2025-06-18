@@ -1,0 +1,76 @@
+name: Build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+    inputs:
+      release:
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    name: Build
+    strategy:
+      matrix:
+        include:
+          - os:   ubuntu
+            arch: x86_64
+          - os:   macos
+            arch: aarch64
+          - os:   macos
+            arch: x86_64
+    runs-on: ${{ matrix.os }}-latest
+
+    steps:
+    - name: setup environment
+      shell: bash
+      run: |
+        set -u
+        osname() {
+          case "${{ matrix.os }}" in
+            macos)  echo apple-darwin      ;;
+            ubuntu) echo unknown-linux-gnu ;;
+          esac
+        }
+        if [[ true = "${{ inputs.release }}" ]]; then
+          profile=release
+          outdir=release
+          retention_days=90
+        else
+          profile=dev
+          outdir=debug
+          retention_days=7
+        fi
+        cat >>$GITHUB_ENV <<EOF
+        target=${{ matrix.arch }}-$(osname)
+        outdir=$outdir
+        profile=$profile
+        retention_days=$retention_days
+        EOF
+
+    - uses: actions/checkout@v4
+    - uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/git
+          ~/.cargo/registry
+          target
+        key:
+          rust-${{ env.target }}-${{ env.profile }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          rust-${{ env.target }}-${{ env.profile }}-
+    - run: rustup toolchain install stable --target ${{ env.target }} --profile minimal
+    - run: rustup default stable
+
+    - run: cargo build --locked --profile ${{ env.profile }} --target ${{ env.target }}
+    - uses: actions/upload-artifact@v4
+      with:
+        name: onepass-${{ env.target }}
+        path: target/${{ env.target }}/${{ env.outdir }}/onepass
+        retention-days: ${{ env.retention_days }}
+
+    - run: cargo publish --locked --dry-run --target ${{ env.target }}
+      if: inputs.release
