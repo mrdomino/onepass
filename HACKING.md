@@ -26,7 +26,7 @@ let argon2 = Argon2::new(Algorithm::Argon2d, Version::V0x13, Params::default());
 argon2.hash_password_into(master_password, salt, &mut key_material);
 ```
 
-We use Argon2d (data-dependent) rather than Argon2i (data-independent) because we're not worried about side-channel attacks in a CLI context, and Argon2d provides better protection against GPU cracking.
+We use Argon2d (data-dependent) rather than Argon2i (data-independent) because we’re not worried about side-channel attacks in a CLI context, and Argon2d provides better protection against GPU cracking.
 
 ### Step 3: Pseudorandom Generation
 ```rust
@@ -35,7 +35,7 @@ hasher.update(&key_material);
 let mut rng = Blake3Rng(hasher.finalize_xof());
 ```
 
-BLAKE3's extendable output function (XOF) gives us a cryptographically secure, unlimited stream of pseudorandom bytes.
+BLAKE3’s extendable output function (XOF) gives us a cryptographically secure, unlimited stream of pseudorandom bytes.
 
 ### Step 4: Password Selection
 ```rust
@@ -50,7 +50,7 @@ We generate a uniform random number in the range `[0, schema_size)` and use it t
 URLs get normalized to ensure consistency:
 
 1. **Scheme Addition**: `google.com` → `https://google.com`
-2. **URL Parsing**: Uses Rust's `url` crate for RFC-compliant parsing
+2. **URL Parsing**: Uses Rust’s `url` crate for RFC-compliant parsing
 3. **Username Injection**: If specified, username gets added: `https://user@example.com/`
 4. **Serialization**: Canonical string representation
 
@@ -73,7 +73,7 @@ Our regex-like schema language supports a subset of regular expressions chosen t
 
 ### Why These Restrictions?
 
-Each password corresponds to exactly one number in the range `[0, schema_size)`. If multiple regex matches could produce the same string, we'd have multiple numbers generating identical passwords, which would reduce entropy and compromise security.
+Each password corresponds to exactly one number in the range `[0, schema_size)`. If multiple regex matches could produce the same string, we’d have multiple numbers generating identical passwords, which would reduce entropy and compromise security.
 
 ## Schema Enumeration
 
@@ -100,7 +100,7 @@ This lets us:
 
 ## Word Lists
 
-Default word list is the [EFF's large word list](https://www.eff.org/dice) — 7776 words designed for diceware. Custom word lists supported via `--words` flag or the `words_path` config setting.
+Default word list is the [EFF’s large word list](https://www.eff.org/dice) — 7776 words designed for diceware. Custom word lists supported via `--words` flag or the `words_path` config setting.
 
 ## Configuration
 
