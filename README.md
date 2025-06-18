@@ -4,6 +4,8 @@ This is my CLI password generator. There are many like it, but this one is mine.
 
 More specifically, this is a deterministic password manager: turn one master password into any number of unique, strong per-site passwords. No secrets stored, config can be public.
 
+**Caveat emptor:** prior to v1, I reserve the right to make changes that result in different passwords getting generated for the same site and master password, and will endeavor to bump the minor version number when I do this. After v1, I will only make such changes if absolutely necessary — e.g. if a flaw is found in the cryptosystem — and these will be accompanied by a new major version.
+
 ## Installation
 
 ### macOS (Recommended)
