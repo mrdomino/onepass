@@ -54,5 +54,44 @@ jobs:
         security import "$INSTALLER_CERT_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k"$KEYCHAIN_PATH"
         security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
         security list-keychain -d user -s "$KEYCHAIN_PATH"
-    - name: Make signed binary and installer
-      run: security find-identity -p codesigning -v
+
+    - name: codesign app
+      run: |
+        cp onepass-aarch64-apple-darwin onepass
+        codesign -s "Developer ID Application: Steven Dee (2TM4K8523U)" -f --timestamp -o runtime onepass
+        chmod +x onepass
+
+    - name: get version
+      id: get-version
+      run: |
+        { echo -n version=
+          ./onepass --version | cut -d' ' -f2
+        } >> $GITHUB_OUTPUT
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: onepass-signed-darwin
+        path: onepass
+
+    - name: notarize installer
+      env:
+        NOTARY_PASS: ${{ secrets.NOTARY_PASS }}
+        DEV_ACCOUNT: ${{ secrets.DEV_ACCOUNT }}
+      run: |
+        xcrun notarytool store-credentials --apple-id "$DEV_ACCOUNT" --team-id 2TM4K8523U --password "$NOTARY_PASS" notary-onepass
+        mkdir .root
+        cp onepass .root
+        pkgbuild --root .root \
+                 --identifier org.wholezero.pkg.onepass \
+                 --version "${{ steps.get-version.outputs.version }}" \
+                 --install-location /usr/local/bin \
+                 --sign "Developer ID Installer: Steven Dee (2TM4K8523U)" \
+                 onepass.pkg
+        xcrun notarytool submit onepass.pkg --keychain-profile notary-onepass --wait
+        xcrun stapler staple onepass.pkg
+        spctl --assess -vv --type install onepass.pkg
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: onepass-pkg-darwin
+        path: onepass.pkg
