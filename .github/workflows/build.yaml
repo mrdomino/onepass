@@ -37,13 +37,16 @@ jobs:
         }
         if [[ true = "${{ inputs.release }}" ]]; then
           profile=release
+          outdir=release
           retention_days=90
         else
-          profile=debug
+          profile=dev
+          outdir=debug
           retention_days=7
         fi
         cat >>$GITHUB_ENV <<EOF
         target=${{ matrix.arch }}-$(osname)
+        outdir=$outdir
         profile=$profile
         retention_days=$retention_days
         EOF
@@ -66,7 +69,7 @@ jobs:
     - uses: actions/upload-artifact@v4
       with:
         name: onepass-${{ env.target }}
-        path: target/${{ env.target }}/${{ env.profile }}/onepass
+        path: target/${{ env.target }}/${{ env.outdir }}/onepass
         retention-days: ${{ env.retention_days }}
 
     - run: cargo publish --locked --dry-run --target ${{ env.target }}
