@@ -106,7 +106,8 @@ jobs:
     name: Create GitHub Release
     needs: [build, macos-release]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
+    # TODO uncomment
+    #if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
     steps:
     - uses: actions/checkout@v4
 
