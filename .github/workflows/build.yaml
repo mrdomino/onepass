@@ -12,6 +12,10 @@ on:
       publish:
         default: false
         type: boolean
+      tag:
+        description: 'Tag to build (e.g., v1.0.0)'
+        type: string
+        required: false
 
 jobs:
   build:
@@ -55,6 +59,8 @@ jobs:
         EOF
 
     - uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.tag || github.ref }}
     - uses: actions/cache@v4
       with:
         path: |
