@@ -17,6 +17,7 @@ mod randexp;
 mod url;
 
 use std::{
+    collections::BTreeSet,
     fs::read_to_string,
     io::{IsTerminal, Write, stdout},
     path::Path,
@@ -121,19 +122,24 @@ fn main() -> Result<()> {
         .transpose()
         .context("failed reading words file")?;
     let words: Option<Box<[&str]>> = words
-        .as_ref()
-        .map(|words| words.lines().map(|line| line.trim()).collect());
+        .as_deref()
+        .map(|words| {
+            words
+                .lines()
+                .map(|line| line.trim())
+                .filter(|line| !line.is_empty())
+                .collect::<BTreeSet<_>>()
+        })
+        .map(|words| words.into_iter().collect());
     let words = Words::from(words.as_deref().unwrap_or(EFF_WORDLIST));
 
     let site = config.find_site(&args.site)?;
     let url = site.as_ref().map_or(&args.site, |(url, _)| url);
     let url = canonicalize(
         url,
-        args.username.as_deref().or_else(|| {
-            site.as_ref()
-                .map(|(_, site)| site.username.as_deref())
-                .flatten()
-        }),
+        args.username
+            .as_deref()
+            .or_else(|| site.as_ref().and_then(|(_, site)| site.username.as_deref())),
     )?;
     let schema = args.schema.as_ref().map_or_else(
         || {
