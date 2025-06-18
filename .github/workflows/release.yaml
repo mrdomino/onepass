@@ -130,8 +130,11 @@ jobs:
             cp "$dir/onepass" "release-files/$target"
           fi
         done
-        if [ -f "artifacts/onepass-pkg-darwin/onepass.pkg" ]; then
-          cp "artifacts/onepass-pkg-darwin/onepass.pkg" "release-files/"
+        if [ -f artifacts/onepass-signed-darwin/onepass ]; then
+          cp artifacts/onepass-signed-darwin/onepass release-files/onepass-aarch64-apple-darwin
+        fi
+        if [ -f artifacts/onepass-pkg-darwin/onepass.pkg ]; then
+          cp artifacts/onepass-pkg-darwin/onepass.pkg release-files/onepass.pkg
         fi
 
     - name: Create Release
