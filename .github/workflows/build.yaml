@@ -9,6 +9,9 @@ on:
       release:
         default: false
         type: boolean
+      publish:
+        default: false
+        type: boolean
 
 jobs:
   build:
@@ -73,4 +76,4 @@ jobs:
         retention-days: ${{ env.retention_days }}
 
     - run: cargo publish --locked --dry-run --target ${{ env.target }}
-      if: inputs.release
+      if: inputs.publish
