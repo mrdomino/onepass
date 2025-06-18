@@ -64,8 +64,6 @@ jobs:
 
     - name: codesign app
       run: |
-        ls -lR .
-        cp onepass-aarch64-apple-darwin/onepass onepass
         codesign -s "Developer ID Application: Steven Dee (2TM4K8523U)" -f --timestamp -o runtime onepass
         chmod +x onepass
 
