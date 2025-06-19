@@ -13,6 +13,7 @@
 // limitations under the License.
 
 mod config;
+mod crypto;
 mod randexp;
 mod url;
 
@@ -25,11 +26,10 @@ use std::{
 
 use anyhow::{Context, Result};
 use argon2::Argon2;
-use blake3::OutputReader;
 use clap::Parser;
 use config::Config;
+use crypto::Blake3Rng;
 use crypto_bigint::{NonZero, RandomMod, U256};
-use rand_core::RngCore;
 use randexp::{Enumerable, Expr, Quantifiable, Words};
 use rpassword::prompt_password;
 use url::canonicalize;
@@ -82,33 +82,6 @@ struct Args {
 }
 
 include!(concat!(env!("OUT_DIR"), "/wordlist.rs"));
-
-struct Blake3Rng(Zeroizing<OutputReader>);
-impl RngCore for Blake3Rng {
-    fn next_u32(&mut self) -> u32 {
-        let mut bytes = [0u8; 4];
-        self.0.fill(&mut bytes);
-        u32::from_le_bytes(bytes)
-    }
-
-    fn next_u64(&mut self) -> u64 {
-        let mut bytes = [0u8; 8];
-        self.0.fill(&mut bytes);
-        u64::from_le_bytes(bytes)
-    }
-
-    fn fill_bytes(&mut self, dst: &mut [u8]) {
-        self.0.fill(dst);
-    }
-
-    fn try_fill_bytes(
-        &mut self,
-        dest: &mut [u8],
-    ) -> std::result::Result<(), crypto_bigint::rand_core::Error> {
-        self.fill_bytes(dest);
-        Ok(())
-    }
-}
 
 fn main() -> Result<()> {
     let args = Args::parse();
@@ -177,12 +150,7 @@ fn main() -> Result<()> {
         }
     }
     let mut key_material = Zeroizing::new([0u8; 32]);
-    let argon2 = Argon2::new(
-        argon2::Algorithm::Argon2d,
-        argon2::Version::V0x13,
-        argon2::Params::default(),
-    );
-    argon2
+    Argon2::default()
         .hash_password_into(password.as_bytes(), salt.as_bytes(), &mut *key_material)
         .map_err(|e| anyhow::anyhow!("argon2 failed: {e}"))?;
 
