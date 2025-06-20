@@ -23,12 +23,14 @@ char-iter = "0.1.0"
 clap = { version = "4.5.39", features = ["derive", "env", "unicode", "wrap_help"] }
 crypto-bigint = { version = "0.6.1", features = ["rand_core", "zeroize"] }
 home-dir = "0.1.0"
+keyring = { version = "3.6.2", features = ["sync-secret-service", "apple-native", "windows-native", "crypto-openssl", "vendored"] }
 nom = "8.0.0"
 rand_core = "0.6.4"
 rpassword = "7.4.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_yaml = "0.9.34"
 url = "2.5.4"
+whoami = { version = "1.6.0", default-features = false }
 zeroize = "1.8.1"
 
 [dev-dependencies]

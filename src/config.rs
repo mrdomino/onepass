@@ -28,6 +28,7 @@ use crate::url::canonicalize;
 pub(crate) struct Config {
     pub words_path: Option<Box<Path>>,
     pub default_schema: String,
+    pub use_keyring: Option<bool>,
     pub aliases: HashMap<String, String>,
     pub sites: HashMap<String, SiteConfig>,
 
@@ -86,6 +87,7 @@ impl Config {
         let default_schema = aliases
             .get(&config.default_schema)
             .map_or(config.default_schema, Clone::clone);
+        let use_keyring = config.use_keyring;
         let sites = config
             .sites
             .into_iter()
@@ -103,6 +105,7 @@ impl Config {
         Config {
             words_path,
             default_schema,
+            use_keyring,
             aliases,
             sites,
 
@@ -130,6 +133,8 @@ struct SerConfig {
     pub words_path: Option<Box<Path>>,
     #[serde(default = "default_schema")]
     pub default_schema: String,
+    #[serde(default)]
+    pub use_keyring: Option<bool>,
     #[serde(default)]
     pub aliases: HashMap<String, String>,
     #[serde(deserialize_with = "deserialize_sites")]
@@ -170,6 +175,7 @@ impl SerConfig {
         SerConfig {
             words_path: None,
             default_schema,
+            use_keyring: None,
             aliases,
             sites,
         }

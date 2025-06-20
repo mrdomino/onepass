@@ -25,15 +25,12 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use argon2::Argon2;
 use clap::Parser;
 use config::Config;
-use crypto::Blake3Rng;
+use crypto::{Blake3Rng, get_onepass_entry, read_password};
 use crypto_bigint::{NonZero, RandomMod, U256};
 use randexp::{Enumerable, Expr, Quantifiable, Words};
-use rpassword::prompt_password;
 use url::canonicalize;
-use zeroize::Zeroizing;
 
 #[derive(Debug, Parser)]
 #[command(version, about)]
@@ -72,6 +69,18 @@ struct Args {
     #[arg(short, long)]
     username: Option<String>,
 
+    /// Explicitly reset system keyring master password
+    #[arg(short, long)]
+    reset_keyring: bool,
+
+    /// Use the system keyring to store the master password
+    #[arg(short, long, env = "ONEPASS_USE_KEYRING", num_args = 0..=1, require_equals = true, default_missing_value = "true")]
+    keyring: Option<bool>,
+
+    /// Do not use the system keyring to store the master password
+    #[arg(short = 'K', long, conflicts_with = "keyring")]
+    no_keyring: bool,
+
     /// Confirm master password
     #[arg(short, long)]
     confirm: bool,
@@ -84,7 +93,10 @@ struct Args {
 include!(concat!(env!("OUT_DIR"), "/wordlist.rs"));
 
 fn main() -> Result<()> {
-    let args = Args::parse();
+    let mut args = Args::parse();
+    if args.no_keyring {
+        args.keyring = Some(false);
+    }
 
     let config = Config::from_file(args.config_path.as_deref()).context("failed to read config")?;
 
@@ -126,7 +138,6 @@ fn main() -> Result<()> {
         .unwrap_or_else(|| site.map_or(0, |(_, site)| site.increment));
     let expr = Expr::parse(schema).context("invalid schema")?;
     let size = words.size(&expr);
-
     let salt = format!("{0},{1}", increment, &url);
 
     if args.verbose {
@@ -138,25 +149,14 @@ fn main() -> Result<()> {
         eprintln!("salt: {salt:?}");
     }
 
-    let password: Zeroizing<String> = prompt_password("Master password: ")
-        .context("failed reading password")?
-        .into();
-    if args.confirm {
-        let confirmed: Zeroizing<String> = prompt_password("Confirm: ")
-            .context("failed reading confirmation")?
-            .into();
-        if *confirmed != *password {
-            anyhow::bail!("Passwords don’t match");
-        }
+    if args.reset_keyring {
+        get_onepass_entry()?.delete_credential()?;
     }
-    let mut key_material = Zeroizing::new([0u8; 32]);
-    Argon2::default()
-        .hash_password_into(password.as_bytes(), salt.as_bytes(), &mut *key_material)
-        .map_err(|e| anyhow::anyhow!("argon2 failed: {e}"))?;
 
-    let mut hasher = Zeroizing::new(blake3::Hasher::new());
-    hasher.update(&*key_material);
-    let mut rng = Blake3Rng(Zeroizing::new(hasher.finalize_xof()));
+    let use_keyring = args.keyring.or(config.use_keyring).unwrap_or(false);
+
+    let password = read_password(use_keyring, args.confirm)?;
+    let mut rng = Blake3Rng::from_password_salt(password, salt)?;
     let index = U256::random_mod(&mut rng, &NonZero::new(size).unwrap());
     let res = words.gen_at(&expr, index)?;
     let mut stdout = stdout();
