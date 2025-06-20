@@ -14,12 +14,12 @@
 
 use anyhow::{Context, Result};
 use argon2::{Algorithm, Argon2, Params, Version};
-use blake3::OutputReader;
 use keyring::Entry;
-use rand_core::RngCore;
+use rand_chacha::ChaCha20Rng;
+use rand_core::{RngCore, SeedableRng};
 use rpassword::prompt_password;
 use whoami::fallible::username;
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 pub(crate) fn read_password(use_keyring: bool, confirm: bool) -> Result<Zeroizing<String>> {
     let password = use_keyring
@@ -76,48 +76,39 @@ pub fn get_onepass_entry() -> Result<Entry> {
     Entry::new("onepass", &user).context("failed constructing keyring entry")
 }
 
-pub(crate) struct Blake3Rng(Zeroizing<OutputReader>);
+pub(crate) struct Rng(ChaCha20Rng);
 
-impl Blake3Rng {
+impl Rng {
     pub fn from_password_salt(password: Zeroizing<String>, salt: String) -> Result<Self> {
         let mut key_material = Zeroizing::new([0u8; 32]);
-        let params = Params::new(32 * 1024, 3, 1, None)
-            .map_err(|e| anyhow::anyhow!("argon2 params failed: {e}"))?;
+        let params =
+            Params::new(32 * 1024, 3, 1, None).map_err(|e| anyhow::anyhow!("Params::new: {e}"))?;
         Argon2::new(Algorithm::Argon2id, Version::V0x13, params)
             .hash_password_into(password.as_bytes(), salt.as_bytes(), &mut *key_material)
             .map_err(|e| anyhow::anyhow!("argon2 failed: {e}"))?;
-        Ok(Blake3Rng::new(key_material))
-    }
-
-    pub fn new(key_material: Zeroizing<[u8; 32]>) -> Self {
-        let mut hasher = Zeroizing::new(blake3::Hasher::new());
-        hasher.update(&*key_material);
-        Blake3Rng(Zeroizing::new(hasher.finalize_xof()))
+        Ok(Rng(ChaCha20Rng::from_seed(*key_material)))
     }
 }
 
-impl RngCore for Blake3Rng {
+impl RngCore for Rng {
     fn next_u32(&mut self) -> u32 {
-        let mut bytes = [0u8; 4];
-        self.0.fill(&mut bytes);
-        u32::from_le_bytes(bytes)
+        self.0.next_u32()
     }
-
     fn next_u64(&mut self) -> u64 {
-        let mut bytes = [0u8; 8];
-        self.0.fill(&mut bytes);
-        u64::from_le_bytes(bytes)
+        self.0.next_u64()
     }
-
     fn fill_bytes(&mut self, dst: &mut [u8]) {
-        self.0.fill(dst);
+        self.0.fill_bytes(dst)
     }
+}
 
-    fn try_fill_bytes(
-        &mut self,
-        dest: &mut [u8],
-    ) -> std::result::Result<(), crypto_bigint::rand_core::Error> {
-        self.fill_bytes(dest);
-        Ok(())
+impl Drop for Rng {
+    fn drop(&mut self) {
+        unsafe {
+            let ptr = &mut self.0 as *mut ChaCha20Rng as *mut u8;
+            let size = std::mem::size_of::<ChaCha20Rng>();
+            let slice = std::slice::from_raw_parts_mut(ptr, size);
+            slice.zeroize();
+        }
     }
 }

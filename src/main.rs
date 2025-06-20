@@ -27,7 +27,7 @@ use std::{
 use anyhow::{Context, Result};
 use clap::Parser;
 use config::Config;
-use crypto::{Blake3Rng, get_onepass_entry, read_password};
+use crypto::{Rng, get_onepass_entry, read_password};
 use crypto_bigint::{NonZero, RandomMod, U256};
 use randexp::{Enumerable, Expr, Quantifiable, Words};
 use url::canonicalize;
@@ -163,7 +163,7 @@ fn main() -> Result<()> {
     let use_keyring = args.keyring.or(config.use_keyring).unwrap_or(false);
 
     let password = read_password(use_keyring, args.confirm)?;
-    let mut rng = Blake3Rng::from_password_salt(password, salt)?;
+    let mut rng = Rng::from_password_salt(password, salt)?;
     let index = U256::random_mod(&mut rng, &NonZero::new(size).unwrap());
     let res = words.gen_at(&expr, index)?;
     let mut stdout = stdout();

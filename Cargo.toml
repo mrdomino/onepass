@@ -1,6 +1,6 @@
 [package]
 name = "onepass"
-version = "0.8.1"
+version = "0.9.0"
 categories = ["command-line-utilities"]
 edition = "2024"
 keywords = ["password", "cryptography", "deterministic"]
@@ -18,14 +18,14 @@ exclude = [
 [dependencies]
 anyhow = "1.0.98"
 argon2 = { version = "0.5.3", features = ["zeroize"] }
-blake3 = { version = "1.8.2", features = ["zeroize"] }
 char-iter = "0.1.0"
 clap = { version = "4.5.39", features = ["derive", "env", "unicode", "wrap_help"] }
-crypto-bigint = { version = "0.6.1", features = ["rand_core", "zeroize"] }
+crypto-bigint = { version = "0.7.0-pre.5", features = ["rand_core", "zeroize"] }
 home-dir = "0.1.0"
 keyring = { version = "3.6.2", features = ["sync-secret-service", "apple-native", "windows-native", "crypto-openssl", "vendored"] }
 nom = "8.0.0"
-rand_core = "0.6.4"
+rand_chacha = "0.9.0"
+rand_core = "0.9.3"
 rpassword = "7.4.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_yaml = "0.9.34"

@@ -22,18 +22,18 @@ Example: `"0,https://google.com/"`
 
 ### Step 2: Key Derivation
 ```rust
-let argon2 = Argon2::default();
+let params =
+    Params::new(32 * 1024, 3, 1, None)?;
+let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params)?;
 argon2.hash_password_into(master_password, salt, &mut key_material);
 ```
 
 ### Step 3: Pseudorandom Generation
 ```rust
-let mut hasher = blake3::Hasher::new();
-hasher.update(&key_material);
-let mut rng = Blake3Rng(hasher.finalize_xof());
+let mut rng = ChaCha20Rng::from_seed(key_material);
 ```
 
-BLAKE3’s extendable output function (XOF) gives us a cryptographically secure, unlimited stream of pseudorandom bytes.
+ChaCha20 gives us a cryptographically secure, unlimited stream of pseudorandom bytes.
 
 ### Step 4: Password Selection
 ```rust
@@ -90,9 +90,9 @@ This lets us:
 
 ## Cryptographic Choices
 
-**Argon2id**: Memory-hard key derivation. We use default parameters.
+**Argon2id**: Memory-hard key derivation.
 
-**BLAKE3**: Successor to BLAKE2, with a nicer (and built-in) XOF.
+**ChaCha20**: Cryptographically secure pseudorandom number generator with a good security margin.
 
 **256-bit arithmetic**: All internal calculations use 256-bit unsigned integers, supporting password universes up to `2**256` possibilities.
 
