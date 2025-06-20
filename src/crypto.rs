@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use anyhow::{Context, Result};
-use argon2::Argon2;
+use argon2::{Algorithm, Argon2, Params, Version};
 use blake3::OutputReader;
 use keyring::Entry;
 use rand_core::RngCore;
@@ -81,7 +81,9 @@ pub(crate) struct Blake3Rng(Zeroizing<OutputReader>);
 impl Blake3Rng {
     pub fn from_password_salt(password: Zeroizing<String>, salt: String) -> Result<Self> {
         let mut key_material = Zeroizing::new([0u8; 32]);
-        Argon2::default()
+        let params = Params::new(32 * 1024, 3, 1, None)
+            .map_err(|e| anyhow::anyhow!("argon2 params failed: {e}"))?;
+        Argon2::new(Algorithm::Argon2id, Version::V0x13, params)
             .hash_password_into(password.as_bytes(), salt.as_bytes(), &mut *key_material)
             .map_err(|e| anyhow::anyhow!("argon2 failed: {e}"))?;
         Ok(Blake3Rng::new(key_material))
