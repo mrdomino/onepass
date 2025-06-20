@@ -69,17 +69,24 @@ struct Args {
     #[arg(short, long)]
     username: Option<String>,
 
-    /// Explicitly reset system keyring master password
-    #[arg(short, long)]
-    reset_keyring: bool,
-
     /// Use the system keyring to store the master password
-    #[arg(short, long, env = "ONEPASS_USE_KEYRING", num_args = 0..=1, require_equals = true, default_missing_value = "true")]
+    #[arg(
+        short,
+        long,
+        env = "ONEPASS_USE_KEYRING",
+        default_missing_value = "true",
+        num_args = 0..=1,
+        require_equals = true,
+    )]
     keyring: Option<bool>,
 
     /// Do not use the system keyring to store the master password
     #[arg(short = 'K', long, conflicts_with = "keyring")]
     no_keyring: bool,
+
+    /// Explicitly reset system keyring master password
+    #[arg(short, long)]
+    reset_keyring: bool,
 
     /// Confirm master password
     #[arg(short, long)]
