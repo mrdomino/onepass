@@ -52,7 +52,7 @@ onepass -s phrase github.com   # 5-word passphrase
 
 ## How It Works
 
-We use Argon2d to derive a 256-bit key from your master password with salt `{increment},{url}`. That key seeds a BLAKE3 extendable output function, which generates a uniform random number to select from all possible passwords matching your schema.
+We use Argon2id to derive a 256-bit key from your master password with salt `{increment},{url}`. That key seeds a BLAKE3 extendable output function, which generates a uniform random number to select from all possible passwords matching your schema.
 
 Same inputs → same outputs. Always.
 

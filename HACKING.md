@@ -22,11 +22,9 @@ Example: `"0,https://google.com/"`
 
 ### Step 2: Key Derivation
 ```rust
-let argon2 = Argon2::new(Algorithm::Argon2d, Version::V0x13, Params::default());
+let argon2 = Argon2::default();
 argon2.hash_password_into(master_password, salt, &mut key_material);
 ```
-
-We use Argon2d (data-dependent) rather than Argon2i (data-independent) because we’re not worried about side-channel attacks in a CLI context, and Argon2d provides better protection against GPU cracking.
 
 ### Step 3: Pseudorandom Generation
 ```rust
@@ -92,7 +90,7 @@ This lets us:
 
 ## Cryptographic Choices
 
-**Argon2d**: Memory-hard key derivation resistant to GPU attacks. We use default parameters.
+**Argon2id**: Memory-hard key derivation. We use default parameters.
 
 **BLAKE3**: Successor to BLAKE2, with a nicer (and built-in) XOF.
 
@@ -152,6 +150,6 @@ Some day we might try to ship Windows binaries or an app; ask nicely.
 
 **Key material**: All cryptographic material uses `Zeroizing` types to clear memory on drop.
 
-**Side channels**: Argon2d parameter choice assumes CLI usage where side-channel attacks are impractical.
+**Side channels**: Argon2id parameter choice assumes CLI usage where side-channel attacks are impractical.
 
 **Password rotation**: Increment parameter allows site-specific password changes without master password changes.
