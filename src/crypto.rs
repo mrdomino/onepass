@@ -18,7 +18,6 @@ use keyring::Entry;
 use rand_chacha::ChaCha20Rng;
 use rand_core::{RngCore, SeedableRng};
 use rpassword::prompt_password;
-use whoami::fallible::username;
 use zeroize::{Zeroize, Zeroizing};
 
 pub(crate) fn read_password(use_keyring: bool, confirm: bool) -> Result<Zeroizing<String>> {
@@ -72,8 +71,7 @@ fn check_confirm(password: &Zeroizing<String>) -> Result<bool> {
 }
 
 pub fn get_onepass_entry() -> Result<Entry> {
-    let user = username().context("failed getting username")?;
-    Entry::new("onepass", &user).context("failed constructing keyring entry")
+    Entry::new("org.whilezero.app.onepass", "seed").context("failed constructing keyring entry")
 }
 
 pub(crate) struct Rng(ChaCha20Rng);

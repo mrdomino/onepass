@@ -30,7 +30,6 @@ rpassword = "7.4.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_yaml = "0.9.34"
 url = "2.5.4"
-whoami = { version = "1.6.0", default-features = false }
 zeroize = "1.8.1"
 
 [dev-dependencies]
