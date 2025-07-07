@@ -22,21 +22,24 @@ use std::{
     fs::read_to_string,
     io::{IsTerminal, Write, stdout},
     path::Path,
+    process::exit,
 };
 
 use anyhow::{Context, Result};
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use config::Config;
 use crypto::{Rng, get_onepass_entry, read_password};
 use crypto_bigint::{NonZero, RandomMod, U256};
 use randexp::{Enumerable, Expr, Quantifiable, Words};
 use url::canonicalize;
+use zeroize::Zeroizing;
 
 #[derive(Debug, Parser)]
 #[command(version, about)]
 struct Args {
-    /// The site for which to generate a password
-    site: String,
+    /// Site(s) for which to generate a password
+    #[arg(value_name = "SITE")]
+    sites: Vec<String>,
 
     /// Override the path of the config file (default: ~/.config/onepass/config.yaml)
     #[arg(
@@ -57,15 +60,15 @@ struct Args {
     )]
     words_path: Option<Box<Path>>,
 
-    /// Override schema to use for this site (may be a configured alias)
+    /// Override schema to use (may be a configured alias)
     #[arg(short, long)]
     schema: Option<String>,
 
-    /// Override increment to use for this site
+    /// Override increment to use
     #[arg(short, long, value_name = "NUM")]
     increment: Option<u32>,
 
-    /// Override username to use for this site
+    /// Override username to use
     #[arg(short, long)]
     username: Option<String>,
 
@@ -109,6 +112,7 @@ fn main() -> Result<()> {
 
     let words: Option<Box<str>> = args
         .words_path
+        .clone()
         .or_else(|| config.words_path())
         .map(|path| read_to_string(path).map(|s| s.into()))
         .transpose()
@@ -125,8 +129,42 @@ fn main() -> Result<()> {
         .map(|words| words.into_iter().collect());
     let words = Words::from(words.as_deref().unwrap_or(EFF_WORDLIST));
 
-    let site = config.find_site(&args.site)?;
-    let url = site.as_ref().map_or(&args.site, |(url, _)| url);
+    if args.reset_keyring {
+        get_onepass_entry()?.delete_credential()?;
+        if args.sites.is_empty() {
+            return Ok(());
+        }
+    }
+
+    if args.sites.is_empty() {
+        eprintln!("Specify at least one site\n");
+        eprintln!("{}", Args::command().render_help());
+        exit(1);
+    }
+
+    let use_keyring = args.keyring.or(config.use_keyring).unwrap_or(false);
+    let password = read_password(use_keyring, args.confirm)?;
+
+    let mut stdout = stdout();
+    for site in &args.sites {
+        let res = gen_password(&password, site, &config, &args, &words)?;
+        stdout.write_all(res.as_bytes())?;
+        if stdout.is_terminal() || args.sites.len() > 1 {
+            writeln!(stdout)?;
+        }
+    }
+    Ok(())
+}
+
+fn gen_password(
+    password: &str,
+    req: &str,
+    config: &Config,
+    args: &Args,
+    words: &Words,
+) -> Result<Zeroizing<String>> {
+    let site = config.find_site(req)?;
+    let url = site.as_ref().map_or(req, |(url, _)| url);
     let url = canonicalize(
         url,
         args.username
@@ -149,27 +187,16 @@ fn main() -> Result<()> {
 
     if args.verbose {
         eprintln!(
-            "schema has about {0} bits of entropy (0x{1} possible passwords)",
+            "schema for {2} has about {0} bits of entropy (0x{1} possible passwords)",
             &size.bits(),
-            &size.to_string().trim_start_matches('0')
+            &size.to_string().trim_start_matches('0'),
+            req,
         );
         eprintln!("salt: {salt:?}");
     }
 
-    if args.reset_keyring {
-        get_onepass_entry()?.delete_credential()?;
-    }
-
-    let use_keyring = args.keyring.or(config.use_keyring).unwrap_or(false);
-
-    let password = read_password(use_keyring, args.confirm)?;
     let mut rng = Rng::from_password_salt(password, salt)?;
     let index = U256::random_mod(&mut rng, &NonZero::new(size).unwrap());
     let res = words.gen_at(&expr, index)?;
-    let mut stdout = stdout();
-    stdout.write_all(res.as_bytes())?;
-    if stdout.is_terminal() {
-        writeln!(stdout)?;
-    }
-    Ok(())
+    Ok(res)
 }

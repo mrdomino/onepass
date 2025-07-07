@@ -77,7 +77,7 @@ pub fn get_onepass_entry() -> Result<Entry> {
 pub(crate) struct Rng(ChaCha20Rng);
 
 impl Rng {
-    pub fn from_password_salt(password: Zeroizing<String>, salt: String) -> Result<Self> {
+    pub fn from_password_salt(password: &str, salt: String) -> Result<Self> {
         let mut key_material = Zeroizing::new([0u8; 32]);
         let params =
             Params::new(32 * 1024, 3, 1, None).map_err(|e| anyhow::anyhow!("Params::new: {e}"))?;
