@@ -144,9 +144,14 @@ jobs:
     - uses: actions/download-artifact@v4
       with:
         path: artifacts
+    - run: |
+        mkdir attest
+        for path in artifacts/*; do
+          mv "$path/onepass*" "attest/$path"
+        done
     - uses: actions/attest-build-provenance@v2
       with:
-        subject-path: artifacts/*
+        subject-path: attest/*
 
   github-release:
     name: Create GitHub Release
