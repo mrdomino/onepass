@@ -10,7 +10,11 @@ Optionally, you may sync your master password to the system keyring. It is recom
 
 ### GitHub releases
 
-Download the [latest GitHub release](https://github.com/mrdomino/onepass/releases/latest). The macOS binaries are signed.
+Download the [latest GitHub release](https://github.com/mrdomino/onepass/releases/latest). The macOS binaries are signed. All release artifacts are [attested](https://github.blog/news-insights/product-news/introducing-artifact-attestations-now-in-public-beta/), and these attestations can be verified using the GitHub CLI:
+
+```sh
+gh attestation verify /path/to/onepass --owner mrdomino
+```
 
 ### Cargo
 
