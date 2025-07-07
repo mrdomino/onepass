@@ -20,10 +20,6 @@ on:
 jobs:
   build:
     name: Build
-    permissions:
-      id-token: write
-      contents: read
-      attestations: write
     strategy:
       matrix:
         include:
@@ -79,11 +75,6 @@ jobs:
     - run: rustup default stable
 
     - run: cargo build --locked --profile ${{ env.profile }} --target ${{ env.target }}
-    - name: Generate artifact attestation
-      uses: actions/attest-build-provenance@v2
-      if: inputs.release
-      with:
-        subject-path: target/${{ env.target }}/${{ env.outdir }}/onepass
     - uses: actions/upload-artifact@v4
       with:
         name: onepass-${{ env.target }}

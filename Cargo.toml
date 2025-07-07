@@ -1,6 +1,6 @@
 [package]
 name = "onepass"
-version = "1.0.0"
+version = "1.0.1"
 categories = ["command-line-utilities"]
 edition = "2024"
 keywords = ["password", "cryptography", "deterministic"]
