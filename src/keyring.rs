@@ -25,8 +25,7 @@ const ACCOUNT: &str = "seed";
 pub(crate) fn load_password() -> Result<Option<Zeroizing<String>>> {
     match get_entry()?.get_password() {
         Err(Error::NoEntry) => return Ok(None),
-        Err(Error::Other(e)) => Err(e),
-        Ok(password) => Ok(Some(password.into())),
+        r => Ok(Some(r?.into())),
     }
 }
 

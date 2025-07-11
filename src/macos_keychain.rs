@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::ptr;
+use std::{fmt::Display, ptr};
 
 use anyhow::Result;
 use core_foundation::{
@@ -163,9 +163,28 @@ impl Entry {
     }
 }
 
+#[derive(Debug)]
 pub(crate) enum Error {
     NoEntry,
     Other(anyhow::Error),
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::NoEntry => write!(f, "entry not found"),
+            Error::Other(err) => err.fmt(f),
+        }
+    }
+}
+
+impl core::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Error::Other(err) => Some(err.as_ref()),
+            _ => None,
+        }
+    }
 }
 
 const SEC_SUCCESS: OSStatus = errSecSuccess;
