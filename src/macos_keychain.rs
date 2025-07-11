@@ -27,7 +27,7 @@ use objc2_foundation::NSString;
 use objc2_local_authentication::LAContext;
 use security_framework_sys::{
     access_control::{
-        kSecAttrAccessibleWhenUnlockedThisDeviceOnly, SecAccessControlCreateWithFlags
+        SecAccessControlCreateWithFlags, kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
     },
     base::{errSecItemNotFound, errSecSuccess},
     item::{
@@ -144,14 +144,8 @@ impl Entry {
                 kSecClass as CFTypeRef,
                 kSecClassGenericPassword as CFTypeRef,
             );
-            query.set(
-                kSecAttrService as CFTypeRef,
-                service_str.as_CFTypeRef(),
-            );
-            query.set(
-                kSecAttrAccount as CFTypeRef,
-                account_str.as_CFTypeRef(),
-            );
+            query.set(kSecAttrService as CFTypeRef, service_str.as_CFTypeRef());
+            query.set(kSecAttrAccount as CFTypeRef, account_str.as_CFTypeRef());
         }
 
         let status = unsafe { SecItemDelete(query.as_concrete_TypeRef()) };
