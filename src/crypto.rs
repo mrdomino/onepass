@@ -12,67 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use argon2::{Algorithm, Argon2, Params, Version};
-use keyring::Entry;
 use rand_chacha::ChaCha20Rng;
 use rand_core::{RngCore, SeedableRng};
-use rpassword::prompt_password;
 use zeroize::{Zeroize, Zeroizing};
-
-pub(crate) fn read_password(use_keyring: bool, confirm: bool) -> Result<Zeroizing<String>> {
-    let password = use_keyring
-        .then(|| read_password_keyring(confirm))
-        .transpose()?
-        .flatten();
-    if let Some(password) = password {
-        return Ok(password);
-    }
-    let password: Zeroizing<String> = prompt_password("Master password: ")
-        .context("failed reading password")?
-        .into();
-    if !confirm
-        .then(|| check_confirm(&password))
-        .transpose()?
-        .unwrap_or(true)
-    {
-        anyhow::bail!("passwords don't match");
-    }
-    if use_keyring {
-        let entry = get_onepass_entry()?;
-        if let Err(e) = entry.set_password(password.as_str()) {
-            eprintln!("failed storing password in keychain: {e}");
-        }
-    }
-    Ok(password)
-}
-
-fn read_password_keyring(confirm: bool) -> Result<Option<Zeroizing<String>>> {
-    let entry = get_onepass_entry()?;
-    let password: Zeroizing<String> = match entry.get_password() {
-        Err(keyring::Error::NoEntry) => return Ok(None),
-        r => r.context("failed getting password from keyring")?.into(),
-    };
-    if !confirm
-        .then(|| check_confirm(&password))
-        .transpose()?
-        .unwrap_or(true)
-    {
-        anyhow::bail!("passwords don't match");
-    }
-    Ok(Some(password))
-}
-
-fn check_confirm(password: &Zeroizing<String>) -> Result<bool> {
-    let confirm: Zeroizing<String> = prompt_password("Confirm: ")
-        .context("failed reading password confirmation")?
-        .into();
-    Ok(password.as_str() == confirm.as_str())
-}
-
-pub fn get_onepass_entry() -> Result<Entry> {
-    Entry::new("org.whilezero.app.onepass", "seed").context("failed constructing keyring entry")
-}
 
 pub(crate) struct Rng(ChaCha20Rng);
 

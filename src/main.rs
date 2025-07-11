@@ -14,6 +14,9 @@
 
 mod config;
 mod crypto;
+mod keyring;
+#[cfg(target_os = "macos")]
+mod macos_keychain;
 mod randexp;
 mod url;
 
@@ -28,9 +31,11 @@ use std::{
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser};
 use config::Config;
-use crypto::{Rng, get_onepass_entry, read_password};
+use crypto::Rng;
 use crypto_bigint::{NonZero, RandomMod, U256};
+use keyring::delete_password;
 use randexp::{Enumerable, Expr, Quantifiable, Words};
+use rpassword::prompt_password;
 use url::canonicalize;
 use zeroize::Zeroizing;
 
@@ -130,7 +135,7 @@ fn main() -> Result<()> {
     let words = Words::from(words.as_deref().unwrap_or(EFF_WORDLIST));
 
     if args.reset_keyring {
-        get_onepass_entry()?.delete_credential()?;
+        delete_password()?;
         if args.sites.is_empty() {
             return Ok(());
         }
@@ -199,4 +204,34 @@ fn gen_password(
     let index = U256::random_mod(&mut rng, &NonZero::new(size).unwrap());
     let res = words.gen_at(&expr, index)?;
     Ok(res)
+}
+
+fn read_password(use_keyring: bool, confirm: bool) -> Result<Zeroizing<String>> {
+    let password = use_keyring
+        .then(keyring::load_password)
+        .transpose()?
+        .flatten();
+    if let Some(password) = password {
+        return Ok(password);
+    }
+    let password: Zeroizing<String> = prompt_password("Seed password: ")
+        .context("failed reading password")?
+        .into();
+    if use_keyring || confirm {
+        check_confirm(&password)?;
+    }
+    if use_keyring {
+        keyring::save_password(&password)?;
+    }
+    Ok(password)
+}
+
+fn check_confirm(password: &str) -> Result<()> {
+    let confirmed: Zeroizing<String> = prompt_password("Confirmation: ")
+        .context("failed reading confirmation")?
+        .into();
+    if *confirmed != password {
+        anyhow::bail!("passwords don’t match");
+    }
+    Ok(())
 }
