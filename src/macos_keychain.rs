@@ -27,7 +27,8 @@ use objc2_foundation::NSString;
 use objc2_local_authentication::LAContext;
 use security_framework_sys::{
     access_control::{
-        SecAccessControlCreateWithFlags, kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+        SecAccessControlCreateWithFlags, kSecAccessControlBiometryAny,
+        kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
     },
     base::{errSecItemNotFound, errSecSuccess},
     item::{
@@ -55,7 +56,7 @@ impl Entry {
             SecAccessControlCreateWithFlags(
                 kCFAllocatorDefault,
                 kSecAttrAccessibleWhenUnlockedThisDeviceOnly as CFTypeRef,
-                1 << 1,
+                kSecAccessControlBiometryAny,
                 ptr::null_mut(),
             )
         };

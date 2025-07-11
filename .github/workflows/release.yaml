@@ -28,7 +28,7 @@ jobs:
 
   publish:
     name: Publish to crates.io
-    needs: build
+    needs: [build, github-release]
     runs-on: ubuntu-latest
     environment: crates-io
     if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
@@ -56,15 +56,18 @@ jobs:
       env:
         APPLICATION_CERT_B64: ${{ secrets.APPLICATION_CERT_B64 }}
         INSTALLER_CERT_B64: ${{ secrets.INSTALLER_CERT_B64 }}
+        BUILD_PROVISION_PROFILE_B64: ${{ secrets.BUILD_PROVISION_PROFILE_B64 }}
         P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
         KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
       run: |
         APPLICATION_CERT_PATH=$RUNNER_TEMP/application.p12
         INSTALLER_CERT_PATH=$RUNNER_TEMP/installer.p12
         KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+        PP_PATH=$RUNNER_TEMP/build_pp.provisionprofile
 
         echo -n "$APPLICATION_CERT_B64" | base64 --decode -o "$APPLICATION_CERT_PATH"
         echo -n "$INSTALLER_CERT_B64" | base64 --decode -o "$INSTALLER_CERT_PATH"
+        echo -n "$BUILD_PROVISION_PROFILE_B64" | base64 --decode -o "$PP_PATH"
 
         security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
         security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
@@ -75,16 +78,33 @@ jobs:
         security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
         security list-keychain -d user -s "$KEYCHAIN_PATH"
 
+        mkdir -p ~/Library/Developer/Xcode/UserData/Provisioning\ Profiles
+        cp "$PP_PATH" ~/Library/Developer/Xcode/UserData/Provisioning\ Profiles
+
     - name: codesign app
       run: |
-        codesign -s "Developer ID Application: Steven Dee (2TM4K8523U)" -f --timestamp -o runtime onepass
-        chmod +x onepass
+        mkdir .root
+        mv onepass .root
+        codesign \
+            --sign "Developer ID Application: Steven Dee (2TM4K8523U)" \
+            --force \
+            --timestamp \
+            --options runtime \
+            --entitlements onepass.entitlements \
+            .root/onepass
+        chmod +x .root/onepass
 
-    - name: get version and verify
+    - uses: actions/upload-artifact@v4
+      with:
+        name: onepass-signed-darwin
+        path: .root/onepass
+
+    - name: check signature
+      run: codesign -vvv --strict --deep .root/onepass
+
+    - name: get version
       id: get-version
       run: |
-        binary_version=$(./onepass --version | cut -d' ' -f2)
-
         if [ -n "${{ inputs.tag }}" ]; then
           expected_version="${{ inputs.tag }}"
         else
@@ -94,36 +114,31 @@ jobs:
         # Remove 'v' prefix if present for comparison
         expected_clean="${expected_version#v}"
 
-        if [ "$binary_version" != "$expected_clean" ]; then
-          echo "ERROR: Version mismatch!"
-          echo "Binary version: $binary_version"
-          echo "Expected version: $expected_clean"
-          exit 1
-        fi
-
-        echo "Version verified: $binary_version matches $expected_clean"
-        echo "version=$binary_version" >> $GITHUB_OUTPUT
-
-    - uses: actions/upload-artifact@v4
-      with:
-        name: onepass-signed-darwin
-        path: onepass
+        echo "version=$expected_clean" >> $GITHUB_OUTPUT
 
     - name: notarize installer
       env:
         NOTARY_PASS: ${{ secrets.NOTARY_PASS }}
         DEV_ACCOUNT: ${{ secrets.DEV_ACCOUNT }}
       run: |
-        xcrun notarytool store-credentials --apple-id "$DEV_ACCOUNT" --team-id 2TM4K8523U --password "$NOTARY_PASS" notary-onepass
-        mkdir .root
-        cp onepass .root
+        set -xuo pipefail
+        xcrun notarytool store-credentials \
+            --apple-id "$DEV_ACCOUNT" \
+            --team-id 2TM4K8523U \
+            --password "$NOTARY_PASS" \
+            notary-onepass
         pkgbuild --root .root \
                  --identifier org.wholezero.pkg.onepass \
                  --version "${{ steps.get-version.outputs.version }}" \
                  --install-location /usr/local/bin \
                  --sign "Developer ID Installer: Steven Dee (2TM4K8523U)" \
                  onepass.pkg
-        xcrun notarytool submit onepass.pkg --keychain-profile notary-onepass --wait
+        codesign -vvv --deep --strict .root/onepass
+        pkgutil --check-signature onepass.pkg
+        xcrun notarytool submit \
+            onepass.pkg \
+            --keychain-profile notary-onepass \
+            --wait
         xcrun stapler staple onepass.pkg
         spctl --assess -vv --type install onepass.pkg
 
@@ -146,6 +161,7 @@ jobs:
         path: artifacts
     - run: |
         mkdir attest
+        ls -lR artifacts
         for path in artifacts/*; do
           mv "$path/onepass*" "attest/$path"
         done

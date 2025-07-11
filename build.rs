@@ -54,5 +54,13 @@ fn main() -> Result<()> {
     writeln!(output, "];")?;
 
     println!("cargo:rerun-if-changed=eff_large_wordlist.txt");
+
+    // Embed Info.plist on macOS
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    if target_os == "macos" {
+        println!("cargo:rustc-link-arg=-Wl,-sectcreate,__TEXT,__info_plist,Info.plist");
+        println!("cargo:rerun-if-changed=Info.plist");
+    }
+
     Ok(())
 }
