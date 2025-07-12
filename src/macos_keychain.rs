@@ -14,11 +14,11 @@
 
 use std::{fmt::Display, ptr};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use core_foundation::{
-    base::{kCFAllocatorDefault, CFOptionFlags, CFRelease, CFTypeRef, OSStatus, TCFType},
+    base::{CFOptionFlags, CFRelease, CFTypeRef, OSStatus, TCFType, kCFAllocatorDefault},
     boolean::CFBoolean,
-    data::CFData,
+    data::{CFData, CFDataGetLength, CFDataGetMutableBytePtr, CFMutableDataRef},
     dictionary::CFMutableDictionary,
     string::{CFString, CFStringRef},
 };
@@ -37,6 +37,7 @@ use security_framework_sys::{
     },
     keychain_item::{SecItemAdd, SecItemCopyMatching, SecItemDelete},
 };
+use zeroize::Zeroize;
 
 const SEC_SUCCESS: OSStatus = errSecSuccess;
 const SEC_ITEM_NOT_FOUND: OSStatus = errSecItemNotFound;
@@ -51,7 +52,12 @@ struct AccessControl(CFTypeRef);
 impl AccessControl {
     fn new(protection: CFStringRef, flags: CFOptionFlags) -> Result<Self> {
         let access_control = unsafe {
-            SecAccessControlCreateWithFlags(kCFAllocatorDefault, protection as CFTypeRef, flags, ptr::null_mut())
+            SecAccessControlCreateWithFlags(
+                kCFAllocatorDefault,
+                protection as CFTypeRef,
+                flags,
+                ptr::null_mut(),
+            )
         };
         if access_control.is_null() {
             anyhow::bail!("failed to create access control");
@@ -63,7 +69,35 @@ impl AccessControl {
 impl Drop for AccessControl {
     fn drop(&mut self) {
         if !self.0.is_null() {
-            unsafe { CFRelease(self.0); };
+            unsafe {
+                CFRelease(self.0);
+            };
+        }
+    }
+}
+
+struct SecureCFData(CFData);
+
+impl SecureCFData {
+    fn from_buffer(data: &[u8]) -> Self {
+        SecureCFData(CFData::from_buffer(data))
+    }
+
+    #[allow(non_snake_case)]
+    fn as_CFTypeRef(&self) -> CFTypeRef {
+        self.0.as_CFTypeRef()
+    }
+}
+
+impl Drop for SecureCFData {
+    fn drop(&mut self) {
+        unsafe {
+            let ptr = CFDataGetMutableBytePtr(self.0.as_concrete_TypeRef() as CFMutableDataRef);
+            if !ptr.is_null() {
+                let len = usize::try_from(CFDataGetLength(self.0.as_concrete_TypeRef())).unwrap();
+                let slice = std::slice::from_raw_parts_mut(ptr, len);
+                slice.zeroize();
+            }
         }
     }
 }
@@ -77,8 +111,11 @@ impl Entry {
     }
 
     pub fn set_password(&self, password: &str) -> Result<()> {
-        let access_control = AccessControl::new(unsafe { kSecAttrAccessibleWhenUnlockedThisDeviceOnly }, kSecAccessControlBiometryAny)?;
-        let password_data = CFData::from_buffer(password.as_bytes());
+        let access_control = AccessControl::new(
+            unsafe { kSecAttrAccessibleWhenUnlockedThisDeviceOnly },
+            kSecAccessControlBiometryAny,
+        )?;
+        let password_data = SecureCFData::from_buffer(password.as_bytes());
         let service_str = CFString::new(&self.service);
         let account_str = CFString::new(&self.account);
 
@@ -91,10 +128,7 @@ impl Entry {
             query.set(kSecAttrService as CFTypeRef, service_str.as_CFTypeRef());
             query.set(kSecAttrAccount as CFTypeRef, account_str.as_CFTypeRef());
             query.set(kSecValueData as CFTypeRef, password_data.as_CFTypeRef());
-            query.set(
-                kSecAttrAccessControl as CFTypeRef,
-                access_control.0,
-            );
+            query.set(kSecAttrAccessControl as CFTypeRef, access_control.0);
         }
 
         let status = unsafe { SecItemAdd(query.as_concrete_TypeRef(), ptr::null_mut()) };
@@ -137,9 +171,12 @@ impl Entry {
                         "failed to read from keychain"
                     )));
                 }
-                let data = unsafe { CFData::wrap_under_create_rule(result as *mut _) };
-                let bytes = data.bytes();
-                let password = String::from_utf8_lossy(bytes).to_string();
+                let data =
+                    SecureCFData(unsafe { CFData::wrap_under_create_rule(result as *mut _) });
+                let bytes = data.0.bytes();
+                let password = String::from_utf8(bytes.to_vec())
+                    .context("non–UTF-8 password; delete it with -r")
+                    .map_err(Error::Other)?;
                 Ok(password)
             }
             SEC_ITEM_NOT_FOUND => Err(Error::NoEntry),
