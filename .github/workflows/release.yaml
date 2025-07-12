@@ -163,7 +163,7 @@ jobs:
         mkdir attest
         ls -lR artifacts
         for path in artifacts/*; do
-          mv "$path/onepass*" "attest/$path"
+          mv "$path"/onepass* "attest/${path#artifacts/}"
         done
     - uses: actions/attest-build-provenance@v2
       with:
