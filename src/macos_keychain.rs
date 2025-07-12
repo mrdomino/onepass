@@ -16,11 +16,11 @@ use std::{fmt::Display, ptr};
 
 use anyhow::Result;
 use core_foundation::{
-    base::{CFTypeRef, OSStatus, TCFType, kCFAllocatorDefault},
+    base::{kCFAllocatorDefault, CFOptionFlags, CFRelease, CFTypeRef, OSStatus, TCFType},
     boolean::CFBoolean,
     data::CFData,
     dictionary::CFMutableDictionary,
-    string::CFString,
+    string::{CFString, CFStringRef},
 };
 use objc2::{rc::Retained, runtime::AnyObject};
 use objc2_foundation::NSString;
@@ -38,9 +38,34 @@ use security_framework_sys::{
     keychain_item::{SecItemAdd, SecItemCopyMatching, SecItemDelete},
 };
 
+const SEC_SUCCESS: OSStatus = errSecSuccess;
+const SEC_ITEM_NOT_FOUND: OSStatus = errSecItemNotFound;
+
 pub(crate) struct Entry {
     pub service: String,
     pub account: String,
+}
+
+struct AccessControl(CFTypeRef);
+
+impl AccessControl {
+    fn new(protection: CFStringRef, flags: CFOptionFlags) -> Result<Self> {
+        let access_control = unsafe {
+            SecAccessControlCreateWithFlags(kCFAllocatorDefault, protection as CFTypeRef, flags, ptr::null_mut())
+        };
+        if access_control.is_null() {
+            anyhow::bail!("failed to create access control");
+        }
+        Ok(AccessControl(access_control as CFTypeRef))
+    }
+}
+
+impl Drop for AccessControl {
+    fn drop(&mut self) {
+        if !self.0.is_null() {
+            unsafe { CFRelease(self.0); };
+        }
+    }
 }
 
 impl Entry {
@@ -52,17 +77,7 @@ impl Entry {
     }
 
     pub fn set_password(&self, password: &str) -> Result<()> {
-        let access_control = unsafe {
-            SecAccessControlCreateWithFlags(
-                kCFAllocatorDefault,
-                kSecAttrAccessibleWhenUnlockedThisDeviceOnly as CFTypeRef,
-                kSecAccessControlBiometryAny,
-                ptr::null_mut(),
-            )
-        };
-        if access_control.is_null() {
-            anyhow::bail!("failed to create access control");
-        }
+        let access_control = AccessControl::new(unsafe { kSecAttrAccessibleWhenUnlockedThisDeviceOnly }, kSecAccessControlBiometryAny)?;
         let password_data = CFData::from_buffer(password.as_bytes());
         let service_str = CFString::new(&self.service);
         let account_str = CFString::new(&self.account);
@@ -78,7 +93,7 @@ impl Entry {
             query.set(kSecValueData as CFTypeRef, password_data.as_CFTypeRef());
             query.set(
                 kSecAttrAccessControl as CFTypeRef,
-                access_control as CFTypeRef,
+                access_control.0,
             );
         }
 
@@ -181,6 +196,3 @@ impl core::error::Error for Error {
         }
     }
 }
-
-const SEC_SUCCESS: OSStatus = errSecSuccess;
-const SEC_ITEM_NOT_FOUND: OSStatus = errSecItemNotFound;
