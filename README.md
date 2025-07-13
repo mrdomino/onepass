@@ -10,7 +10,7 @@ Keyring sync can be requested either with the `-k` / `--keyring` CLI arg, or the
 
 ## Install from GitHub releases
 
-Download the [latest GitHub release](https://github.com/mrdomino/onepass/releases/latest) binary for your platform, or download and run `onepass.pkg` for recent (i.e. Apple Silicon running OS X 10.13+) macOS machines.
+Download the [latest GitHub release](https://github.com/mrdomino/onepass/releases/latest) binary for your platform, or download and run the `onepass.pkg` installer for recent (i.e. Apple Silicon running OS X 10.13+) macOS machines.
 
 ## Quick start
 
