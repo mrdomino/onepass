@@ -23,7 +23,7 @@ onepass google.com
 You can override site settings with either config file entries or command-line flags. E.g. to use a password schema consisting of 18 alphanumeric characters:
 
 ```sh
-onepass google.com -s '[A-Za-z0-9]{16}'
+onepass google.com -s '[A-Za-z0-9]{18}'
 ```
 
 A default config file is generated at `${XDG_CONFIG_DIR:-$HOME/.config}/onepass/config.yaml` on the app’s first run. You may customize this config file; as it does not contain any sensitive data, you may like to back it up with other non-sensitive documents.
