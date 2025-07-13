@@ -1,6 +1,6 @@
 # onepass
 
-Onepass is a CLI deterministic password generator. Think of it like a password manager (à la 1Password or the macOS Passwords app) except that instead of needing to store every password it generates, you only need to keep track of the one seed password from which the rest can be regenerated.
+Onepass is a deterministic CLI password manager/generator. Think of it like an ordinary password manager (à la 1Password or the macOS Passwords app) except that instead of needing to store and keep track of every single password it generates, you only need to know the one seed password from which the rest are grown.
 
 Individual site passwords can be cycled without changing your seed password by increasing a per-site “increment” parameter. Different password schemas are supported per site, such as “one lowercase letter, one uppercase letter, one digit, 15 alphanumeric characters.” The specification for these schemas is a regex-like syntax, and schemas may also be mapped to human-readable aliases; the [example config](example/config.yaml) demonstrates how this works.
 
