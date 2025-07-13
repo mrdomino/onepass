@@ -12,201 +12,130 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{fmt::Display, ptr};
+use std::{
+    fmt::Display,
+    ptr::{self, NonNull},
+};
 
 use anyhow::{Context, Result};
-use core_foundation::{
-    base::{CFOptionFlags, CFRelease, CFTypeRef, OSStatus, TCFType, kCFAllocatorDefault},
-    boolean::CFBoolean,
-    data::{CFData, CFDataGetLength, CFDataGetMutableBytePtr, CFMutableDataRef},
-    dictionary::CFMutableDictionary,
-    string::{CFString, CFStringRef},
-};
-use objc2::{rc::Retained, runtime::AnyObject};
+use objc2::runtime::AnyObject;
+use objc2_core_foundation::{CFData, CFDictionary, CFRetained, CFString, CFType, kCFBooleanTrue};
 use objc2_foundation::NSString;
 use objc2_local_authentication::LAContext;
-use security_framework_sys::{
-    access_control::{
-        SecAccessControlCreateWithFlags, kSecAccessControlBiometryAny,
-        kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-    },
-    base::{errSecItemNotFound, errSecSuccess},
-    item::{
-        kSecAttrAccessControl, kSecAttrAccount, kSecAttrService, kSecClass,
-        kSecClassGenericPassword, kSecReturnData, kSecUseAuthenticationContext, kSecValueData,
-    },
-    keychain_item::{SecItemAdd, SecItemCopyMatching, SecItemDelete},
+use objc2_security::{
+    SecAccessControl, SecAccessControlCreateFlags, SecItemAdd, SecItemCopyMatching, SecItemDelete,
+    errSecItemNotFound, errSecSuccess, errSecUserCanceled, kSecAttrAccessControl,
+    kSecAttrAccessibleWhenUnlockedThisDeviceOnly, kSecAttrAccount, kSecAttrService, kSecClass,
+    kSecClassGenericPassword, kSecReturnData, kSecUseAuthenticationContext, kSecValueData,
 };
-use zeroize::Zeroize;
-
-const SEC_SUCCESS: OSStatus = errSecSuccess;
-const SEC_ITEM_NOT_FOUND: OSStatus = errSecItemNotFound;
 
 pub(crate) struct Entry {
-    pub service: String,
-    pub account: String,
-}
-
-struct AccessControl(CFTypeRef);
-
-impl AccessControl {
-    fn new(protection: CFStringRef, flags: CFOptionFlags) -> Result<Self> {
-        let access_control = unsafe {
-            SecAccessControlCreateWithFlags(
-                kCFAllocatorDefault,
-                protection as CFTypeRef,
-                flags,
-                ptr::null_mut(),
-            )
-        };
-        if access_control.is_null() {
-            anyhow::bail!("failed to create access control");
-        }
-        Ok(AccessControl(access_control as CFTypeRef))
-    }
-}
-
-impl Drop for AccessControl {
-    fn drop(&mut self) {
-        if !self.0.is_null() {
-            unsafe {
-                CFRelease(self.0);
-            };
-        }
-    }
-}
-
-struct SecureCFData(CFData);
-
-impl SecureCFData {
-    fn from_buffer(data: &[u8]) -> Self {
-        SecureCFData(CFData::from_buffer(data))
-    }
-
-    #[allow(non_snake_case)]
-    fn as_CFTypeRef(&self) -> CFTypeRef {
-        self.0.as_CFTypeRef()
-    }
-}
-
-impl Drop for SecureCFData {
-    fn drop(&mut self) {
-        unsafe {
-            let ptr = CFDataGetMutableBytePtr(self.0.as_concrete_TypeRef() as CFMutableDataRef);
-            if !ptr.is_null() {
-                let len = usize::try_from(CFDataGetLength(self.0.as_concrete_TypeRef())).unwrap();
-                let slice = std::slice::from_raw_parts_mut(ptr, len);
-                slice.zeroize();
-            }
-        }
-    }
+    pub service: CFRetained<CFString>,
+    pub account: CFRetained<CFString>,
 }
 
 impl Entry {
     pub fn new(service: &str, account: &str) -> Result<Self> {
         Ok(Entry {
-            service: service.into(),
-            account: account.into(),
+            service: CFString::from_str(service),
+            account: CFString::from_str(account),
         })
     }
 
     pub fn set_password(&self, password: &str) -> Result<()> {
-        let access_control = AccessControl::new(
-            unsafe { kSecAttrAccessibleWhenUnlockedThisDeviceOnly },
-            kSecAccessControlBiometryAny,
-        )?;
-        let password_data = SecureCFData::from_buffer(password.as_bytes());
-        let service_str = CFString::new(&self.service);
-        let account_str = CFString::new(&self.account);
-
-        let mut query = CFMutableDictionary::new();
-        unsafe {
-            query.set(
-                kSecClass as CFTypeRef,
-                kSecClassGenericPassword as CFTypeRef,
-            );
-            query.set(kSecAttrService as CFTypeRef, service_str.as_CFTypeRef());
-            query.set(kSecAttrAccount as CFTypeRef, account_str.as_CFTypeRef());
-            query.set(kSecValueData as CFTypeRef, password_data.as_CFTypeRef());
-            query.set(kSecAttrAccessControl as CFTypeRef, access_control.0);
+        let access_control = unsafe {
+            SecAccessControl::with_flags(
+                None,
+                kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+                SecAccessControlCreateFlags::BiometryAny,
+                ptr::null_mut(),
+            )
         }
-
-        let status = unsafe { SecItemAdd(query.as_concrete_TypeRef(), ptr::null_mut()) };
-        if status == errSecSuccess {
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!("failed to add password: {:?}", status))
+        .context("failed creating access control")?;
+        let password = CFData::from_bytes(password.as_bytes());
+        let query = unsafe {
+            CFDictionary::from_slices(
+                &[
+                    kSecClass,
+                    kSecAttrService,
+                    kSecAttrAccount,
+                    kSecValueData,
+                    kSecAttrAccessControl,
+                ],
+                &[
+                    kSecClassGenericPassword as &CFType,
+                    &*self.service,
+                    &*self.account,
+                    &*password,
+                    &*access_control,
+                ],
+            )
+        };
+        let status = unsafe { SecItemAdd(query.as_opaque(), ptr::null_mut()) };
+        if status != errSecSuccess {
+            anyhow::bail!("failed to set password: {status}");
         }
+        Ok(())
     }
 
     pub fn get_password(&self) -> core::result::Result<String, Error> {
+        let reason = NSString::from_str("load your seed password");
         let context = unsafe { LAContext::new() };
-        let reason = NSString::from_str("Access your seed password");
         unsafe { context.setLocalizedReason(&reason) };
-        let service_str = CFString::new(&self.service);
-        let account_str = CFString::new(&self.account);
-        let mut query = CFMutableDictionary::new();
-
-        unsafe {
-            query.set(
-                kSecClass as CFTypeRef,
-                kSecClassGenericPassword as CFTypeRef,
-            );
-            query.set(kSecAttrService as CFTypeRef, service_str.as_CFTypeRef());
-            query.set(kSecAttrAccount as CFTypeRef, account_str.as_CFTypeRef());
-            query.set(
-                kSecReturnData as CFTypeRef,
-                CFBoolean::true_value().as_CFTypeRef(),
-            );
-            let context_ptr = Retained::as_ptr(&context) as *const AnyObject as CFTypeRef;
-            query.set(kSecUseAuthenticationContext as CFTypeRef, context_ptr);
+        let context = unsafe { std::mem::transmute::<&AnyObject, &CFType>(&*context) };
+        let query = unsafe {
+            CFDictionary::from_slices(
+                &[
+                    kSecClass,
+                    kSecAttrService,
+                    kSecAttrAccount,
+                    kSecReturnData,
+                    kSecUseAuthenticationContext,
+                ],
+                &[
+                    kSecClassGenericPassword as &CFType,
+                    &*self.service,
+                    &*self.account,
+                    kCFBooleanTrue.unwrap(),
+                    context,
+                ],
+            )
+        };
+        let mut result: *const CFType = ptr::null();
+        let status =
+            unsafe { SecItemCopyMatching(query.as_opaque(), &mut result as *mut *const CFType) };
+        if status == errSecUserCanceled {
+            return Err(Error::Other(anyhow::anyhow!("Authentication canceled")));
+        } else if status == errSecItemNotFound {
+            return Err(Error::NoEntry);
+        } else if status != errSecSuccess {
+            return Err(Error::Other(anyhow::anyhow!(
+                "failed to load password: {status:?}"
+            )));
         }
-
-        let mut result: CFTypeRef = ptr::null_mut();
-        let status = unsafe { SecItemCopyMatching(query.as_concrete_TypeRef(), &mut result) };
-        match status {
-            SEC_SUCCESS => {
-                if result.is_null() {
-                    return Err(Error::Other(anyhow::anyhow!(
-                        "failed to read from keychain"
-                    )));
-                }
-                let data =
-                    SecureCFData(unsafe { CFData::wrap_under_create_rule(result as *mut _) });
-                let bytes = data.0.bytes();
-                let password = String::from_utf8(bytes.to_vec())
-                    .context("non–UTF-8 password; delete it with -r")
-                    .map_err(Error::Other)?;
-                Ok(password)
-            }
-            SEC_ITEM_NOT_FOUND => Err(Error::NoEntry),
-            _ => Err(Error::Other(anyhow::anyhow!(
-                "keychain load failed: {:?}",
-                status
-            ))),
+        if result.is_null() {
+            return Err(Error::Other(anyhow::anyhow!("nil result from keychain")));
         }
+        let result = NonNull::new(result as *mut CFData).unwrap();
+        let result = unsafe { CFRetained::from_raw(result) };
+        let password = str::from_utf8(unsafe { result.as_bytes_unchecked() })
+            .context("non-utf8 password; delete with -r")
+            .map_err(Error::Other)?;
+        Ok(String::from(password))
     }
 
     pub fn delete_credential(&self) -> Result<()> {
-        let service_str = CFString::new(&self.service);
-        let account_str = CFString::new(&self.account);
-
-        let mut query = CFMutableDictionary::new();
-        unsafe {
-            query.set(
-                kSecClass as CFTypeRef,
-                kSecClassGenericPassword as CFTypeRef,
-            );
-            query.set(kSecAttrService as CFTypeRef, service_str.as_CFTypeRef());
-            query.set(kSecAttrAccount as CFTypeRef, account_str.as_CFTypeRef());
+        let query = unsafe {
+            CFDictionary::from_slices(
+                &[kSecClass, kSecAttrService, kSecAttrAccount],
+                &[kSecClassGenericPassword, &*self.service, &*self.account],
+            )
+        };
+        let status = unsafe { SecItemDelete(query.as_opaque()) };
+        if status != errSecSuccess && status != errSecItemNotFound {
+            anyhow::bail!("failed to delete password: {status:?}");
         }
-
-        let status = unsafe { SecItemDelete(query.as_concrete_TypeRef()) };
-        if status == SEC_SUCCESS || status == SEC_ITEM_NOT_FOUND {
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!("delete password failed: {:?}", status))
-        }
+        Ok(())
     }
 }
 

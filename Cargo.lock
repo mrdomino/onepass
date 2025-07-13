@@ -1018,7 +1018,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c10c2894a6fed806ade6027bcd50662746363a9589d3ec9d9bef30a4e4bc166"
 dependencies = [
  "bitflags 2.9.1",
+ "block2",
  "dispatch2",
+ "libc",
  "objc2",
 ]
 
@@ -1060,6 +1062,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1f8e0ef3ab66b08c42644dcb34dba6ec0a574bbd8adbb8bdbdc7a2779731a44"
 dependencies = [
  "bitflags 2.9.1",
+ "block2",
+ "libc",
  "objc2",
  "objc2-core-foundation",
 ]
@@ -1078,25 +1082,25 @@ checksum = "a4895175b425cb1f87721b59f0f286c2092bd4af812243672510e1ac53e2e0ad"
 
 [[package]]
 name = "onepass"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "argon2",
  "char-iter",
  "clap",
- "core-foundation 0.10.1",
  "crypto-bigint",
  "home-dir",
  "keyring",
  "nom",
  "num-traits",
  "objc2",
+ "objc2-core-foundation",
  "objc2-foundation",
  "objc2-local-authentication",
+ "objc2-security",
  "rand_chacha 0.9.0",
  "rand_core 0.9.3",
  "rpassword",
- "security-framework-sys",
  "serde",
  "serde_yaml",
  "url",
