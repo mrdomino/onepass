@@ -75,7 +75,7 @@ jobs:
     - run: rustup default stable
 
     - run: cargo build --locked --profile ${{ env.profile }} --target ${{ env.target }}
-      if: !inputs.release
+      if: ${{ !inputs.release }}
     - run: cargo build -F macos-biometry --locked --profile ${{ env.profile }} --target ${{ env.target }}
       if: inputs.release
 
