@@ -48,6 +48,10 @@ impl Drop for SecureData {
     }
 }
 
+/// Entry exposes an API superficially compatible with the subset of keyring::Entry used by
+/// onepass. The difference is that it asks for the password it saves to be protected by biometric
+/// unlock. This requires using an LAContext when we unlock the password, and also requires the app
+/// to be codesigned with the correct entitlements.
 pub(crate) struct Entry {
     pub service: CFRetained<CFString>,
     pub account: CFRetained<CFString>,
@@ -154,7 +158,7 @@ impl Entry {
         Ok(String::from(password))
     }
 
-    pub fn delete_credential(&self) -> Result<()> {
+    pub fn delete_credential(&self) -> core::result::Result<(), Error> {
         let query = unsafe {
             CFDictionary::from_slices(
                 &[kSecClass, kSecAttrService, kSecAttrAccount],
@@ -162,13 +166,19 @@ impl Entry {
             )
         };
         let status = unsafe { SecItemDelete(query.as_opaque()) };
-        if status != errSecSuccess && status != errSecItemNotFound {
-            anyhow::bail!("failed to delete password: {status:?}");
+        if status == errSecItemNotFound {
+            return Err(Error::NoEntry);
+        } else if status != errSecSuccess {
+            return Err(Error::Other(anyhow::anyhow!(
+                "failed to delete password: {status:?}"
+            )));
         }
         Ok(())
     }
 }
 
+/// Error is a superficially compatible type with keyring::Error. In particular, it must expose a
+/// NoEntry option, so this can be checked by the functions that call keyring.
 #[derive(Debug)]
 pub(crate) enum Error {
     NoEntry,
