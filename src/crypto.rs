@@ -18,6 +18,8 @@ use rand_chacha::ChaCha20Rng;
 use rand_core::{RngCore, SeedableRng};
 use zeroize::{Zeroize, Zeroizing};
 
+/// Rng wraps a ChaCha20Rng but zeroizes it on drop. It also supports creation from a password and
+/// salt via argon2id with our chosen parameters.
 pub(crate) struct Rng(ChaCha20Rng);
 
 impl Rng {
