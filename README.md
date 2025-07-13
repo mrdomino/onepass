@@ -40,7 +40,8 @@ Building from source on macOS requires codesigning, which probably requires you 
 Assuming you’re using your Apple Development signing key, you should be able to do something like the following:
 
 ```sh
-sed "s/2TM4K8523U.org.whilezero.app.onepass/$MY_TEAM_ID.*" onepass.entitlements > my-onepass.entitlements &&
+sed "s/2TM4K8523U.org.whilezero.app.onepass/$MY_TEAM_ID.*/" \
+    onepass.entitlements > my-onepass.entitlements &&
   cargo build --release &&
   codesign \
     --force \
