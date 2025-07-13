@@ -15,11 +15,14 @@
 use std::{
     fmt::Display,
     ptr::{self, NonNull},
+    slice,
 };
 
 use anyhow::{Context, Result};
 use objc2::runtime::AnyObject;
-use objc2_core_foundation::{CFData, CFDictionary, CFRetained, CFString, CFType, kCFBooleanTrue};
+use objc2_core_foundation::{
+    CFDictionary, CFMutableData, CFRetained, CFString, CFType, kCFBooleanTrue,
+};
 use objc2_foundation::NSString;
 use objc2_local_authentication::LAContext;
 use objc2_security::{
@@ -28,6 +31,22 @@ use objc2_security::{
     kSecAttrAccessibleWhenUnlockedThisDeviceOnly, kSecAttrAccount, kSecAttrService, kSecClass,
     kSecClassGenericPassword, kSecReturnData, kSecUseAuthenticationContext, kSecValueData,
 };
+use zeroize::Zeroize;
+
+struct SecureData(CFRetained<CFMutableData>);
+
+impl Drop for SecureData {
+    fn drop(&mut self) {
+        unsafe {
+            let ptr = CFMutableData::mutable_byte_ptr(Some(&self.0));
+            let len = self.0.len();
+            if !ptr.is_null() {
+                let slice: &mut [u8] = slice::from_raw_parts_mut(ptr, len);
+                slice.zeroize();
+            }
+        }
+    }
+}
 
 pub(crate) struct Entry {
     pub service: CFRetained<CFString>,
@@ -52,7 +71,18 @@ impl Entry {
             )
         }
         .context("failed creating access control")?;
-        let password = CFData::from_bytes(password.as_bytes());
+        let password_bytes = password.as_bytes();
+        let password = SecureData(
+            CFMutableData::new(None, password_bytes.len() as isize)
+                .context("failed to allocate buffer")?,
+        );
+        unsafe {
+            CFMutableData::append_bytes(
+                Some(&password.0),
+                password_bytes.as_ptr(),
+                password_bytes.len() as isize,
+            );
+        }
         let query = unsafe {
             CFDictionary::from_slices(
                 &[
@@ -64,10 +94,10 @@ impl Entry {
                 ],
                 &[
                     kSecClassGenericPassword as &CFType,
-                    &*self.service,
-                    &*self.account,
-                    &*password,
-                    &*access_control,
+                    &self.service,
+                    &self.account,
+                    &password.0,
+                    &access_control,
                 ],
             )
         };
@@ -94,8 +124,8 @@ impl Entry {
                 ],
                 &[
                     kSecClassGenericPassword as &CFType,
-                    &*self.service,
-                    &*self.account,
+                    &self.service,
+                    &self.account,
                     kCFBooleanTrue.unwrap(),
                     context,
                 ],
@@ -116,9 +146,9 @@ impl Entry {
         if result.is_null() {
             return Err(Error::Other(anyhow::anyhow!("nil result from keychain")));
         }
-        let result = NonNull::new(result as *mut CFData).unwrap();
-        let result = unsafe { CFRetained::from_raw(result) };
-        let password = str::from_utf8(unsafe { result.as_bytes_unchecked() })
+        let result = NonNull::new(result as *mut CFMutableData).unwrap();
+        let result = SecureData(unsafe { CFRetained::from_raw(result) });
+        let password = str::from_utf8(unsafe { result.0.as_bytes_unchecked() })
             .context("non-utf8 password; delete with -r")
             .map_err(Error::Other)?;
         Ok(String::from(password))
@@ -128,7 +158,7 @@ impl Entry {
         let query = unsafe {
             CFDictionary::from_slices(
                 &[kSecClass, kSecAttrService, kSecAttrAccount],
-                &[kSecClassGenericPassword, &*self.service, &*self.account],
+                &[kSecClassGenericPassword, &self.service, &self.account],
             )
         };
         let status = unsafe { SecItemDelete(query.as_opaque()) };
