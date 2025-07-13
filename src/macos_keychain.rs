@@ -112,7 +112,7 @@ impl Entry {
         let reason = NSString::from_str("load your seed password");
         let context = unsafe { LAContext::new() };
         unsafe { context.setLocalizedReason(&reason) };
-        let context = unsafe { std::mem::transmute::<&AnyObject, &CFType>(&*context) };
+        let context = unsafe { std::mem::transmute::<&AnyObject, &CFType>(&context) };
         let query = unsafe {
             CFDictionary::from_slices(
                 &[
