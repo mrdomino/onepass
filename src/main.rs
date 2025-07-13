@@ -75,7 +75,7 @@ struct Args {
     #[arg(short, long)]
     username: Option<String>,
 
-    /// Use the system keyring to store the master password
+    /// Use the system keyring to store the seed password
     #[arg(
         short,
         long,
@@ -86,15 +86,15 @@ struct Args {
     )]
     keyring: Option<bool>,
 
-    /// Do not use the system keyring to store the master password
+    /// Do not use the system keyring to store the seed password
     #[arg(short = 'K', long, conflicts_with = "keyring")]
     no_keyring: bool,
 
-    /// Explicitly reset system keyring master password
+    /// Explicitly reset system keyring seed password
     #[arg(short, long)]
     reset_keyring: bool,
 
-    /// Confirm master password
+    /// Confirm seed password
     #[arg(short, long)]
     confirm: bool,
 
