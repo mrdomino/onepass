@@ -212,6 +212,9 @@ fn read_password(use_keyring: bool, confirm: bool) -> Result<Zeroizing<String>> 
         .transpose()?
         .flatten();
     if let Some(password) = password {
+        if confirm {
+            check_confirm(&password)?;
+        }
         return Ok(password);
     }
     let password: Zeroizing<String> = prompt_password("Seed password: ")
