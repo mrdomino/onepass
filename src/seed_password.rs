@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", feature = "macos-biometry"))]
 use crate::macos_keychain::{Entry, Error};
 use anyhow::{Context, Result};
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(all(target_os = "macos", feature = "macos-biometry")))]
 use keyring::{Entry, Error};
 use rpassword::prompt_password;
 use zeroize::Zeroizing;

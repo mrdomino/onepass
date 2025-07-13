@@ -15,7 +15,7 @@
 mod config;
 mod crypto;
 mod seed_password;
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", feature = "macos-biometry"))]
 mod macos_keychain;
 mod randexp;
 mod url;
