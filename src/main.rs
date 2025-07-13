@@ -14,7 +14,7 @@
 
 mod config;
 mod crypto;
-mod keyring;
+mod seed_password;
 #[cfg(target_os = "macos")]
 mod macos_keychain;
 mod randexp;
@@ -33,9 +33,7 @@ use clap::{CommandFactory, Parser};
 use config::Config;
 use crypto::Rng;
 use crypto_bigint::{NonZero, RandomMod, U256};
-use keyring::delete_password;
 use randexp::{Enumerable, Expr, Quantifiable, Words};
-use rpassword::prompt_password;
 use url::canonicalize;
 use zeroize::Zeroizing;
 
@@ -77,7 +75,7 @@ struct Args {
     #[arg(short, long)]
     username: Option<String>,
 
-    /// Use the system keyring to store the master password
+    /// Use the system keyring to store the seed password
     #[arg(
         short,
         long,
@@ -88,15 +86,15 @@ struct Args {
     )]
     keyring: Option<bool>,
 
-    /// Do not use the system keyring to store the master password
+    /// Do not use the system keyring to store the seed password
     #[arg(short = 'K', long, conflicts_with = "keyring")]
     no_keyring: bool,
 
-    /// Explicitly reset system keyring master password
+    /// Explicitly reset system keyring seed password
     #[arg(short, long)]
     reset_keyring: bool,
 
-    /// Confirm master password
+    /// Confirm seed password
     #[arg(short, long)]
     confirm: bool,
 
@@ -135,7 +133,7 @@ fn main() -> Result<()> {
     let words = Words::from(words.as_deref().unwrap_or(EFF_WORDLIST));
 
     if args.reset_keyring {
-        delete_password()?;
+        seed_password::delete()?;
         if args.sites.is_empty() {
             return Ok(());
         }
@@ -148,7 +146,7 @@ fn main() -> Result<()> {
     }
 
     let use_keyring = args.keyring.or(config.use_keyring).unwrap_or(false);
-    let password = read_password(use_keyring, args.confirm)?;
+    let password = seed_password::read(use_keyring, args.confirm)?;
 
     let mut stdout = stdout();
     for site in &args.sites {
@@ -204,37 +202,4 @@ fn gen_password(
     let index = U256::random_mod(&mut rng, &NonZero::new(size).unwrap());
     let res = words.gen_at(&expr, index)?;
     Ok(res)
-}
-
-fn read_password(use_keyring: bool, confirm: bool) -> Result<Zeroizing<String>> {
-    let password = use_keyring
-        .then(keyring::load_password)
-        .transpose()?
-        .flatten();
-    if let Some(password) = password {
-        if confirm {
-            check_confirm(&password)?;
-        }
-        return Ok(password);
-    }
-    let password: Zeroizing<String> = prompt_password("Seed password: ")
-        .context("failed reading password")?
-        .into();
-    if use_keyring || confirm {
-        check_confirm(&password)?;
-    }
-    if use_keyring {
-        keyring::save_password(&password)?;
-    }
-    Ok(password)
-}
-
-fn check_confirm(password: &str) -> Result<()> {
-    let confirmed: Zeroizing<String> = prompt_password("Confirmation: ")
-        .context("failed reading confirmation")?
-        .into();
-    if *confirmed != password {
-        anyhow::bail!("passwords don’t match");
-    }
-    Ok(())
 }
