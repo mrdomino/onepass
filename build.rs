@@ -55,9 +55,10 @@ fn main() -> Result<()> {
 
     println!("cargo:rerun-if-changed=eff_large_wordlist.txt");
 
-    // Embed Info.plist on macOS
+    // Embed Info.plist on macOS with macos-biometry feature
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
-    if target_os == "macos" {
+    let macos_biometry = env::var("CARGO_FEATURE_MACOS_BIOMETRY").is_ok();
+    if target_os == "macos" && macos_biometry {
         println!("cargo:rustc-link-arg=-Wl,-sectcreate,__TEXT,__info_plist,Info.plist");
         println!("cargo:rerun-if-changed=Info.plist");
     }

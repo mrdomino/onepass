@@ -32,29 +32,31 @@ A default config file is generated at `${XDG_CONFIG_DIR:-$HOME/.config}/onepass/
 
 ### From cargo
 
-On non-macOS platforms, onepass may be installed via cargo:
+Onepass may be installed via cargo:
 
 ```sh
 cargo install onepass
 ```
 
-### From source
+Note, however, that on macOS, the biometric keyring support will not be enabled.
 
-On non-macOS platforms, you may simply do:
+### From source
 
 ```sh
 cargo build --release &&
   sudo install target/release/onepass /usr/local/bin/onepass
 ```
 
-Building from source on macOS requires codesigning to use the biometric keychain APIs, which probably requires you to edit [`onepass.entitlements`](onepass.entitlements) to replace the team ID with your own.
+To enable the macOS biometric keyring support, you will need to produce a codesigned binary.
+
+To do this, you will probably need to edit [`onepass.entitlements`](onepass.entitlements) to replace the team ID with your own.
 
 Assuming you’re using an Apple Development local-only signing key, you should be able to do something like the following:
 
 ```sh
 sed "s/2TM4K8523U.org.whilezero.app.onepass/$MY_TEAM_ID.*/" \
     onepass.entitlements > my-onepass.entitlements &&
-  cargo build --release &&
+  cargo build -F macos-biometry --release &&
   codesign \
     --force \
     --options runtime \
