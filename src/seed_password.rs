@@ -29,7 +29,7 @@ const ACCOUNT: &str = "seed";
 /// from the console. This allows the user to confirm that the seed password is what they think it
 /// is without otherwise exposing the password.
 pub(crate) fn read(use_keyring: bool, confirm: bool) -> Result<Zeroizing<String>> {
-    let password = use_keyring.then(load_password).transpose()?.flatten();
+    let password = use_keyring.then(load_keyring).transpose()?.flatten();
     if let Some(password) = password {
         if confirm {
             check_confirm(&password)?;
@@ -43,7 +43,7 @@ pub(crate) fn read(use_keyring: bool, confirm: bool) -> Result<Zeroizing<String>
         check_confirm(&password)?;
     }
     if use_keyring {
-        save_password(&password)?;
+        save_keyring(&password)?;
     }
     Ok(password)
 }
@@ -68,14 +68,14 @@ fn check_confirm(password: &str) -> Result<()> {
     Ok(())
 }
 
-fn load_password() -> Result<Option<Zeroizing<String>>> {
+fn load_keyring() -> Result<Option<Zeroizing<String>>> {
     match get_entry()?.get_password() {
         Err(Error::NoEntry) => Ok(None),
         r => Ok(Some(r?.into())),
     }
 }
 
-fn save_password(password: &str) -> Result<()> {
+fn save_keyring(password: &str) -> Result<()> {
     get_entry()?
         .set_password(password)
         .context("failed setting password")
