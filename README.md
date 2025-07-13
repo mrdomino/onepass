@@ -4,21 +4,23 @@ Onepass is a CLI tool that may be used as a deterministic password generator. Th
 
 Onepass takes a single seed password and uses it to generate any number of per-site passwords. Individual site passwords can be cycled without changing all of your passwords by increasing an “increment” parameter for that site. Different password schemas are supported per site, such as “one lowercase letter, one uppercase letter, one digit, 15 alphanumeric characters.” The specification for these schemas is a regex-like syntax, and schemas may also be mapped to human-readable aliases; the [example config](example/config.yaml) demonstrates how these settings may be configured.
 
-Optionally, you may sync your seed password to the system keyring. It is recommended that you only do this if you trust the system on which you’ve installed onepass, as this makes it easy for your passwords to be compromised if your system is infected by malware. (Your seed password itself should actually be safe in this case unless either the system keyring is compromised, or there is a vulnerability in onepass itself.)
+Optionally, you may sync your seed password to the system keyring. This protects it from being shoulder-surfed as you’re entering it, and on some platforms, is guarded by a user presence check (e.g. TouchID.)
+
+Keyring sync can be requested either with the `-k` / `--keyring` CLI arg, or the `use_keyring: true` config setting.
 
 ## Installation
 
 ### GitHub releases
 
-Download the [latest GitHub release](https://github.com/mrdomino/onepass/releases/latest). The macOS binaries are signed. All release artifacts are [attested](https://github.blog/news-insights/product-news/introducing-artifact-attestations-now-in-public-beta/), and these attestations can be verified using the GitHub CLI:
+Download the [latest GitHub release](https://github.com/mrdomino/onepass/releases/latest). The macOS binaries (and the `onepass.pkg` macOS installer) are codesigned. All release artifacts are [attested](https://github.blog/news-insights/product-news/introducing-artifact-attestations-now-in-public-beta/), and these attestations can be verified, e.g. from the GitHub CLI:
 
 ```sh
 gh attestation verify /path/to/onepass --owner mrdomino
 ```
 
-### Cargo
+### From cargo
 
-Onepass releases are published to cargo, so you should be able to simply run:
+On non-macOS platforms, onepass may be installed via cargo:
 
 ```sh
 cargo install onepass
@@ -26,10 +28,29 @@ cargo install onepass
 
 ### From source
 
+On non-macOS platforms, simply do:
+
 ```sh
 cargo build --release &&
-    sudo install target/release/onepass /usr/local/bin/onepass
+  sudo install target/release/onepass /usr/local/bin/onepass
 ```
+
+Building from source on macOS requires codesigning, which probably requires you to edit [`onepass.entitlements`](onepass.entitlements) to replace the team ID with your own. See the [release GitHub workflow](.github/workflows/release.yaml) for an example of the steps required to build `onepass.pkg`, the macOS installer.
+
+Assuming you’re using your Apple Development signing key, you should be able to do something like the following:
+
+```sh
+sed "s/2TM4K8523U.org.whilezero.app.onepass/$MY_TEAM_ID.*" onepass.entitlements > my-onepass.entitlements &&
+  cargo build --release &&
+  codesign \
+    --force \
+    --options runtime \
+    --entitlements my-onepass.entitlements \
+    --sign "Apple Development" \
+    target/release/onepass
+```
+
+If it worked, you should be able to run `target/release/onepass -k google.com` and the command should succeed after reading your seed password; on a second run, or if there is already a password saved, you should see a TouchID prompt and not need to reenter your seed password.
 
 ## Quick start
 
