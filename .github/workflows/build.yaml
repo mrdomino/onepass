@@ -85,5 +85,8 @@ jobs:
         path: target/${{ env.target }}/${{ env.outdir }}/onepass
         retention-days: ${{ env.retention_days }}
 
+    - run: cargo test
+      if: ${{ !inputs.release }}
+
     - run: cargo publish --locked --dry-run --target ${{ env.target }}
       if: inputs.publish
