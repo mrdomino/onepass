@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     env,
     fs::{create_dir_all, read_to_string, write},
     path::{Path, PathBuf},
@@ -29,8 +29,8 @@ pub(crate) struct Config {
     pub words_path: Option<Box<Path>>,
     pub default_schema: String,
     pub use_keyring: Option<bool>,
-    pub aliases: HashMap<String, String>,
-    pub sites: HashMap<String, SiteConfig>,
+    pub aliases: BTreeMap<String, String>,
+    pub sites: BTreeMap<String, SiteConfig>,
 
     config_path: Option<Box<Path>>,
 }
@@ -136,14 +136,14 @@ struct SerConfig {
     #[serde(default)]
     pub use_keyring: Option<bool>,
     #[serde(default)]
-    pub aliases: HashMap<String, String>,
+    pub aliases: BTreeMap<String, String>,
     #[serde(deserialize_with = "deserialize_sites")]
-    pub sites: HashMap<String, SiteConfig>,
+    pub sites: BTreeMap<String, SiteConfig>,
 }
 
 impl SerConfig {
     fn example() -> Self {
-        let aliases: HashMap<String, String> = [
+        let aliases: BTreeMap<String, String> = [
             ("alnum", "[A-Za-z0-9]{18}"),
             ("apple", "[:Word:](-[:word:]){3}[0-9!-/]"),
             ("login", "[!-~]{12}"),
@@ -154,7 +154,7 @@ impl SerConfig {
         .into_iter()
         .map(|(k, v)| (k.into(), v.into()))
         .collect();
-        let sites: HashMap<String, SiteConfig> = [
+        let sites: BTreeMap<String, SiteConfig> = [
             ("apple.com", ("apple", 0)),
             ("google.com", ("mobile", 0)),
             ("iphone.local", ("pin", 1)),
@@ -227,7 +227,7 @@ impl Serialize for SerConfig {
         state.serialize_field("default_schema", &self.default_schema)?;
         state.serialize_field("aliases", &self.aliases)?;
 
-        let sites_for_serialization: HashMap<String, SchemaOrSiteConfig> = self
+        let sites_for_serialization: BTreeMap<String, SchemaOrSiteConfig> = self
             .sites
             .iter()
             .map(|(k, v)| (k.clone(), v.into()))
@@ -238,11 +238,11 @@ impl Serialize for SerConfig {
     }
 }
 
-fn deserialize_sites<'de, D>(deserializer: D) -> Result<HashMap<String, SiteConfig>, D::Error>
+fn deserialize_sites<'de, D>(deserializer: D) -> Result<BTreeMap<String, SiteConfig>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    let sites: HashMap<String, SchemaOrSiteConfig> = HashMap::deserialize(deserializer)?;
+    let sites: BTreeMap<String, SchemaOrSiteConfig> = BTreeMap::deserialize(deserializer)?;
     Ok(sites.into_iter().map(|(k, v)| (k, v.into())).collect())
 }
 
