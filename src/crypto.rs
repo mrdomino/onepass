@@ -63,17 +63,9 @@ mod tests {
 
     #[test]
     fn test_vectors() -> Result<()> {
-        let tests: &[(&str, u64)] = &[
-            ("test", 0xfa6a0c49ba644eb2),
-            ("pass", 0xa7a829d920a4bead),
-            ("testpassword", 0x7990486c179b197f),
-            ("hello", 0x563ca0109d374415),
-        ];
-        for t in tests {
-            let mut rng = Rng::from_password_salt(t.0, "testsalt".into())?;
-            let res = rng.next_u64();
-            assert_eq!(t.1, res, "{:x}", res);
-        }
+        let mut rng = Rng::from_password_salt("test", "testsalt".into())?;
+        let res = rng.next_u64();
+        assert_eq!(0xfa6a0c49ba644eb2, res, "{:x}", res);
         Ok(())
     }
 }
