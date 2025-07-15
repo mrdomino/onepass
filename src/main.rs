@@ -14,10 +14,10 @@
 
 mod config;
 mod crypto;
-mod seed_password;
 #[cfg(all(target_os = "macos", feature = "macos-biometry"))]
 mod macos_keychain;
 mod randexp;
+mod seed_password;
 mod url;
 
 use std::{
