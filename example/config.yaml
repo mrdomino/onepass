@@ -1,11 +1,11 @@
 default_schema: login
 aliases:
-  pin: '[0-9]{8}'
-  phrase: '[:word:](-[:word:]){4}'
   alnum: '[A-Za-z0-9]{18}'
-  mobile: '[a-z0-9]{24}'
-  login: '[!-~]{12}'
   apple: '[:Word:](-[:word:]){3}[0-9!-/]'
+  login: '[!-~]{12}'
+  mobile: '[a-z0-9]{24}'
+  phrase: '[:word:](-[:word:]){4}'
+  pin: '[0-9]{8}'
 sites:
   apple.com: apple
   google.com: mobile
