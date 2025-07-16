@@ -150,7 +150,7 @@ fn main() -> Result<()> {
 
     let mut stdout = stdout();
     for site in &args.sites {
-        let res = gen_password(&password, site, &config, &args, &words)?;
+        let res = gen_password_config(&password, site, &config, &args, &words)?;
         stdout.write_all(res.as_bytes())?;
         if stdout.is_terminal() || args.sites.len() > 1 {
             writeln!(stdout)?;
@@ -159,7 +159,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn gen_password(
+fn gen_password_config(
     password: &str,
     req: &str,
     config: &Config,
@@ -198,8 +198,46 @@ fn gen_password(
         eprintln!("salt: {salt:?}");
     }
 
+    gen_password(password, &url, &expr, increment, &words)
+}
+
+fn gen_password(
+    password: &str,
+    url: &str,
+    expr: &Expr,
+    increment: u32,
+    words: &Words,
+) -> Result<Zeroizing<String>> {
+    let size = words.size(&expr);
+    let salt = format!("{increment},{url}");
     let mut rng = Rng::from_password_salt(password, salt)?;
     let index = U256::random_mod(&mut rng, &NonZero::new(size).unwrap());
-    let res = words.gen_at(&expr, index)?;
-    Ok(res)
+    words.gen_at(&expr, index)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_passwords() -> Result<()> {
+        let tests = [
+            (
+                "pointing-unshaven-asparagus-geography",
+                "arst",
+                "google.com",
+                "[:word:](-[:word:]){3}",
+                0,
+            ),
+            ("!#()/!!%#&!%", "password", "apple.com", "[!-/]{12}", 1),
+        ];
+        let words = Words(EFF_WORDLIST);
+        for (want, password, url, schema, increment) in tests {
+            let url = canonicalize(url, None)?;
+            let expr = Expr::parse(schema)?;
+            let got = gen_password(password, &url, &expr, increment, &words)?;
+            assert_eq!(want, *got);
+        }
+        Ok(())
+    }
 }
