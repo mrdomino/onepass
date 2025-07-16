@@ -12,6 +12,8 @@ Keyring sync can be requested either with the `-k` / `--keyring` CLI arg, or the
 
 Download the [latest GitHub release](https://github.com/mrdomino/onepass/releases/latest) binary for your platform, or download and run the `onepass.pkg` installer for recent (i.e. Apple Silicon running OS X 10.13+) macOS machines.
 
+On macOS, you will need to download and install the [included provisioning profile](https://github.com/mrdomino/onepass/raw/refs/heads/main/onepass.provisionprofile) or the app will be killed by GateKeeper on startup. At present, this step must be done manually.
+
 ## Quick start
 
 Simply call `onepass` with the URL or hostname of the site for which you’d like to generate a password:
