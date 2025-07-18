@@ -42,7 +42,9 @@ pub(crate) fn expand_home<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
         Some(component) => ret.push(component),
         None => return Ok(ret),
     }
-    ret.push(components.as_path());
+    for component in components {
+        ret.push(component);
+    }
     Ok(ret)
 }
 
