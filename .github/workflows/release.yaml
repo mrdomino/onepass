@@ -209,6 +209,7 @@ jobs:
         if [ -f artifacts/onepass-pkg-darwin/onepass.pkg ]; then
           cp artifacts/onepass-pkg-darwin/onepass.pkg release-files/onepass.pkg
         fi
+        cp onepass.provisionprofile release-files/
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
