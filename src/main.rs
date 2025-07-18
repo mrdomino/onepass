@@ -130,8 +130,8 @@ fn main() -> Result<()> {
     // the user word file and another to store the list of slices corresponding to the words. We
     // need both declarations to be around so we can refer to the latter slice list as a &[&str]
     // so it fits into the same type as the built-in EFF word list.
-    let words = read_words_str(&args, &config)?;
-    let words = words.as_deref().map(read_words_arr);
+    let words: Option<_> = read_words_str(&args, &config)?;
+    let words = words.as_deref().map(words_arr);
     let words = Words::from(words.as_deref().unwrap_or(EFF_WORDLIST));
 
     let use_keyring = args.keyring.or(config.use_keyring).unwrap_or(false);
@@ -161,7 +161,7 @@ fn read_words_str(args: &Args, config: &Config) -> Result<Option<Box<str>>> {
         .context("failed reading words file")
 }
 
-fn read_words_arr(words: &'_ str) -> Box<[&'_ str]> {
+fn words_arr(words: &'_ str) -> Box<[&'_ str]> {
     let set = words
         .lines()
         .map(|l| l.trim())
