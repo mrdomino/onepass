@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use crate::url::canonicalize;
 
 pub(crate) struct Config {
-    pub words_path: Option<Box<Path>>,
+    words_path: Option<Box<Path>>,
     pub default_schema: String,
     pub use_keyring: Option<bool>,
     pub aliases: BTreeMap<String, String>,

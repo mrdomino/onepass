@@ -111,27 +111,6 @@ fn main() -> Result<()> {
         args.keyring = Some(false);
     }
 
-    let config = Config::from_file(args.config_path.as_deref()).context("failed to read config")?;
-
-    let words: Option<Box<str>> = args
-        .words_path
-        .clone()
-        .or_else(|| config.words_path())
-        .map(|path| read_to_string(path).map(|s| s.into()))
-        .transpose()
-        .context("failed reading words file")?;
-    let words: Option<Box<[&str]>> = words
-        .as_deref()
-        .map(|words| {
-            words
-                .lines()
-                .map(|line| line.trim())
-                .filter(|line| !line.is_empty())
-                .collect::<BTreeSet<_>>()
-        })
-        .map(|words| words.into_iter().collect());
-    let words = Words::from(words.as_deref().unwrap_or(EFF_WORDLIST));
-
     if args.reset_keyring {
         seed_password::delete()?;
         if args.sites.is_empty() {
@@ -145,6 +124,16 @@ fn main() -> Result<()> {
         exit(1);
     }
 
+    let config = Config::from_file(args.config_path.as_deref()).context("failed to read config")?;
+
+    // The following construction gives us only two allocations: one to store the string data of
+    // the user word file and another to store the list of slices corresponding to the words. We
+    // need both declarations to be around so we can refer to the latter slice list as a &[&str]
+    // so it fits into the same type as the built-in EFF word list.
+    let words = read_words_str(&args, &config)?;
+    let words = words.as_deref().map(read_words_arr);
+    let words = Words::from(words.as_deref().unwrap_or(EFF_WORDLIST));
+
     let use_keyring = args.keyring.or(config.use_keyring).unwrap_or(false);
     let password = seed_password::read(use_keyring, args.confirm)?;
 
@@ -157,6 +146,28 @@ fn main() -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn read_words_str(args: &Args, config: &Config) -> Result<Option<Box<str>>> {
+    let path = args.words_path.as_deref();
+    let config_path = if path.is_none() {
+        config.words_path()
+    } else {
+        None
+    };
+    let path = path.or(config_path.as_deref());
+    path.map(|p| read_to_string(p).map(|s| s.into_boxed_str()))
+        .transpose()
+        .context("failed reading words file")
+}
+
+fn read_words_arr(words: &'_ str) -> Box<[&'_ str]> {
+    let set = words
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect::<BTreeSet<_>>();
+    set.into_iter().collect()
 }
 
 fn gen_password_config(
@@ -198,7 +209,7 @@ fn gen_password_config(
         eprintln!("salt: {salt:?}");
     }
 
-    gen_password(password, &url, &expr, increment, &words)
+    gen_password(password, &url, &expr, increment, words)
 }
 
 fn gen_password(
@@ -208,11 +219,11 @@ fn gen_password(
     increment: u32,
     words: &Words,
 ) -> Result<Zeroizing<String>> {
-    let size = words.size(&expr);
+    let size = words.size(expr);
     let salt = format!("{increment},{url}");
     let mut rng = Rng::from_password_salt(password, salt)?;
     let index = U256::random_mod(&mut rng, &NonZero::new(size).unwrap());
-    words.gen_at(&expr, index)
+    words.gen_at(expr, index)
 }
 
 #[cfg(test)]
