@@ -51,11 +51,17 @@ jobs:
           outdir=debug
           retention_days=7
         fi
+        if [[ macos = "${{ matrix.os }}" && true = "${{ inputs.release }}" ]]; then
+          biometry=true
+        else
+          biometry=false
+        fi
         cat >>$GITHUB_ENV <<EOF
         target=${{ matrix.arch }}-$(osname)
         outdir=$outdir
         profile=$profile
         retention_days=$retention_days
+        biometry=$biometry
         EOF
 
     - uses: actions/checkout@v4
@@ -75,9 +81,9 @@ jobs:
     - run: rustup default stable
 
     - run: cargo build --locked --profile ${{ env.profile }} --target ${{ env.target }}
-      if: ${{ !inputs.release }}
-    - run: cargo build -F macos-biometry --locked --profile ${{ env.profile }} --target ${{ env.target }}
-      if: inputs.release
+      if: ${{ env.biometry != 'true' }}
+    - run: cargo build --locked --profile ${{ env.profile }} --target ${{ env.target }} --features macos-biometry --no-default-features
+      if: ${{ env.biometry == 'true' }}
 
     - uses: actions/upload-artifact@v4
       with:

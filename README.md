@@ -58,7 +58,7 @@ Assuming you’re using an Apple Development local-only signing key, you should 
 ```sh
 sed "s/2TM4K8523U.org.whilezero.app.onepass/$MY_TEAM_ID.*/" \
     onepass.entitlements > my-onepass.entitlements &&
-  cargo build -F macos-biometry --release &&
+  cargo build --no-default-features --features macos-biometry --release &&
   codesign \
     --force \
     --options runtime \
