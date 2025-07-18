@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod home;
+
 use std::{
     collections::BTreeMap,
     env,
@@ -20,7 +22,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use home_dir::HomeDirExt;
+use home::expand_home;
 use serde::{Deserialize, Serialize};
 
 use crate::url::canonicalize;
@@ -72,7 +74,7 @@ impl Config {
 
     pub fn words_path(&self) -> Option<Box<Path>> {
         let path = self.words_path.as_deref()?;
-        let path = path.expand_home().ok()?;
+        let path = expand_home(path).ok()?;
         if path.is_relative() {
             let config_path = self.config_path.as_deref()?.parent()?;
             Some(config_path.join(path).into())
