@@ -34,6 +34,7 @@ jobs:
             arch: x86_64
           - os:   windows
             arch: aarch64
+            runner: windows-11-arm
           - os:   windows
             arch: x86_64
     runs-on: ${{ matrix.runner != '' && matrix.runner || format('{0}-latest', matrix.os)}}
@@ -93,6 +94,7 @@ jobs:
         restore-keys: |
           rust-${{ env.target }}-${{ env.profile }}-
     - run: rustup toolchain install stable --target ${{ env.target }} --profile minimal
+      shell: bash
     - run: rustup default stable
 
     - run: cargo build --locked --profile ${{ env.profile }} --target ${{ env.target }}
