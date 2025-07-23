@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(not(any(feature = "keyring", all(target_os = "macos", feature = "macos-biometry"))))]
+#[cfg(not(any(
+    feature = "keyring",
+    all(target_os = "macos", feature = "macos-biometry")
+)))]
 compile_error!("either \"keyring\" or \"macos-biometry\" must be enabled");
 
 #[cfg(all(target_os = "macos", feature = "macos-biometry"))]
