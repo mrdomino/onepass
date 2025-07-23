@@ -29,13 +29,14 @@ jobs:
             arch: x86_64
           - os:   ubuntu
             arch: aarch64
+            runner: ubuntu-24.04-arm
           - os:   ubuntu
             arch: x86_64
           - os:   windows
             arch: aarch64
           - os:   windows
             arch: x86_64
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ${{ matrix.runner != '' && matrix.runner || format('{0}-latest', matrix.os)}}
 
     steps:
     - name: setup environment
