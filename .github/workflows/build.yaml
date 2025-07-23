@@ -23,11 +23,17 @@ jobs:
     strategy:
       matrix:
         include:
-          - os:   ubuntu
-            arch: x86_64
           - os:   macos
             arch: aarch64
           - os:   macos
+            arch: x86_64
+          - os:   ubuntu
+            arch: aarch64
+          - os:   ubuntu
+            arch: x86_64
+          - os:   windows
+            arch: aarch64
+          - os:   windows
             arch: x86_64
     runs-on: ${{ matrix.os }}-latest
 
@@ -38,8 +44,9 @@ jobs:
         set -u
         osname() {
           case "${{ matrix.os }}" in
-            macos)  echo apple-darwin      ;;
-            ubuntu) echo unknown-linux-gnu ;;
+            macos)   echo apple-darwin      ;;
+            ubuntu)  echo unknown-linux-gnu ;;
+            windows) echo pc-windows-msvc   ;;
           esac
         }
         if [[ true = "${{ inputs.release }}" ]]; then
