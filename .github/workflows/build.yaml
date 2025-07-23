@@ -71,6 +71,13 @@ jobs:
         biometry=$biometry
         EOF
 
+    - run: |
+        sudo sh -c 'apt-get update && apt-get install -yy --no-install-recommends \
+            pkg-config \
+            libdbus-1-dev \
+            libssl-dev'
+      if: ${{ matrix.os == 'ubuntu' }}
+
     - uses: actions/checkout@v4
       with:
         ref: ${{ inputs.tag || github.ref }}
