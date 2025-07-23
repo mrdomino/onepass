@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(not(target_os = "windows"))]
 mod home;
 
 use std::{
@@ -22,6 +23,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+#[cfg(not(target_os = "windows"))]
 use home::expand_home;
 use serde::{Deserialize, Serialize};
 
@@ -74,6 +76,7 @@ impl Config {
 
     pub fn words_path(&self) -> Option<Box<Path>> {
         let path = self.words_path.as_deref()?;
+        #[cfg(not(target_os = "windows"))]
         let path = expand_home(path).ok()?;
         if path.is_relative() {
             let config_path = self.config_path.as_deref()?.parent()?;

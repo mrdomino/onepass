@@ -23,13 +23,23 @@ jobs:
     strategy:
       matrix:
         include:
-          - os:   ubuntu
-            arch: x86_64
           - os:   macos
             arch: aarch64
           - os:   macos
             arch: x86_64
-    runs-on: ${{ matrix.os }}-latest
+          - os:   ubuntu
+            arch: aarch64
+            runner: ubuntu-24.04-arm
+          - os:   ubuntu
+            arch: x86_64
+          - os:   windows
+            arch: aarch64
+            runner: windows-11-arm
+            suffix: .exe
+          - os:     windows
+            arch:   x86_64
+            suffix: .exe
+    runs-on: ${{ matrix.runner != '' && matrix.runner || format('{0}-latest', matrix.os)}}
 
     steps:
     - name: setup environment
@@ -38,8 +48,9 @@ jobs:
         set -u
         osname() {
           case "${{ matrix.os }}" in
-            macos)  echo apple-darwin      ;;
-            ubuntu) echo unknown-linux-gnu ;;
+            macos)   echo apple-darwin      ;;
+            ubuntu)  echo unknown-linux-gnu ;;
+            windows) echo pc-windows-msvc   ;;
           esac
         }
         if [[ true = "${{ inputs.release }}" ]]; then
@@ -64,9 +75,18 @@ jobs:
         biometry=$biometry
         EOF
 
+    - run: |
+        sudo sh -c 'apt-get update && apt-get install -yy --no-install-recommends \
+            pkg-config \
+            libdbus-1-dev \
+            libssl-dev'
+      if: ${{ matrix.os == 'ubuntu' }}
+
     - uses: actions/checkout@v4
       with:
         ref: ${{ inputs.tag || github.ref }}
+    - uses: actions-rust-lang/setup-rust-toolchain@v1
+      if: ${{ matrix.runner == 'windows-11-arm' }}
     - uses: actions/cache@v4
       with:
         path: |
@@ -78,6 +98,7 @@ jobs:
         restore-keys: |
           rust-${{ env.target }}-${{ env.profile }}-
     - run: rustup toolchain install stable --target ${{ env.target }} --profile minimal
+      shell: bash
     - run: rustup default stable
 
     - run: cargo build --locked --profile ${{ env.profile }} --target ${{ env.target }}
@@ -88,7 +109,7 @@ jobs:
     - uses: actions/upload-artifact@v4
       with:
         name: onepass-${{ env.target }}
-        path: target/${{ env.target }}/${{ env.outdir }}/onepass
+        path: target/${{ env.target }}/${{ env.outdir }}/onepass${{ matrix.suffix }}
         retention-days: ${{ env.retention_days }}
 
     - run: cargo test --profile dev --target ${{ env.target }}

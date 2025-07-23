@@ -200,7 +200,7 @@ jobs:
         for dir in artifacts/onepass-*-*-*; do
           if [ -d "$dir" ]; then
             target=$(basename "$dir")
-            cp "$dir/onepass" "release-files/$target"
+            cp "$dir/onepass"* "release-files/$target"
           fi
         done
         if [ -f artifacts/onepass-signed-darwin/onepass ]; then
