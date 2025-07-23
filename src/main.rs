@@ -155,11 +155,9 @@ fn main() -> Result<()> {
         if stdout.is_terminal() || args.sites.len() > 1 {
             writeln!(stdout)?;
         }
-        if stdout.is_terminal() {
-            if let Some(count) = args.learn {
-                for _ in 0..count {
-                    seed_password::check_confirm(&res)?;
-                }
+        if let Some(count) = args.learn {
+            for _ in 0..count {
+                seed_password::check_confirm(&res)?;
             }
         }
     }
