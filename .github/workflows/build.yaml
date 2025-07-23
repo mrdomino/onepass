@@ -116,4 +116,4 @@ jobs:
       if: ${{ !inputs.release }}
 
     - run: cargo publish --locked --dry-run --target ${{ env.target }}
-      if: inputs.publish
+      if: ${{ inputs.publish && matrix.os != 'windows' }}
