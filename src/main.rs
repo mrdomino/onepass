@@ -94,6 +94,17 @@ struct Args {
     #[arg(short, long)]
     reset_keyring: bool,
 
+    /// Learning mode: retype the password to memorize it
+    #[arg(
+        short,
+        long,
+        value_name = "COUNT",
+        default_missing_value = "1",
+        num_args=0..=1,
+        require_equals = true,
+    )]
+    learn: Option<u32>,
+
     /// Confirm seed password
     #[arg(short, long)]
     confirm: bool,
@@ -143,6 +154,13 @@ fn main() -> Result<()> {
         stdout.write_all(res.as_bytes())?;
         if stdout.is_terminal() || args.sites.len() > 1 {
             writeln!(stdout)?;
+        }
+        if stdout.is_terminal() {
+            if let Some(count) = args.learn {
+                for _ in 0..count {
+                    seed_password::check_confirm(&res)?;
+                }
+            }
         }
     }
     Ok(())

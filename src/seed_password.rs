@@ -64,7 +64,7 @@ pub(crate) fn delete() -> Result<()> {
     Ok(())
 }
 
-fn check_confirm(password: &str) -> Result<()> {
+pub(crate) fn check_confirm(password: &str) -> Result<()> {
     let confirmed: Zeroizing<String> = prompt_password("Confirmation: ")
         .context("failed reading confirmation")?
         .into();
