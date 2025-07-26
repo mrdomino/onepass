@@ -33,21 +33,6 @@ use objc2_security::{
 };
 use zeroize::Zeroize;
 
-struct SecureData(CFRetained<CFMutableData>);
-
-impl Drop for SecureData {
-    fn drop(&mut self) {
-        unsafe {
-            let ptr = CFMutableData::mutable_byte_ptr(Some(&self.0));
-            let len = self.0.len();
-            if !ptr.is_null() {
-                let slice: &mut [u8] = slice::from_raw_parts_mut(ptr, len);
-                slice.zeroize();
-            }
-        }
-    }
-}
-
 /// Entry exposes an API superficially compatible with the subset of keyring::Entry used by
 /// onepass. The difference is that it asks for the password it saves to be protected by biometric
 /// unlock. This requires using an LAContext when we unlock the password, and also requires the app
@@ -199,6 +184,21 @@ impl core::error::Error for Error {
         match self {
             Error::Other(err) => Some(err.as_ref()),
             _ => None,
+        }
+    }
+}
+
+struct SecureData(CFRetained<CFMutableData>);
+
+impl Drop for SecureData {
+    fn drop(&mut self) {
+        unsafe {
+            let ptr = CFMutableData::mutable_byte_ptr(Some(&self.0));
+            let len = self.0.len();
+            if !ptr.is_null() {
+                let slice: &mut [u8] = slice::from_raw_parts_mut(ptr, len);
+                slice.zeroize();
+            }
         }
     }
 }
