@@ -49,7 +49,7 @@ fn main() -> Result<()> {
     )?;
     writeln!(output, "pub const EFF_WORDLIST: &[&str] = &[")?;
     for word in words {
-        writeln!(output, "    \"{}\",", word)?;
+        writeln!(output, "    \"{word}\",")?;
     }
     writeln!(output, "];")?;
 

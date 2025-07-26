@@ -65,7 +65,7 @@ mod tests {
     fn test_vectors() -> Result<()> {
         let mut rng = Rng::from_password_salt("test", "testsalt".into())?;
         let res = rng.next_u64();
-        assert_eq!(0xfa6a0c49ba644eb2, res, "{:x}", res);
+        assert_eq!(0xfa6a0c49ba644eb2, res, "{res:x}");
         Ok(())
     }
 }
