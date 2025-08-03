@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Hook courtesy of:
+#
+# <https://deaddabe.fr/blog/2021/09/29/git-pre-commit-hook-for-rust-projects/>
+#
+# To use, do the following:
+#
+#     git config --local core.hooksPath .githooks/
+#
+set -eu
+if ! cargo fmt -- --check
+then
+  echo 'There are some code style issues.' >&2
+  echo 'Run cargo fmt first.' >&2
+  exit 1
+fi
+
+if ! cargo clippy --all-targets -- -D warnings
+then
+  echo 'There are some clippy issues.'
+  exit 1
+fi
+
+if ! cargo test --locked
+then
+  echo 'There are some test issues.'
+  exit 1
+fi
