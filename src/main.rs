@@ -94,7 +94,7 @@ struct Args {
     #[arg(short, long)]
     reset_keyring: bool,
 
-    /// Learning mode: retype the password to memorize it
+    /// Learning mode: retype the site password to memorize it
     #[arg(
         short,
         long,
@@ -109,7 +109,7 @@ struct Args {
     #[arg(short, long)]
     confirm: bool,
 
-    /// Print verbose password entropy output
+    /// Print verbose site password entropy output
     #[arg(short, long)]
     verbose: bool,
 }
