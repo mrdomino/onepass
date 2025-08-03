@@ -19,7 +19,7 @@ use std::{
     collections::BTreeMap,
     env,
     fs::{create_dir_all, read_to_string, write},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use anyhow::{Context, Result};
@@ -50,7 +50,9 @@ pub(crate) struct SiteConfig {
 
 impl Config {
     pub fn from_file(path: Option<&Path>) -> Result<Self> {
-        let path = path.map_or_else(Self::default_path, |p| Ok(p.into()))?;
+        let path = path
+            .map_or_else(Self::default_path, |p| Ok(p.into()))
+            .context("failed finding config dir")?;
         if !path.exists() {
             create_dir_all(path.parent().context("invalid config path")?)?;
             write(&path, serde_yaml::to_string(&SerConfig::example())?)?;
@@ -120,12 +122,9 @@ impl Config {
 
     fn default_path() -> Result<Box<Path>> {
         let mut config_dir = match env::var("XDG_CONFIG_DIR") {
-            Err(env::VarError::NotPresent) => {
-                env::var("HOME").map(|home| PathBuf::from(home).join(".config"))
-            }
-            r => r.map(|config| config.into()),
-        }
-        .context("failed finding config dir")?;
+            Err(env::VarError::NotPresent) => expand_home("~/.config")?,
+            r => r?.into(),
+        };
         config_dir.push("onepass");
         config_dir.push("config.yaml");
         Ok(config_dir.into_boxed_path())
