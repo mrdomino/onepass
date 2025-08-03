@@ -32,7 +32,7 @@ macos-biometry = [
 anyhow = "1.0.98"
 argon2 = { version = "0.5.3", features = ["zeroize"] }
 char-iter = "0.1.0"
-clap = { version = "4.5.39", features = ["derive", "env", "unicode", "wrap_help"] }
+clap = { version = "4.5.42", features = ["derive", "env", "unicode", "wrap_help"] }
 crypto-bigint = { version = "0.7.0-pre.5", features = ["rand_core", "zeroize"] }
 nom = "8.0.0"
 rand_chacha = "0.9.0"
