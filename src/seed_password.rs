@@ -26,7 +26,7 @@ use keyring::{Entry, Error};
 use rpassword::prompt_password;
 use zeroize::Zeroizing;
 
-const SERVICE: &str = "org.whilezero.app.onepass";
+const SERVICE: &str = "onepass.app.whilezero.org";
 const ACCOUNT: &str = "seed";
 
 /// read reads the seed password from either the system keyring or the console.
