@@ -121,21 +121,24 @@ fn main() -> Result<()> {
     if args.no_keyring {
         args.keyring = Some(false);
     }
+    let config = Config::from_file(args.config_path.as_deref()).context("failed to read config")?;
+    let use_keyring = args.keyring.or(config.use_keyring).unwrap_or(false);
 
     if args.reset_keyring {
         seed_password::delete()?;
-        if args.sites.is_empty() {
+    }
+    if args.sites.is_empty() {
+        if args.confirm {
+            let _ = seed_password::read(use_keyring, true)?;
+        }
+        if args.reset_keyring || args.confirm {
             return Ok(());
         }
-    }
-
-    if args.sites.is_empty() {
         eprintln!("Specify at least one site\n");
         eprintln!("{}", Args::command().render_help());
         exit(1);
     }
-
-    let config = Config::from_file(args.config_path.as_deref()).context("failed to read config")?;
+    let seed = seed_password::read(use_keyring, args.confirm)?;
 
     // The following construction gives us only two allocations: one to store the string data of
     // the user word file and another to store the list of slices corresponding to the words. We
@@ -144,9 +147,6 @@ fn main() -> Result<()> {
     let words: Option<_> = read_words_str(&args, &config)?;
     let words = words.as_deref().map(words_arr);
     let words = Words::from(words.as_deref().unwrap_or(EFF_WORDLIST));
-
-    let use_keyring = args.keyring.or(config.use_keyring).unwrap_or(false);
-    let seed = seed_password::read(use_keyring, args.confirm)?;
 
     let mut stdout = stdout();
     for site in &args.sites {
