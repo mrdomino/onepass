@@ -146,11 +146,11 @@ fn main() -> Result<()> {
     let words = Words::from(words.as_deref().unwrap_or(EFF_WORDLIST));
 
     let use_keyring = args.keyring.or(config.use_keyring).unwrap_or(false);
-    let password = seed_password::read(use_keyring, args.confirm)?;
+    let seed = seed_password::read(use_keyring, args.confirm)?;
 
     let mut stdout = stdout();
     for site in &args.sites {
-        let res = gen_password_config(&password, site, &config, &args, &words)?;
+        let res = gen_password_config(&seed, site, &config, &args, &words)?;
         stdout.write_all(res.as_bytes())?;
         if stdout.is_terminal() || args.sites.len() > 1 {
             writeln!(stdout)?;
@@ -187,7 +187,7 @@ fn words_arr(words: &'_ str) -> Box<[&'_ str]> {
 }
 
 fn gen_password_config(
-    password: &str,
+    seed: &str,
     req: &str,
     config: &Config,
     args: &Args,
@@ -225,11 +225,11 @@ fn gen_password_config(
         eprintln!("salt: {salt:?}");
     }
 
-    gen_password(password, &url, &expr, increment, words)
+    gen_password(seed, &url, &expr, increment, words)
 }
 
 fn gen_password(
-    password: &str,
+    seed: &str,
     url: &str,
     expr: &Expr,
     increment: u32,
@@ -237,7 +237,7 @@ fn gen_password(
 ) -> Result<Zeroizing<String>> {
     let size = words.size(expr);
     let salt = format!("{increment},{url}");
-    let mut rng = Rng::from_password_salt(password, salt)?;
+    let mut rng = Rng::from_password_salt(seed, salt)?;
     let index = U256::random_mod(&mut rng, &NonZero::new(size).unwrap());
     words.gen_at(expr, index)
 }
@@ -259,10 +259,10 @@ mod tests {
             ("!#()/!!%#&!%", "password", "apple.com", "[!-/]{12}", 1),
         ];
         let words = Words(EFF_WORDLIST);
-        for (want, password, url, schema, increment) in tests {
+        for (want, seed, url, schema, increment) in tests {
             let url = canonicalize(url, None)?;
             let expr = Expr::parse(schema)?;
-            let got = gen_password(password, &url, &expr, increment, &words)?;
+            let got = gen_password(seed, &url, &expr, increment, &words)?;
             assert_eq!(want, *got);
         }
         Ok(())
