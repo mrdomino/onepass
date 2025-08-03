@@ -28,7 +28,7 @@ fn main() -> Result<()> {
     let out_dir = env::var("OUT_DIR")?;
     let dest_path = Path::new(&out_dir).join("wordlist.rs");
 
-    let file = File::open("eff_large_wordlist.txt")?;
+    let file = File::open("data/eff_large_wordlist.txt")?;
     let reader = BufReader::new(file);
 
     let mut words = Vec::new();
@@ -45,7 +45,7 @@ fn main() -> Result<()> {
     let mut output = File::create(&dest_path)?;
     writeln!(
         output,
-        "// Generated at build time from eff_large_wordlist.txt"
+        "// Generated at build time from data/eff_large_wordlist.txt"
     )?;
     writeln!(output, "pub const EFF_WORDLIST: &[&str] = &[")?;
     for word in words {
@@ -53,14 +53,14 @@ fn main() -> Result<()> {
     }
     writeln!(output, "];")?;
 
-    println!("cargo:rerun-if-changed=eff_large_wordlist.txt");
+    println!("cargo:rerun-if-changed=data/eff_large_wordlist.txt");
 
     // Embed Info.plist on macOS with macos-biometry feature
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let macos_biometry = env::var("CARGO_FEATURE_MACOS_BIOMETRY").is_ok();
     if target_os == "macos" && macos_biometry {
-        println!("cargo:rustc-link-arg=-Wl,-sectcreate,__TEXT,__info_plist,Info.plist");
-        println!("cargo:rerun-if-changed=Info.plist");
+        println!("cargo:rustc-link-arg=-Wl,-sectcreate,__TEXT,__info_plist,data/Info.plist");
+        println!("cargo:rerun-if-changed=data/Info.plist");
     }
 
     Ok(())

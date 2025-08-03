@@ -51,13 +51,13 @@ cargo build --release &&
 
 To enable the macOS biometric keyring support, you will need to produce a codesigned binary.
 
-To do this, you will probably need to edit [`onepass.entitlements`](onepass.entitlements) to replace the team ID with your own.
+To do this, you will probably need to edit [`onepass.entitlements`](data/onepass.entitlements) to replace the team ID with your own.
 
 Assuming you’re using an Apple Development local-only signing key, you should be able to do something like the following:
 
 ```sh
 sed "s/2TM4K8523U.org.whilezero.app.onepass/$MY_TEAM_ID.*/" \
-    onepass.entitlements > my-onepass.entitlements &&
+    data/onepass.entitlements > my-onepass.entitlements &&
   cargo build --no-default-features --features macos-biometry --release &&
   codesign \
     --force \

@@ -90,7 +90,7 @@ jobs:
             --force \
             --timestamp \
             --options runtime \
-            --entitlements onepass.entitlements \
+            --entitlements data/onepass.entitlements \
             .root/onepass
         chmod +x .root/onepass
 
