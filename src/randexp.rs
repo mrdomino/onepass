@@ -14,7 +14,6 @@
 
 use std::cmp;
 
-use anyhow::{Context, Result};
 use crypto_bigint::{NonZero, U256};
 use nom::{
     Finish, IResult, Input, Parser,
@@ -28,7 +27,10 @@ use nom::{
     multi::many1,
     sequence::{delimited, preceded, separated_pair},
 };
+use thiserror::Error;
 use zeroize::Zeroizing;
+
+type Result<T> = core::result::Result<T, Error>;
 
 /// Expr represents a subset of regular expressions that allows for literal strings, character
 /// classes, sequences, and counts. It also has a concept of a "Word", which is equivalent to a
@@ -47,6 +49,21 @@ pub(crate) enum Expr {
     CharClass(CharClass),
     Sequence(Vec<Expr>),
     Repeat(Box<Expr>, u32, u32),
+}
+
+#[derive(Debug, Error)]
+pub(crate) enum Error {
+    #[error("Parse error at {0}: {1}")]
+    Parse(usize, String),
+
+    #[error("Leftover input: {0}")]
+    ExtraInput(String),
+
+    #[error("Index too big")]
+    IndexTooBig,
+
+    #[error("Empty word")]
+    EmptyWord,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -120,11 +137,11 @@ fn u256_saturating_pow(base: &U256, mut exp: u32) -> U256 {
 
 impl Expr {
     pub fn parse(input: &str) -> Result<Self> {
-        let (rem, expr) = Expr::parse_expr(input).finish().map_err(|e| {
-            anyhow::anyhow!("Parse error at {}: {}", e.input.len(), e.code.description())
-        })?;
+        let (rem, expr) = Expr::parse_expr(input)
+            .finish()
+            .map_err(|e| Error::Parse(e.input.len(), e.code.description().into()))?;
         if !rem.is_empty() {
-            anyhow::bail!("leftover input: {rem}");
+            return Err(Error::ExtraInput(rem.into()));
         }
         Ok(expr)
     }
@@ -293,7 +310,7 @@ impl Enumerable<Expr> for Words<'_> {
             Expr::Word => String::from(self.0[u256_to_usize(&index)]),
             Expr::WOrd => {
                 let mut chars = self.0[u256_to_usize(&index)].chars();
-                let first = chars.next().context("empty word")?.to_uppercase();
+                let first = chars.next().ok_or(Error::EmptyWord)?.to_uppercase();
                 first.chain(chars).collect()
             }
             Expr::Literal(s) => s.clone(),
@@ -310,7 +327,7 @@ impl Enumerable<Expr> for Words<'_> {
                     }
                     *index -= *n;
                 }
-                anyhow::bail!("index too big");
+                return Err(Error::IndexTooBig);
             }
 
             Expr::Sequence(exprs) => {
@@ -352,7 +369,7 @@ impl Enumerable<Expr> for Words<'_> {
                     }
                     *index -= *n;
                 }
-                anyhow::bail!("index too big");
+                return Err(Error::IndexTooBig);
             }
         };
         Ok(Zeroizing::new(res))
