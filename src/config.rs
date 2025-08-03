@@ -12,19 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(not(target_os = "windows"))]
-mod home;
+mod dirs;
 
 use std::{
     collections::BTreeMap,
-    env,
     fs::{create_dir_all, read_to_string, write},
     path::Path,
 };
 
 use anyhow::{Context, Result};
-#[cfg(not(target_os = "windows"))]
-use home::expand_home;
+use dirs::{config_dir, expand_home};
 use serde::{Deserialize, Serialize};
 
 use crate::url::canonicalize;
@@ -51,7 +48,7 @@ pub(crate) struct SiteConfig {
 impl Config {
     pub fn from_file(path: Option<&Path>) -> Result<Self> {
         let path = path
-            .map_or_else(Self::default_path, |p| Ok(p.into()))
+            .map_or_else(Self::default_path, |p| Some(p.into()))
             .context("failed finding config dir")?;
         if !path.exists() {
             create_dir_all(path.parent().context("invalid config path")?)?;
@@ -78,8 +75,7 @@ impl Config {
 
     pub fn words_path(&self) -> Option<Box<Path>> {
         let path = self.words_path.as_deref()?;
-        #[cfg(not(target_os = "windows"))]
-        let path = expand_home(path).ok()?;
+        let path = expand_home(path)?;
         if path.is_relative() {
             let config_path = self.config_path.as_deref()?.parent()?;
             Some(config_path.join(path).into())
@@ -120,14 +116,11 @@ impl Config {
         }
     }
 
-    fn default_path() -> Result<Box<Path>> {
-        let mut config_dir = match env::var("XDG_CONFIG_DIR") {
-            Err(env::VarError::NotPresent) => expand_home("~/.config")?,
-            r => r?.into(),
-        };
+    fn default_path() -> Option<Box<Path>> {
+        let mut config_dir = config_dir()?;
         config_dir.push("onepass");
         config_dir.push("config.yaml");
-        Ok(config_dir.into_boxed_path())
+        Some(config_dir.into_boxed_path())
     }
 }
 

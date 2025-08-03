@@ -1054,7 +1054,6 @@ dependencies = [
  "clap",
  "crypto-bigint",
  "keyring",
- "nix",
  "nom",
  "num-traits",
  "objc2",
