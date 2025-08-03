@@ -1,14 +1,10 @@
 #!/bin/sh
-#
+set -eu
 # Hook courtesy of:
-#
 # <https://deaddabe.fr/blog/2021/09/29/git-pre-commit-hook-for-rust-projects/>
-#
-# To use, do the following:
-#
+# To use:
 #     git config --local core.hooksPath .githooks/
 #
-set -eu
 if ! cargo fmt -- --check
 then
   echo 'There are some code style issues.' >&2
