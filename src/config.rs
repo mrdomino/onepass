@@ -177,10 +177,11 @@ impl SerConfig {
         })
         .collect();
         let default_schema = "login".to_string();
+        let use_keyring = Some(true);
         SerConfig {
             words_path: None,
             default_schema,
-            use_keyring: None,
+            use_keyring,
             aliases,
             sites,
         }
@@ -229,7 +230,13 @@ impl Serialize for SerConfig {
         use serde::ser::SerializeStruct;
 
         let mut state = serializer.serialize_struct("SerConfig", 3)?;
+        if let Some(path) = &self.words_path {
+            state.serialize_field("words_path", path)?;
+        }
         state.serialize_field("default_schema", &self.default_schema)?;
+        if let Some(use_keyring) = &self.use_keyring {
+            state.serialize_field("use_keyring", use_keyring)?;
+        }
         state.serialize_field("aliases", &self.aliases)?;
 
         let sites_for_serialization: BTreeMap<String, SchemaOrSiteConfig> = self
