@@ -132,10 +132,8 @@ impl Entry {
                 "failed to load password: {status:?}"
             )));
         }
-        if result.is_null() {
-            return Err(Error::Other(anyhow::anyhow!("nil result from keychain")));
-        }
-        let result = NonNull::new(result as *mut CFMutableData).unwrap();
+        let result = NonNull::new(result as *mut CFMutableData)
+            .ok_or(Error::Other(anyhow::anyhow!("nil result from keychain")))?;
         let result = SecureData(unsafe { CFRetained::from_raw(result) });
         let password = str::from_utf8(unsafe { result.0.as_bytes_unchecked() })
             .context("non-utf8 password; delete with -r")
