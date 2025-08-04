@@ -26,14 +26,6 @@ use keyring::{Entry, Error};
 use rpassword::prompt_password;
 use zeroize::Zeroizing;
 
-// XXX macos-biometry keyring entries get grandfathered in.
-// We made these before we noticed that the serivce names here were supposed to be normal DNS, not
-// reversed DNS. We decided to switch to normal DNS for other platforms and for plain keyring on
-// macOS, but for macos-biometry builds, A, we use our own keychain access group (so other apps do
-// not get to see our passwords), and B, the password isn’t visible outside the app.
-#[cfg(all(target_os = "macos", feature = "macos-biometry"))]
-const SERVICE: &str = "org.whilezero.app.onepass";
-#[cfg(not(all(target_os = "macos", feature = "macos-biometry")))]
 const SERVICE: &str = "onepass.app.whilezero.org";
 const ACCOUNT: &str = "seed";
 
