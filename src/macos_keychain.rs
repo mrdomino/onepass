@@ -133,7 +133,8 @@ impl Entry {
             )));
         }
         let result = NonNull::new(result as *mut CFMutableData)
-            .ok_or(Error::Other(anyhow::anyhow!("nil result from keychain")))?;
+            .context("nil result from keychain")
+            .map_err(Error::Other)?;
         let result = SecureData(unsafe { CFRetained::from_raw(result) });
         let password = str::from_utf8(unsafe { result.0.as_bytes_unchecked() })
             .context("non-utf8 password; delete with -r")
