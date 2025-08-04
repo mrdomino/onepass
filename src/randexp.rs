@@ -25,6 +25,7 @@ use nom::{
         one_of,
     },
     combinator::{fail, map, opt, value},
+    error::ErrorKind,
     multi::many1,
     sequence::{delimited, preceded, separated_pair},
 };
@@ -189,8 +190,17 @@ impl Expr {
         .parse(input)?;
         let rs = rs
             .into_iter()
-            .map(|(start, end)| CharRange { start, end })
-            .collect();
+            .try_fold(Vec::new(), |mut acc, (start, end)| {
+                if start <= end {
+                    acc.push(CharRange { start, end });
+                    Ok(acc)
+                } else {
+                    Err(nom::Err::Failure(nom::error::Error::new(
+                        input,
+                        ErrorKind::Verify,
+                    )))
+                }
+            })?;
         Ok((input, CharClass::from_ranges(rs)))
     }
 
