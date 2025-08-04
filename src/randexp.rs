@@ -423,6 +423,12 @@ mod tests {
     }
 
     #[test]
+    fn char_class_fail() {
+        let expr = Expr::parse("[z-a]");
+        assert!(expr.is_err());
+    }
+
+    #[test]
     fn char_class_table() -> Result<()> {
         let tests = vec![
             (vec![('A', 'Z')], "[A-MD-Z]"),
