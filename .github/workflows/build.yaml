@@ -75,7 +75,8 @@ jobs:
         biometry=$biometry
         EOF
 
-    - run: |
+    - name: install system dependencies
+      run: |
         sudo sh -c 'apt-get update && apt-get install -yy --no-install-recommends \
             pkg-config \
             libdbus-1-dev \
