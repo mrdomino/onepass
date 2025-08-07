@@ -22,7 +22,7 @@ pub(crate) fn config_dir() -> Option<PathBuf> {
     if let Some(config_dir) = env::var_os("XDG_CONFIG_DIR").map(PathBuf::from) {
         return Some(config_dir);
     }
-    #[cfg(target_os = "windows")]
+    #[cfg(windows)]
     if let Some(config_dir) = env::var_os("APPDATA").map(PathBuf::from) {
         return Some(config_dir);
     }
@@ -32,7 +32,7 @@ pub(crate) fn config_dir() -> Option<PathBuf> {
 }
 
 pub(crate) fn current_home() -> Option<PathBuf> {
-    #[cfg(target_os = "windows")]
+    #[cfg(windows)]
     if let Some(dir) = env::var_os("USERPROFILE").map(PathBuf::from) {
         return Some(dir);
     }
