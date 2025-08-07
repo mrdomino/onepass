@@ -1101,6 +1101,7 @@ dependencies = [
  "objc2-security",
  "rand_chacha 0.9.0",
  "rand_core 0.9.3",
+ "readpassphrase-3",
  "rpassword",
  "serde",
  "serde_yaml",
@@ -1321,6 +1322,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99d9a13982dcf210057a8a78572b2217b667c3beacbf3a0d8b454f6f82837d38"
 dependencies = [
  "getrandom 0.3.3",
+]
+
+[[package]]
+name = "readpassphrase-3"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a1ceaa4a1ebebbb85fcebe4366d65995e4de1103b51fc46ad8194aefd0e6f1e"
+dependencies = [
+ "bitflags",
+ "cc",
+ "zeroize",
 ]
 
 [[package]]

@@ -23,8 +23,25 @@ use crate::macos_keychain::{Entry, Error};
 use anyhow::{Context, Result};
 #[cfg(not(all(target_os = "macos", feature = "macos-biometry")))]
 use keyring::{Entry, Error};
-use rpassword::prompt_password;
+#[cfg(not(windows))]
+use readpassphrase_3::getpass;
+#[cfg(windows)]
+use rpassword::prompt_password as getpass;
 use zeroize::Zeroizing;
+
+#[cfg(windows)]
+mod prompts {
+    pub(crate) const SEED_PASSWORD: &str = "Seed password: ";
+    pub(crate) const CONFIRMATION: &str = "Confirmation: ";
+}
+
+#[cfg(not(windows))]
+mod prompts {
+    use std::ffi::CStr;
+
+    pub(crate) const SEED_PASSWORD: &CStr = c"Seed password: ";
+    pub(crate) const CONFIRMATION: &CStr = c"ConfirmationP ";
+}
 
 const SERVICE: &str = "onepass.app.whilezero.org";
 const ACCOUNT: &str = "seed";
@@ -42,7 +59,7 @@ pub(crate) fn read(use_keyring: bool, confirm: bool) -> Result<Zeroizing<String>
         }
         return Ok(password);
     }
-    let password: Zeroizing<String> = prompt_password("Seed password: ")
+    let password: Zeroizing<String> = getpass(prompts::SEED_PASSWORD)
         .context("failed reading password")?
         .into();
     if use_keyring || confirm {
@@ -65,7 +82,7 @@ pub(crate) fn delete() -> Result<()> {
 }
 
 pub(crate) fn check_confirm(password: &str) -> Result<()> {
-    let confirmed: Zeroizing<String> = prompt_password("Confirmation: ")
+    let confirmed: Zeroizing<String> = getpass(prompts::CONFIRMATION)
         .context("failed reading confirmation")?
         .into();
     if *confirmed != password {
