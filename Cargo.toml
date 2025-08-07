@@ -10,7 +10,7 @@ repository = "https://github.com/mrdomino/onepass"
 description = "A mostly-stateless deterministic password manager"
 
 exclude = [
-    ".githooks/**",
+    ".githook/*",
     ".github/**",
     ".gitignore",
     "example/**",
