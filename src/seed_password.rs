@@ -40,7 +40,7 @@ mod prompts {
     use std::ffi::CStr;
 
     pub(crate) const SEED_PASSWORD: &CStr = c"Seed password: ";
-    pub(crate) const CONFIRMATION: &CStr = c"ConfirmationP ";
+    pub(crate) const CONFIRMATION: &CStr = c"Confirmation: ";
 }
 
 const SERVICE: &str = "onepass.app.whilezero.org";
