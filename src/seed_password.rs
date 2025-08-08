@@ -12,39 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(not(any(
-    feature = "keyring",
-    all(target_os = "macos", feature = "macos-biometry")
-)))]
-compile_error!("either \"keyring\" or \"macos-biometry\" must be enabled");
+mod getpass;
+mod keyring;
 
-#[cfg(all(target_os = "macos", feature = "macos-biometry"))]
-use crate::macos_keychain::{Entry, Error};
 use anyhow::{Context, Result};
-#[cfg(not(all(target_os = "macos", feature = "macos-biometry")))]
-use keyring::{Entry, Error};
-#[cfg(not(windows))]
-use readpassphrase_3::getpass;
-#[cfg(windows)]
-use rpassword::prompt_password as getpass;
+use getpass::prompts;
+use keyring::{Error, get_entry};
 use zeroize::Zeroizing;
-
-#[cfg(windows)]
-mod prompts {
-    pub(crate) const SEED_PASSWORD: &str = "Seed password: ";
-    pub(crate) const CONFIRMATION: &str = "Confirmation: ";
-}
-
-#[cfg(not(windows))]
-mod prompts {
-    use std::ffi::CStr;
-
-    pub(crate) const SEED_PASSWORD: &CStr = c"Seed password: ";
-    pub(crate) const CONFIRMATION: &CStr = c"Confirmation: ";
-}
-
-const SERVICE: &str = "onepass.app.whilezero.org";
-const ACCOUNT: &str = "seed";
 
 /// read reads the seed password from either the system keyring or the console.
 ///
@@ -59,7 +33,7 @@ pub(crate) fn read(use_keyring: bool, confirm: bool) -> Result<Zeroizing<String>
         }
         return Ok(password);
     }
-    let password: Zeroizing<String> = getpass(prompts::SEED_PASSWORD)
+    let password: Zeroizing<String> = getpass::getpass(prompts::SEED_PASSWORD)
         .context("failed reading password")?
         .into();
     if use_keyring || confirm {
@@ -82,7 +56,7 @@ pub(crate) fn delete() -> Result<()> {
 }
 
 pub(crate) fn check_confirm(password: &str) -> Result<()> {
-    let confirmed: Zeroizing<String> = getpass(prompts::CONFIRMATION)
+    let confirmed: Zeroizing<String> = getpass::getpass(prompts::CONFIRMATION)
         .context("failed reading confirmation")?
         .into();
     if *confirmed != password {
@@ -102,8 +76,4 @@ fn save_keyring(password: &str) -> Result<()> {
     get_entry()?
         .set_password(password)
         .context("failed setting password")
-}
-
-fn get_entry() -> Result<Entry> {
-    Entry::new(SERVICE, ACCOUNT).context("failed getting keyring entry")
 }
