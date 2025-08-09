@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod getpass;
 mod keyring;
 
 use anyhow::{Context, Result};
-use getpass::prompts;
 use keyring::{Error, get_entry};
+use readpassphrase_3::getpass;
 use zeroize::Zeroizing;
 
 /// read reads the seed password from either the system keyring or the console.
@@ -33,7 +32,7 @@ pub(crate) fn read(use_keyring: bool, confirm: bool) -> Result<Zeroizing<String>
         }
         return Ok(password);
     }
-    let password: Zeroizing<String> = getpass::getpass(prompts::SEED_PASSWORD)
+    let password: Zeroizing<String> = getpass(c"Seed password: ")
         .context("failed reading password")?
         .into();
     if use_keyring || confirm {
@@ -56,7 +55,7 @@ pub(crate) fn delete() -> Result<()> {
 }
 
 pub(crate) fn check_confirm(password: &str) -> Result<()> {
-    let confirmed: Zeroizing<String> = getpass::getpass(prompts::CONFIRMATION)
+    let confirmed: Zeroizing<String> = getpass(c"Confirmation: ")
         .context("failed reading confirmation")?
         .into();
     if *confirmed != password {
