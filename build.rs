@@ -12,56 +12,55 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use core::error;
 use std::{
     env,
+    ffi::OsStr,
     fs::File,
     io::{BufRead, BufReader, Write},
     path::Path,
-    result,
 };
 
-type Error = Box<dyn error::Error>;
-type Result<T> = result::Result<T, Error>;
+fn main() {
+    gen_eff_wordlist();
+    embed_info_plist();
+}
 
-fn main() -> Result<()> {
-    let out_dir = env::var("OUT_DIR")?;
+fn gen_eff_wordlist() {
+    println!("cargo:rerun-if-changed=data/eff_large_wordlist.txt");
+    let out_dir = env::var_os("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("wordlist.rs");
-
-    let file = File::open("data/eff_large_wordlist.txt")?;
+    let file = File::open("data/eff_large_wordlist.txt").unwrap();
     let reader = BufReader::new(file);
-
     let mut words = Vec::new();
-
     for line in reader.lines() {
-        let line = line?;
-        let line = line.trim();
+        let line = line.unwrap();
+        let line = line.split('\t').nth(1).unwrap().trim();
         if line.is_empty() {
             continue;
         }
-        words.push(line.split('\t').nth(1).ok_or("parse failure")?.to_string());
+        words.push(line.to_string());
     }
 
-    let mut output = File::create(&dest_path)?;
+    let mut output = File::create(&dest_path).unwrap();
     writeln!(
         output,
         "// Generated at build time from data/eff_large_wordlist.txt"
-    )?;
-    writeln!(output, "pub const EFF_WORDLIST: &[&str] = &[")?;
+    )
+    .unwrap();
+    writeln!(output, "pub const EFF_WORDLIST: &[&str] = &[").unwrap();
     for word in words {
-        writeln!(output, "    \"{word}\",")?;
+        writeln!(output, "    \"{word}\",").unwrap();
     }
-    writeln!(output, "];")?;
+    writeln!(output, "];").unwrap();
+}
 
-    println!("cargo:rerun-if-changed=data/eff_large_wordlist.txt");
-
-    // Embed Info.plist on macOS with macos-biometry feature
-    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
-    let macos_biometry = env::var("CARGO_FEATURE_MACOS_BIOMETRY").is_ok();
-    if target_os == "macos" && macos_biometry {
-        println!("cargo:rustc-link-arg=-Wl,-sectcreate,__TEXT,__info_plist,data/Info.plist");
-        println!("cargo:rerun-if-changed=data/Info.plist");
+fn embed_info_plist() {
+    // If we are using the biometric keychain API, we must embed Info.plist for the app to work.
+    if env::var_os("CARGO_FEATURE_MACOS_BIOMETRY").is_none()
+        || env::var_os("CARGO_CFG_TARGET_OS").is_some_and(|os| OsStr::new("macos") != os)
+    {
+        return;
     }
-
-    Ok(())
+    println!("cargo:rustc-link-arg=-Wl,-sectcreate,__TEXT,__info_plist,data/Info.plist");
+    println!("cargo:rerun-if-changed=data/Info.plist");
 }
