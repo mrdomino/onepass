@@ -165,7 +165,9 @@ fn main() -> Result<()> {
         }
         if let Some(count) = args.learn {
             for _ in 0..count {
-                seed_password::check_confirm(&res)?;
+                if !seed_password::check_confirm(&res)? {
+                    eprint!("✘ ");
+                }
             }
         }
     }

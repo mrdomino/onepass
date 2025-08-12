@@ -27,16 +27,16 @@ use zeroize::Zeroizing;
 pub(crate) fn read(use_keyring: bool, confirm: bool) -> Result<Zeroizing<String>> {
     let password = use_keyring.then(load_keyring).transpose()?.flatten();
     if let Some(password) = password {
-        if confirm {
-            check_confirm(&password)?;
+        if confirm && !check_confirm(&password)? {
+            anyhow::bail!("passwords don’t match");
         }
         return Ok(password);
     }
     let password: Zeroizing<String> = getpass(c"Seed password: ")
         .context("failed reading password")?
         .into();
-    if use_keyring || confirm {
-        check_confirm(&password)?;
+    if (use_keyring || confirm) && !check_confirm(&password)? {
+        anyhow::bail!("passwords don’t match");
     }
     if use_keyring {
         save_keyring(&password)?;
@@ -54,14 +54,11 @@ pub(crate) fn delete() -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn check_confirm(password: &str) -> Result<()> {
+pub(crate) fn check_confirm(password: &str) -> Result<bool> {
     let confirmed: Zeroizing<String> = getpass(c"Confirmation: ")
         .context("failed reading confirmation")?
         .into();
-    if *confirmed != password {
-        anyhow::bail!("passwords don’t match");
-    }
-    Ok(())
+    Ok(*confirmed == password)
 }
 
 fn load_keyring() -> Result<Option<Zeroizing<String>>> {
