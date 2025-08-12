@@ -38,30 +38,11 @@ use url::canonicalize;
 use zeroize::Zeroizing;
 
 #[derive(Debug, Parser)]
-#[command(version, about)]
+#[command(version, about, next_help_heading = "Site Options")]
 struct Args {
     /// Site(s) for which to generate a password
-    #[arg(value_name = "SITE")]
+    #[arg(value_name = "SITE", help_heading = None)]
     sites: Vec<String>,
-
-    /// Override the path of the config file (default: ~/.config/onepass/config.yaml)
-    #[arg(
-        short = 'f',
-        long = "config",
-        env = "ONEPASS_CONFIG_FILE",
-        value_name = "CONFIG_FILE"
-    )]
-    config_path: Option<Box<Path>>,
-
-    /// Read words from the specified newline-separated dictionary file (by default, uses words
-    /// from the EFF large word list)
-    #[arg(
-        short,
-        long = "words",
-        env = "ONEPASS_WORDS_FILE",
-        value_name = "WORDS_FILE"
-    )]
-    words_path: Option<Box<Path>>,
 
     /// Override schema to use (may be a configured alias)
     #[arg(short, long)]
@@ -75,7 +56,7 @@ struct Args {
     #[arg(short, long)]
     username: Option<String>,
 
-    /// Use the system keyring to store the seed password
+    /// Store the seed password in the OS keyring
     #[arg(
         short,
         long,
@@ -83,18 +64,28 @@ struct Args {
         default_missing_value = "true",
         num_args = 0..=1,
         require_equals = true,
+        help_heading = "Keyring Integration",
     )]
     keyring: Option<bool>,
 
-    /// Do not use the system keyring to store the seed password
-    #[arg(short = 'K', long, conflicts_with = "keyring")]
+    /// Do not store the seed password
+    #[arg(
+        short = 'K',
+        long,
+        conflicts_with = "keyring",
+        help_heading = "Keyring Integration"
+    )]
     no_keyring: bool,
 
-    /// Explicitly reset system keyring seed password
-    #[arg(short, long)]
+    /// Clear the seed password keyring entry
+    #[arg(short, long, help_heading = "Keyring Integration")]
     reset_keyring: bool,
 
-    /// Learning mode: retype the site password to memorize it
+    /// Confirm seed password
+    #[arg(short, long, help_heading = "Password Entry")]
+    confirm: bool,
+
+    /// Learn the site password by retyping it
     #[arg(
         short,
         long,
@@ -102,12 +93,29 @@ struct Args {
         default_missing_value = "1",
         num_args=0..=1,
         require_equals = true,
+        help_heading = "Password Entry",
     )]
     learn: Option<u32>,
 
-    /// Confirm seed password
-    #[arg(short, long)]
-    confirm: bool,
+    /// Override word list
+    #[arg(
+        short,
+        long = "words",
+        env = "ONEPASS_WORDS_FILE",
+        value_name = "WORDS_FILE",
+        help_heading = "Configuration"
+    )]
+    words_path: Option<Box<Path>>,
+
+    /// Override config file
+    #[arg(
+        short = 'f',
+        long = "config",
+        env = "ONEPASS_CONFIG_FILE",
+        value_name = "CONFIG_FILE",
+        help_heading = "Configuration"
+    )]
+    config_path: Option<Box<Path>>,
 
     /// Print verbose site password entropy output
     #[arg(short, long)]
