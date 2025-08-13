@@ -144,7 +144,7 @@ fn main() -> Result<()> {
         }
         eprintln!("Specify at least one site\n");
         eprintln!("{}", Args::command().render_help());
-        exit(1);
+        exit(2);
     }
     let seed = seed_password::read(use_keyring, args.confirm)?;
 
