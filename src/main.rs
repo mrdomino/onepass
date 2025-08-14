@@ -25,11 +25,10 @@ use std::{
     fs::read_to_string,
     io::{IsTerminal, Write, stdout},
     path::Path,
-    process::exit,
 };
 
 use anyhow::{Context, Result};
-use clap::{CommandFactory, Parser};
+use clap::{CommandFactory, Parser, error::ErrorKind};
 use config::Config;
 use crypto::Rng;
 use crypto_bigint::{NonZero, RandomMod, U256};
@@ -142,9 +141,9 @@ fn main() -> Result<()> {
         if args.reset_keyring || args.confirm {
             return Ok(());
         }
-        eprintln!("Specify at least one site\n");
-        eprintln!("{}", Args::command().render_help());
-        exit(2);
+        Args::command()
+            .error(ErrorKind::TooFewValues, "specify at least one site")
+            .exit();
     }
     let seed = seed_password::read(use_keyring, args.confirm)?;
 
