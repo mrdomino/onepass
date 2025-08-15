@@ -169,7 +169,7 @@ impl SerConfig {
         })
         .collect();
         let default_schema = "login".to_string();
-        let use_keyring = Some(true);
+        let use_keyring = Some(cfg!(not(target_os = "linux")));
         SerConfig {
             words_path: None,
             default_schema,
