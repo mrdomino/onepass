@@ -36,10 +36,8 @@ jobs:
           - os:   windows
             arch: aarch64
             runner: windows-11-arm
-            suffix: .exe
           - os:     windows
             arch:   x86_64
-            suffix: .exe
     runs-on: ${{ matrix.runner != '' && matrix.runner || format('{0}-latest', matrix.os)}}
 
     steps:
@@ -64,16 +62,22 @@ jobs:
           retention_days=7
         fi
         if [[ macos = "${{ matrix.os }}" && true = "${{ inputs.release }}" ]]; then
-          biometry=true
+          features=' --no-default-features --features=macos-biometry'
         else
-          biometry=false
+          features=
+        fi
+        if [[ winsows = "${{ matrix.os }}" ]]; then
+          suffix=.exe
+        else
+          suffix=
         fi
         cat >>$GITHUB_ENV <<EOF
         target=${{ matrix.arch }}-$(osname)
         outdir=$outdir
         profile=$profile
         retention_days=$retention_days
-        biometry=$biometry
+        features=$features
+        suffix=$suffix
         EOF
 
     - name: install system dependencies
@@ -101,15 +105,12 @@ jobs:
       shell: bash
     - run: rustup default ${{ env.RUST_VERSION }}
 
-    - run: cargo build --locked --profile ${{ env.profile }} --target ${{ env.target }}
-      if: ${{ env.biometry != 'true' }}
-    - run: cargo build --locked --profile ${{ env.profile }} --target ${{ env.target }} --features macos-biometry --no-default-features
-      if: ${{ env.biometry == 'true' }}
+    - run: cargo build --locked --profile ${{ env.profile }} --target ${{ env.target }}${{ env.features }}
 
     - uses: actions/upload-artifact@v4
       with:
         name: onepass-${{ env.target }}
-        path: target/${{ env.target }}/${{ env.outdir }}/onepass${{ matrix.suffix }}
+        path: target/${{ env.target }}/${{ env.outdir }}/onepass${{ env.suffix }}
         retention-days: ${{ env.retention_days }}
 
     - run: cargo test --profile dev --target ${{ env.target }}
