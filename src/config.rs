@@ -260,7 +260,10 @@ fn is_zero(value: &u32) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
     use anyhow::Result;
+    use tempfile::NamedTempFile;
 
     use super::*;
 
@@ -294,7 +297,7 @@ mod tests {
                     schema: B
                 "http://localhost":
                     schema: C
-        "#,
+            "#,
         )?;
         let tests = [
             (
@@ -319,5 +322,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: temp config file
+    #[test]
+    fn temp_config_file() -> Result<()> {
+        let mut config_file = NamedTempFile::new()?;
+        write!(
+            config_file,
+            r#"
+            sites:
+                google.com:
+                    schema: '[A-Z]{{0}}'
+            "#,
+        )?;
+        let config = Config::from_file(Some(config_file.path()))?;
+        let (u, site) = config.find_site("google.com")?.context("fail")?;
+        assert_eq!("[A-Z]{0}", &site.schema);
+        assert_eq!("https://google.com/", &u);
+        Ok(())
+    }
 }

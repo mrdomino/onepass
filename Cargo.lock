@@ -1104,6 +1104,7 @@ dependencies = [
  "readpassphrase-3",
  "serde",
  "serde_yaml",
+ "tempfile",
  "url",
  "zeroize",
 ]
