@@ -17,6 +17,9 @@ on:
         type: string
         required: false
 
+env:
+  RUST_VERSION: 1.89
+
 jobs:
   build:
     name: Build
@@ -86,7 +89,10 @@ jobs:
         ref: ${{ inputs.tag || github.ref }}
     - uses: actions-rust-lang/setup-rust-toolchain@v1
       if: ${{ matrix.runner == 'windows-11-arm' }}
+      with:
+        toolchain: ${{ env.RUST_VERSION }}
     - uses: actions/cache@v4
+      if: ${{ matrix.runner != 'windows-11-arm' }}
       with:
         path: |
           ~/.cargo/git
@@ -96,9 +102,11 @@ jobs:
           rust-${{ env.target }}-${{ env.profile }}-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           rust-${{ env.target }}-${{ env.profile }}-
-    - run: rustup toolchain install stable --target ${{ env.target }} --profile minimal
+    - run: rustup toolchain install ${{ env.RUST_VERSION }} --target ${{ env.target }} --profile minimal
+      if: ${{ matrix.runner != 'windows-11-arm' }}
       shell: bash
-    - run: rustup default stable
+    - run: rustup default ${{ env.RUST_VERSION }}
+      if: ${{ matrix.runner != 'windows-11-arm' }}
 
     - run: cargo build --locked --profile ${{ env.profile }} --target ${{ env.target }}
       if: ${{ env.biometry != 'true' }}
