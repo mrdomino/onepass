@@ -64,7 +64,7 @@ jobs:
         if [[ macos = "${{ matrix.os }}" && true = "${{ inputs.release }}" ]]; then
           features=' --no-default-features --features=macos-biometry'
         else
-          features=' --features=keyring'
+          features=
         fi
         if [[ winsows = "${{ matrix.os }}" ]]; then
           suffix=.exe
