@@ -163,15 +163,18 @@ fn main() -> Result<()> {
             writeln!(stdout)?;
         }
         if let Some(count) = args.learn {
-            let mut ok = true;
+            let mut failures = 0;
             for _ in 0..count {
-                ok = seed_password::check_confirm(&res)?;
-                if !ok {
+                if !seed_password::check_confirm(&res)? {
+                    failures += 1;
                     eprint!("✘ ");
                 }
             }
-            if !ok {
-                anyhow::bail!("password mismatch");
+            if failures != 0 {
+                if count == 1 {
+                    anyhow::bail!("password mismatch");
+                }
+                anyhow::bail!("{failures}/{count} attempts failed");
             }
         }
     }
