@@ -82,10 +82,10 @@ jobs:
 
     - name: install system dependencies
       run: |
-        sudo sh -c 'apt-get update && apt-get install -yy --no-install-recommends \
-            pkg-config \
-            libdbus-1-dev \
-            libssl-dev'
+        sudo sh -eu <<EOF
+        apt-get update && apt-get install -yy --no-install-recommends \
+            libdbus-1-dev
+        EOF
       if: ${{ matrix.os == 'ubuntu' }}
 
     - uses: actions/checkout@v4
