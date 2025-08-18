@@ -33,7 +33,7 @@ jobs:
     environment: crates-io
     if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         ref: ${{ inputs.tag || github.ref }}
     - run: cargo publish --no-verify --locked
@@ -46,7 +46,7 @@ jobs:
     runs-on: macos-latest
     environment: macos
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         ref: ${{ inputs.tag || github.ref }}
     - uses: actions/download-artifact@v5
@@ -177,7 +177,7 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || inputs.create_github_release
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         ref: ${{ inputs.tag || github.ref }}
 
