@@ -40,7 +40,7 @@ rand_core = "0.9.3"
 readpassphrase-3 = { version = "0.9.1", features = ["zeroize"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_yaml = "0.9.34"
-url = "2.5.4"
+url = "2.5.6"
 zeroize = "1.8.1"
 
 [dependencies.keyring]
