@@ -30,7 +30,7 @@ jobs:
     name: Publish to crates.io
     permissions:
       id-token: write
-    needs: [build, github-release]
+    needs: build
     runs-on: ubuntu-latest
     environment: crates-io
     if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
