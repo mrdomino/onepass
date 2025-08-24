@@ -263,6 +263,10 @@ fn gen_password(
 
 #[cfg(test)]
 mod tests {
+    use std::{fs::File, path::PathBuf};
+
+    use tempfile::TempDir;
+
     use super::*;
 
     #[test]
@@ -284,6 +288,38 @@ mod tests {
             let got = gen_password(seed, &url, &expr, increment, &words)?;
             assert_eq!(want, *got);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn test_words_file() -> Result<()> {
+        let dir = TempDir::new()?;
+        let mut dir_path = PathBuf::from(dir.path());
+        dir_path.push("config");
+        let config_path = dir_path.clone().into_boxed_path();
+        dir_path.pop();
+        dir_path.push("words");
+        let words_path = dir_path.into_boxed_path();
+
+        let mut config_file = File::create(&config_path)?;
+        writeln!(config_file, "words_path: words")?;
+        writeln!(config_file, "sites:")?;
+        drop(config_file);
+
+        let mut words_file = File::create(&words_path)?;
+        writeln!(words_file, "bob")?;
+        writeln!(words_file, "  dole")?;
+        writeln!(words_file, "bob  ")?;
+        writeln!(words_file, "a")?;
+        drop(words_file);
+
+        let config = Config::from_file(Some(&config_path))?;
+        let args: [&str; 0] = [];
+        let words = read_words_str(&Args::parse_from(args.iter()), &config)?
+            .context("failed reading words file")?;
+        let words = words_arr(&words);
+        assert_eq!(Box::from(vec!["a", "bob", "dole"]), words);
+
         Ok(())
     }
 }
