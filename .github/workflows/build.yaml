@@ -95,6 +95,8 @@ jobs:
       shell: bash
     - run: rustup default ${{ env.RUST_VERSION }}
     - uses: mrdomino/rust-cache@v2
+      with:
+        key: ${{ env.profile }}
 
     - run: cargo build --locked --profile ${{ env.profile }} --target ${{ env.target }}${{ env.features }}
 
