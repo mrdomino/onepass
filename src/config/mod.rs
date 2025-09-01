@@ -416,7 +416,7 @@ mod tests {
         writeln!(config_file, "sites:")?;
         let mut a_file = File::create(&a_path)?;
         writeln!(a_file, "include:")?;
-        writeln!(a_file, "- {}", b_path.display())?;
+        writeln!(a_file, "- b/b.yaml")?;
         writeln!(a_file, "sites:")?;
         let mut b_file = File::create(&b_path)?;
         writeln!(b_file, "words_path: words")?;
