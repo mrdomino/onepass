@@ -182,15 +182,7 @@ fn main() -> Result<()> {
 }
 
 fn read_words_str(args: &Args, config: &Config) -> Result<Option<Box<str>>> {
-    let path = args.words_path.as_deref();
-    // Read:
-    // ```
-    // let path = path.or_else(|| config.words_path());
-    // ```
-    // But since the latter is an `Option<Box<_>>` and the former is an `Option<&_>`,
-    // we need some extra steps (and an extra binding to optionally hold the `Box`.)
-    let config_path = path.is_none().then(|| config.words_path()).flatten();
-    let path = path.or(config_path.as_deref());
+    let path = args.words_path.as_deref().or(config.words_path.as_deref());
     path.map(|p| read_to_string(p).map(|s| s.into_boxed_str()))
         .transpose()
         .context("failed reading words file")

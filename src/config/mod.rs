@@ -15,9 +15,10 @@
 mod dirs;
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     fs::{create_dir_all, read_to_string, write},
-    path::Path,
+    mem,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result};
@@ -27,13 +28,11 @@ use serde::{Deserialize, Serialize};
 use crate::url::canonicalize;
 
 pub(crate) struct Config {
-    words_path: Option<Box<Path>>,
+    pub words_path: Option<Box<Path>>,
     pub default_schema: String,
     pub use_keyring: Option<bool>,
     pub aliases: BTreeMap<String, String>,
     pub sites: BTreeMap<String, SiteConfig>,
-
-    config_path: Option<Box<Path>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -54,14 +53,14 @@ impl Config {
             create_dir_all(path.parent().context("invalid config path")?)?;
             write(&path, serde_yaml::to_string(&SerConfig::example())?)?;
         }
-        let mut config = Self::from_str(&read_to_string(&path)?)?;
-        config.config_path = Some(path);
-        Ok(config)
+        let mut loader = ConfigLoader::new();
+        loader.load(&path)
     }
 
+    #[cfg(test)]
     pub fn from_str(s: &str) -> Result<Self> {
         let config: SerConfig = serde_yaml::from_str(s)?;
-        Ok(Self::from_ser_config(config))
+        Self::from_ser_config(config, &PathBuf::from("/a"))
     }
 
     pub fn find_site(&self, url: &str) -> Result<Option<(String, &SiteConfig)>> {
@@ -73,19 +72,33 @@ impl Config {
         Ok(Some((url, site)))
     }
 
-    pub fn words_path(&self) -> Option<Box<Path>> {
-        let path = self.words_path.as_deref()?;
-        let path = expand_home(path)?;
-        if path.is_relative() {
-            let config_path = self.config_path.as_deref()?.parent()?;
-            Some(config_path.join(path).into())
-        } else {
-            Some(path.into())
+    /// Merge other into self, preferring other over self.
+    fn extend(&mut self, mut other: Config) {
+        other.words_path.into_iter().for_each(|p| {
+            self.words_path = Some(p);
+        });
+        if !other.default_schema.is_empty() {
+            self.default_schema = mem::take(&mut other.default_schema);
         }
+        other
+            .use_keyring
+            .into_iter()
+            .for_each(|v| self.use_keyring = Some(v));
+        self.aliases.extend(mem::take(&mut other.aliases));
+        self.sites.extend(mem::take(&mut other.sites));
     }
 
-    fn from_ser_config(config: SerConfig) -> Self {
-        let words_path = config.words_path;
+    fn from_ser_config(config: SerConfig, config_path: &Path) -> Result<Self> {
+        let words_path = config
+            .words_path
+            .map(|p| -> Result<Box<Path>> {
+                let mut path = expand_home(p).context("expand_home failed")?;
+                if path.is_relative() {
+                    path = config_path.join(path);
+                }
+                Ok(path.into())
+            })
+            .transpose()?;
         let aliases = config.aliases;
         let default_schema = aliases
             .get(&config.default_schema)
@@ -105,15 +118,13 @@ impl Config {
                 (site, config)
             })
             .collect();
-        Config {
+        Ok(Config {
             words_path,
             default_schema,
             use_keyring,
             aliases,
             sites,
-
-            config_path: None,
-        }
+        })
     }
 
     fn default_path() -> Option<Box<Path>> {
@@ -124,10 +135,60 @@ impl Config {
     }
 }
 
+pub struct ConfigLoader {
+    visited_files: HashSet<PathBuf>,
+}
+
+impl ConfigLoader {
+    pub fn new() -> Self {
+        Self {
+            visited_files: HashSet::new(),
+        }
+    }
+
+    pub fn load<P: AsRef<Path>>(&mut self, path: P) -> Result<Config> {
+        let path = path.as_ref();
+        let canonical_path = path.canonicalize()?;
+        if self.visited_files.contains(&canonical_path) {
+            anyhow::bail!("circular dependency");
+        }
+        self.visited_files.insert(canonical_path.clone());
+        let contents = read_to_string(&canonical_path)?;
+        let mut ser_config: SerConfig = serde_yaml::from_str(&contents)?;
+        let include = mem::take(&mut ser_config.include);
+        let mut config = Config::from_ser_config(
+            ser_config,
+            canonical_path.parent().context("failed getting parent")?,
+        )?;
+        if !include.is_empty() {
+            let base_dir = canonical_path
+                .parent()
+                .context("failed to get parent dir")?;
+            for include_path in &include {
+                let resolved_path = self.resolve_include_path(include_path, base_dir)?;
+                let included_config = self.load(&resolved_path)?;
+                config.extend(included_config);
+            }
+        }
+        self.visited_files.remove(&canonical_path);
+        Ok(config)
+    }
+
+    fn resolve_include_path(&self, include_path: &Path, base_dir: &Path) -> Result<PathBuf> {
+        let mut path = expand_home(include_path).context("failed home expansion")?;
+        if path.is_relative() {
+            path = base_dir.join(path);
+        }
+        Ok(path)
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct SerConfig {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub include: Vec<PathBuf>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub words_path: Option<Box<Path>>,
+    pub words_path: Option<PathBuf>,
     #[serde(default = "default_schema")]
     pub default_schema: String,
     #[serde(default)]
@@ -171,6 +232,7 @@ impl SerConfig {
         let default_schema = "login".to_string();
         let use_keyring = Some(cfg!(not(target_os = "linux")));
         SerConfig {
+            include: Vec::new(),
             words_path: None,
             default_schema,
             use_keyring,
@@ -260,10 +322,10 @@ fn is_zero(value: &u32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
+    use std::{fs::File, io::Write};
 
     use anyhow::Result;
-    use tempfile::NamedTempFile;
+    use tempfile::{NamedTempFile, TempDir};
 
     use super::*;
 
@@ -337,6 +399,38 @@ mod tests {
         let (u, site) = config.find_site("google.com")?.context("fail")?;
         assert_eq!("[A-Z]{0}", &site.schema);
         assert_eq!("https://google.com/", &u);
+        Ok(())
+    }
+
+    #[test]
+    fn test_include() -> Result<()> {
+        let mut config_file = NamedTempFile::new()?;
+        let dir = TempDir::new()?;
+        let a_path = dir.path().join("a.yaml");
+        let b_dir = dir.path().join("b");
+        create_dir_all(&b_dir)?;
+        let b_path = b_dir.join("b.yaml");
+        let b_words_path = b_dir.join("words");
+        writeln!(config_file, "include:")?;
+        writeln!(config_file, "- {}", a_path.display())?;
+        writeln!(config_file, "sites:")?;
+        let mut a_file = File::create(&a_path)?;
+        writeln!(a_file, "include:")?;
+        writeln!(a_file, "- b/b.yaml")?;
+        writeln!(a_file, "sites:")?;
+        let mut b_file = File::create(&b_path)?;
+        writeln!(b_file, "words_path: words")?;
+        writeln!(b_file, "sites:")?;
+        writeln!(b_file, " google.com:")?;
+        writeln!(b_file, "  schema: '[A-Z]{{4}}'")?;
+        let mut b_words_file = File::create(&b_words_path)?;
+        writeln!(b_words_file, "aAa")?;
+        writeln!(b_words_file, "bB")?;
+        let config = Config::from_file(Some(config_file.path()))?;
+        let (u, site) = config.find_site("google.com")?.context("fail")?;
+        assert_eq!("https://google.com/", &u);
+        assert_eq!("[A-Z]{4}", &site.schema);
+        assert_eq!(Some(b_words_path.canonicalize()?.into()), config.words_path);
         Ok(())
     }
 }
