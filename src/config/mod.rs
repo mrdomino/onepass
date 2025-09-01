@@ -85,6 +85,10 @@ impl Config {
             .into_iter()
             .for_each(|v| self.use_keyring = Some(v));
         self.aliases.extend(mem::take(&mut other.aliases));
+        // TODO(someday): merge and apply schema aliases in a more principled way.
+        // This only applies base schemas to included sites; it does not apply included schemas
+        // to base sites. To do the latter seems like it would require a more substantial rework
+        // of the schema alias code.
         for (k, mut config) in other.sites.into_iter() {
             if let Some(schema) = self.aliases.get(&config.schema) {
                 config.schema = schema.clone();
