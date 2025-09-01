@@ -166,8 +166,10 @@ impl ConfigLoader {
                 .context("failed to get parent dir")?;
             for include_path in &include {
                 let resolved_path = self.resolve_include_path(include_path, base_dir)?;
-                let included_config = self.load(&resolved_path)?;
-                config.extend(included_config);
+                match self.load(&resolved_path) {
+                    Ok(included_config) => config.extend(included_config),
+                    Err(e) => eprintln!("Loading {}: {}", resolved_path.display(), e),
+                }
             }
         }
         self.visited_files.remove(&canonical_path);
