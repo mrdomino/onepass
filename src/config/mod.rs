@@ -85,7 +85,12 @@ impl Config {
             .into_iter()
             .for_each(|v| self.use_keyring = Some(v));
         self.aliases.extend(mem::take(&mut other.aliases));
-        self.sites.extend(mem::take(&mut other.sites));
+        for (k, mut config) in other.sites.into_iter() {
+            if let Some(schema) = self.aliases.get(&config.schema) {
+                config.schema = schema.clone();
+            }
+            self.sites.insert(k, config);
+        }
     }
 
     fn from_ser_config(config: SerConfig, config_path: &Path) -> Result<Self> {
@@ -415,6 +420,8 @@ mod tests {
         let b_words_path = b_dir.join("words");
         writeln!(config_file, "include:")?;
         writeln!(config_file, "- {}", a_path.display())?;
+        writeln!(config_file, "aliases:")?;
+        writeln!(config_file, " a: '[A-Z]{{4}}'")?;
         writeln!(config_file, "sites:")?;
         let mut a_file = File::create(&a_path)?;
         writeln!(a_file, "include:")?;
@@ -424,7 +431,7 @@ mod tests {
         writeln!(b_file, "words_path: words")?;
         writeln!(b_file, "sites:")?;
         writeln!(b_file, " google.com:")?;
-        writeln!(b_file, "  schema: '[A-Z]{{4}}'")?;
+        writeln!(b_file, "  schema: a")?;
         let mut b_words_file = File::create(&b_words_path)?;
         writeln!(b_words_file, "aAa")?;
         writeln!(b_words_file, "bB")?;
