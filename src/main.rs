@@ -215,7 +215,7 @@ fn gen_password_config(
     let schema = args.schema.as_ref().map_or_else(
         || {
             site.as_ref()
-                .map_or(&config.default_schema, |(_, site)| &site.schema)
+                .map_or(config.default_schema(), |(_, site)| &site.schema)
         },
         |schema| config.aliases.get(schema).unwrap_or(schema),
     );

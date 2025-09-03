@@ -29,7 +29,7 @@ use crate::url::canonicalize;
 
 pub(crate) struct Config {
     pub words_path: Option<Box<Path>>,
-    pub default_schema: String,
+    default_schema: Option<String>,
     pub use_keyring: Option<bool>,
     pub aliases: BTreeMap<String, String>,
     pub sites: BTreeMap<String, SiteConfig>,
@@ -43,6 +43,8 @@ pub(crate) struct SiteConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
 }
+
+const DEFAULT_SCHEMA: &str = "[A-Za-z0-9]{16}";
 
 impl Config {
     pub fn from_file(path: Option<&Path>) -> Result<Self> {
@@ -72,14 +74,20 @@ impl Config {
         Ok(Some((url, site)))
     }
 
+    pub fn default_schema(&'_ self) -> &'_ str {
+        self.default_schema.as_deref().unwrap_or(DEFAULT_SCHEMA)
+    }
+
     /// Merge other into self, preferring other over self.
     fn extend(&mut self, mut other: Config) {
-        other.words_path.into_iter().for_each(|p| {
-            self.words_path = Some(p);
-        });
-        if !other.default_schema.is_empty() {
-            self.default_schema = mem::take(&mut other.default_schema);
-        }
+        other
+            .words_path
+            .into_iter()
+            .for_each(|p| self.words_path = Some(p));
+        other
+            .default_schema
+            .into_iter()
+            .for_each(|s| self.default_schema = Some(s));
         other
             .use_keyring
             .into_iter()
@@ -109,9 +117,9 @@ impl Config {
             })
             .transpose()?;
         let aliases = config.aliases;
-        let default_schema = aliases
-            .get(&config.default_schema)
-            .map_or(config.default_schema, Clone::clone);
+        let default_schema = config
+            .default_schema
+            .map(|schema| aliases.get(&schema).map_or(schema, Clone::clone));
         let use_keyring = config.use_keyring;
         let sites = config
             .sites
@@ -200,8 +208,8 @@ struct SerConfig {
     pub include: Vec<PathBuf>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub words_path: Option<PathBuf>,
-    #[serde(default = "default_schema")]
-    pub default_schema: String,
+    #[serde(default, skip_serializing_if = "Option::is_None")]
+    pub default_schema: Option<String>,
     #[serde(default)]
     pub use_keyring: Option<bool>,
     #[serde(default)]
@@ -240,7 +248,7 @@ impl SerConfig {
             )
         })
         .collect();
-        let default_schema = "login".to_string();
+        let default_schema = Some("login".to_string());
         let use_keyring = Some(cfg!(not(target_os = "linux")));
         SerConfig {
             include: Vec::new(),
@@ -321,10 +329,6 @@ where
 {
     let sites: BTreeMap<String, SchemaOrSiteConfig> = BTreeMap::deserialize(deserializer)?;
     Ok(sites.into_iter().map(|(k, v)| (k, v.into())).collect())
-}
-
-fn default_schema() -> String {
-    "[A-Za-z0-9]{16}".into()
 }
 
 fn is_zero(value: &u32) -> bool {
