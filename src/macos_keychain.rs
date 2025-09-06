@@ -31,7 +31,7 @@ use objc2_security::{
     kSecAttrAccessibleWhenUnlockedThisDeviceOnly, kSecAttrAccount, kSecAttrService, kSecClass,
     kSecClassGenericPassword, kSecReturnData, kSecUseAuthenticationContext, kSecValueData,
 };
-use zeroize::Zeroize;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Entry exposes an API superficially compatible with the subset of keyring::Entry used by
 /// onepass. The difference is that it asks for the password it saves to be protected by biometric
@@ -201,3 +201,4 @@ impl Drop for SecureData {
         }
     }
 }
+impl ZeroizeOnDrop for SecureData {}
