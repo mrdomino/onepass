@@ -16,7 +16,7 @@ use anyhow::Result;
 use argon2::{Algorithm, Argon2, Params, Version};
 use rand_chacha::ChaCha20Rng;
 use rand_core::{RngCore, SeedableRng};
-use zeroize::{Zeroizing, zeroize_flat_type};
+use zeroize::{ZeroizeOnDrop, Zeroizing, zeroize_flat_type};
 
 /// Rng wraps a ChaCha20Rng but zeroizes it on drop. It also supports creation from a password and
 /// salt via argon2id with our chosen parameters.
@@ -51,6 +51,7 @@ impl Drop for Rng {
         unsafe { zeroize_flat_type(self as *mut Self) }
     }
 }
+impl ZeroizeOnDrop for Rng {}
 
 #[cfg(test)]
 mod tests {
