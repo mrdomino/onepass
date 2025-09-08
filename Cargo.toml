@@ -37,7 +37,7 @@ crypto-bigint = { version = "0.7.0-rc.4", features = ["rand_core", "zeroize"] }
 nom = "8.0.0"
 rand_chacha = "0.9.0"
 rand_core = "0.9.3"
-readpassphrase-3 = { version = "0.10.0-pre.2", features = ["zeroize"] }
+readpassphrase-3 = { version = "0.10.0", features = ["zeroize"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_yaml = "0.9.34"
 url = "2.5.6"
