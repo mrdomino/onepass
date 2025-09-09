@@ -71,7 +71,7 @@ If it worked, you should be able to run `target/release/onepass -k google.com` a
 
 ## How it works
 
-At a high level, we take your seed password, turn it into a random number, and use that random number to select a password from the set of all possible passwords that could satisfy your site’s schema. Since the password stays the same across runs, the random numbers also stay the same, so you get the same site passwords every time without ever having to store any of them.
+At a high level, we take your seed password, turn it into a random number, and use that random number to select a password from the set of all possible passwords that could satisfy your site’s schema. Since the seed password stays the same across runs, the random numbers also stay the same, so you get the same site passwords every time without ever having to store any of them.
 
 If you are interested in the details of how we do this, read on.
 
