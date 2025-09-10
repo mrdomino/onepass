@@ -1332,6 +1332,7 @@ checksum = "bd1d7b946cc17ec85bf123a9228ce247f6ecfa6331d78c339c2c0f92630a6f87"
 dependencies = [
  "bitflags",
  "cc",
+ "tcm-readpassphrase-vendored",
  "zeroize",
 ]
 
@@ -1532,6 +1533,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "tcm-readpassphrase-vendored"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a29a01bd8faded69a753c99f2efd8bce68f5a6e003ddf637c47d1ed64d35720e"
+dependencies = [
+ "cc",
 ]
 
 [[package]]

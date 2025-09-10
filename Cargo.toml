@@ -19,7 +19,10 @@ exclude = [
 ]
 
 [features]
-default = ["keyring"]
+default = [
+    "keyring",
+    "readpass-vendored",
+]
 macos-biometry = [
     "objc2",
     "objc2-core-foundation",
@@ -27,6 +30,8 @@ macos-biometry = [
     "objc2-local-authentication",
     "objc2-security",
 ]
+readpass-libbsd = ["readpassphrase-3/libbsd-static"]
+readpass-vendored = ["readpassphrase-3/linux-vendored"]
 
 [dependencies]
 anyhow = "1.0.99"
@@ -46,7 +51,6 @@ zeroize = "1.8.1"
 version = "1.0.0-pre.4"
 default-features = false
 features = [
-    "libbsd-static",
     "windows-vendored",
     "zeroize",
 ]
