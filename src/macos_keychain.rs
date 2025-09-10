@@ -132,6 +132,8 @@ impl Entry {
                 "failed to load password: {status:?}"
             )));
         }
+        // XXX: `SecItemCopyMatching` actually returns `CFData`, so this is not allowed, but
+        // empirically it has been working so far.
         let result = NonNull::new(result as *mut CFMutableData)
             .context("nil result from keychain")
             .map_err(Error::Other)?;
