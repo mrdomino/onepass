@@ -84,6 +84,7 @@ jobs:
       run: |
         sudo sh -eu <<EOF
         apt-get update && apt-get install -yy --no-install-recommends \
+            libbsd-dev \
             libdbus-1-dev
         EOF
       if: ${{ matrix.os == 'ubuntu' }}
