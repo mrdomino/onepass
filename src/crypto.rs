@@ -23,7 +23,7 @@ use zeroize::{ZeroizeOnDrop, Zeroizing, zeroize_flat_type};
 pub(crate) struct Rng(ChaCha20Rng);
 
 impl Rng {
-    pub fn from_password_salt(password: &str, salt: String) -> Result<Self> {
+    pub fn from_password_salt(password: &str, salt: &str) -> Result<Self> {
         let mut key_material = Zeroizing::new([0u8; 32]);
         let params =
             Params::new(32 * 1024, 3, 1, None).map_err(|e| anyhow::anyhow!("Params::new: {e}"))?;
@@ -59,7 +59,7 @@ mod tests {
 
     #[test]
     fn test_vectors() -> Result<()> {
-        let mut rng = Rng::from_password_salt("test", "testsalt".into())?;
+        let mut rng = Rng::from_password_salt("test", "testsalt")?;
         let res = rng.next_u64();
         assert_eq!(0xfa6a0c49ba644eb2, res, "{res:x}");
         Ok(())

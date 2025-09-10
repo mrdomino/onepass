@@ -248,7 +248,7 @@ fn gen_password(
 ) -> Result<Zeroizing<String>> {
     let size = words.size(expr);
     let salt = format!("{increment},{url}");
-    let mut rng = Rng::from_password_salt(seed, salt)?;
+    let mut rng = Rng::from_password_salt(seed, &salt)?;
     let index = U256::random_mod(&mut rng, &NonZero::new(size).unwrap());
     words.gen_at(expr, index)
 }
