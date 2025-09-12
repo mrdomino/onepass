@@ -63,7 +63,7 @@ jobs:
         fi
         if [[ macos = "${{ matrix.os }}" && true = "${{ inputs.release }}" ]]; then
           features=' --no-default-features --features=macos-biometry'
-        elif [[ linux = "${{ matrix.os }}" && true = "${{ inputs.release }}" ]]; then
+        elif [[ ubuntu = "${{ matrix.os }}" && true = "${{ inputs.release }}" ]]; then
           features=' --no-default-features --features=keyring,readpass-libbsd'
         else
           features=
