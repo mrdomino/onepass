@@ -1326,9 +1326,9 @@ dependencies = [
 
 [[package]]
 name = "readpassphrase-3"
-version = "1.0.0-pre.4"
+version = "1.0.0-pre.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd1d7b946cc17ec85bf123a9228ce247f6ecfa6331d78c339c2c0f92630a6f87"
+checksum = "a43a94570dc8f77336d9635424b4ee7ea4faf6bc1fbbb7e58098e69d40f085d5"
 dependencies = [
  "bitflags",
  "cc",
