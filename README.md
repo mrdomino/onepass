@@ -4,14 +4,14 @@ Onepass is a deterministic CLI password manager/generator. Think of it like an o
 
 Individual site passwords can be cycled without changing your seed password by increasing a per-site “increment” parameter. Different password schemas are supported per site, such as “one lowercase letter, one uppercase letter, one digit, 15 alphanumeric characters.” The specification for these schemas is a regex-like syntax, and schemas may also be mapped to human-readable aliases; the [example config](example/config.yaml) demonstrates how this works.
 
-Optionally, you may sync your seed password to the system keyring. This protects it from being shoulder-surfed as you’re entering it, and on some platforms, is guarded by a user presence check (e.g. TouchID.)
+Optionally, you may sync your seed password to the system keyring to protect it from being shoulder-surfed as you’re entering it. On macOS, this mode requires TouchID (or other biometric auth) to unlock your seed password; since these APIs require paid developer certificates to work, the prebuilt macOS binaries are signed with one.
 
 Keyring sync can be requested either with the `-k` / `--keyring` CLI arg, or the `use_keyring: true` config setting.
 
 ## Install from GitHub releases
 Download the [latest GitHub release](https://github.com/mrdomino/onepass/releases/latest) binary for your platform, or download and run the `onepass.pkg` installer for recent (i.e. Apple Silicon running OS X 10.13+) macOS machines.
 
-On macOS, you will need to download and install the [included provisioning profile](https://github.com/mrdomino/onepass/raw/refs/heads/main/onepass.provisionprofile) or the app will be killed by GateKeeper on startup. At present, this step must be done manually.
+On macOS, because we only ship a binary and not a full app bundle, you will also need to download and install the [included provisioning profile](https://github.com/mrdomino/onepass/raw/refs/heads/main/onepass.provisionprofile) or the app will be killed by GateKeeper on startup. At present, this step must be done manually.
 
 ## Quick start
 Simply call `onepass` with the URL or hostname of the site for which you’d like to generate a password:
