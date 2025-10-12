@@ -17,9 +17,6 @@ on:
         type: string
         required: false
 
-env:
-  RUST_VERSION: "1.90"
-
 jobs:
   build:
     name: Build
@@ -94,9 +91,7 @@ jobs:
     - uses: actions/checkout@v5
       with:
         ref: ${{ inputs.tag || github.ref }}
-    - run: rustup toolchain install ${{ env.RUST_VERSION }} --target ${{ env.target }} --profile minimal
-      shell: bash
-    - run: rustup default ${{ env.RUST_VERSION }}
+    - run: rustup toolchain install --target ${{ env.target }} --profile minimal
     - uses: mrdomino/rust-cache@v2
       with:
         key: ${{ env.profile }}
