@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::{
+    borrow::Cow,
     env,
     ffi::OsStr,
     path::{Component, Path, PathBuf},
@@ -39,21 +40,20 @@ pub(crate) fn current_home() -> Option<PathBuf> {
     env::var_os("HOME").map(PathBuf::from)
 }
 
-pub(crate) fn expand_home<P: AsRef<Path>>(path: P) -> Option<PathBuf> {
+pub(crate) fn expand_home(path: Cow<'_, Path>) -> Option<Cow<'_, Path>> {
+    if !path.starts_with("~") {
+        return Some(path);
+    }
     let mut ret = PathBuf::new();
-    let mut components = path.as_ref().components();
+    let mut components = path.components();
     match components.next() {
         Some(Component::Normal(os)) if os == OsStr::new("~") => {
             ret.push(current_home()?);
         }
-        Some(Component::Normal(os)) if os.to_str()?.starts_with("~") => {
-            return None;
-        }
-        Some(component) => ret.push(component),
-        None => return Some(ret),
+        _ => return None,
     }
     for component in components {
         ret.push(component);
     }
-    Some(ret)
+    Some(Cow::Owned(ret))
 }
