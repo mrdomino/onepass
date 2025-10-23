@@ -15,7 +15,6 @@
 mod dirs;
 
 use std::{
-    borrow::Cow,
     collections::{BTreeMap, HashSet},
     fs::{create_dir_all, read_to_string, write},
     mem,
@@ -110,9 +109,9 @@ impl Config {
         let words_path = config
             .words_path
             .map(|p| -> Result<Box<Path>> {
-                let mut path = expand_home(Cow::Owned(p)).context("expand_home failed")?;
+                let mut path = expand_home(p.into()).context("expand_home failed")?;
                 if path.is_relative() {
-                    path = Cow::Owned(config_path.join(path));
+                    path = config_path.join(path).into();
                 }
                 Ok(path.into())
             })
@@ -198,12 +197,12 @@ impl ConfigLoader {
         &self,
         include_path: &'a Path,
         base_dir: &Path,
-    ) -> Result<Cow<'a, Path>> {
-        let mut path = expand_home(Cow::Borrowed(include_path)).context("failed home expansion")?;
+    ) -> Result<Box<Path>> {
+        let mut path = expand_home(include_path.into()).context("failed home expansion")?;
         if path.is_relative() {
-            path = Cow::Owned(base_dir.join(path));
+            path = base_dir.join(path).into();
         }
-        Ok(path)
+        Ok(path.into())
     }
 }
 
