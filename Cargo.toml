@@ -37,7 +37,7 @@ readpass-vendored = ["readpassphrase-3/linux-vendored"]
 anyhow = "1.0.100"
 argon2 = { version = "0.6.0-rc.1", features = ["zeroize"] }
 char-iter = "0.1.0"
-clap = { version = "4.5.50", features = ["derive", "env", "unicode", "wrap_help"] }
+clap = { version = "4.5.51", features = ["derive", "env", "unicode", "wrap_help"] }
 crypto-bigint = { version = "0.7.0-rc.9", features = ["rand_core", "zeroize"] }
 nom = "8.0.0"
 rand_chacha = "0.9.0"
