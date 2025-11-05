@@ -37,7 +37,8 @@ pub(crate) struct Config {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct SiteConfig {
-    pub schema: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub increment: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -78,6 +79,13 @@ impl Config {
         self.default_schema.as_deref().unwrap_or(DEFAULT_SCHEMA)
     }
 
+    pub fn site_schema<'a>(&'a self, config: &'a SiteConfig) -> &'a str {
+        config
+            .schema
+            .as_deref()
+            .unwrap_or_else(|| self.default_schema())
+    }
+
     /// Merge other into self, preferring other over self.
     fn extend(&mut self, mut other: Config) {
         other
@@ -98,8 +106,12 @@ impl Config {
         // to base sites. To do the latter seems like it would require a more substantial rework
         // of the schema alias code.
         for (k, mut config) in other.sites.into_iter() {
-            if let Some(schema) = self.aliases.get(&config.schema) {
-                config.schema = schema.clone();
+            if let Some(schema) = config
+                .schema
+                .as_deref()
+                .and_then(|schema| self.aliases.get(schema))
+            {
+                config.schema = Some(schema.clone());
             }
             self.sites.insert(k, config);
         }
@@ -125,8 +137,12 @@ impl Config {
             .sites
             .into_iter()
             .map(|(mut site, mut config)| {
-                if let Some(schema) = aliases.get(&config.schema) {
-                    config.schema = schema.clone();
+                if let Some(schema) = config
+                    .schema
+                    .as_deref()
+                    .and_then(|schema| aliases.get(schema))
+                {
+                    config.schema = Some(schema.clone());
                 }
                 // TODO: print warnings on parse errors here
                 if let Ok(url) = canonicalize(&site, None) {
@@ -241,7 +257,7 @@ impl SerConfig {
             (
                 k.into(),
                 SiteConfig {
-                    schema: schema.into(),
+                    schema: Some(schema.into()),
                     increment,
                     username: None,
                 },
@@ -264,6 +280,7 @@ impl SerConfig {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 enum SchemaOrSiteConfig {
+    Empty,
     Schema(String),
     Config(SiteConfig),
 }
@@ -271,8 +288,13 @@ enum SchemaOrSiteConfig {
 impl From<SchemaOrSiteConfig> for SiteConfig {
     fn from(value: SchemaOrSiteConfig) -> Self {
         match value {
+            SchemaOrSiteConfig::Empty => SiteConfig {
+                schema: None,
+                increment: 0,
+                username: None,
+            },
             SchemaOrSiteConfig::Schema(schema) => SiteConfig {
-                schema,
+                schema: Some(schema),
                 increment: 0,
                 username: None,
             },
@@ -283,8 +305,11 @@ impl From<SchemaOrSiteConfig> for SiteConfig {
 
 impl From<&SiteConfig> for SchemaOrSiteConfig {
     fn from(config: &SiteConfig) -> Self {
-        if is_zero(&config.increment) && config.username.is_none() {
-            SchemaOrSiteConfig::Schema(config.schema.clone())
+        if let Some(schema) = config.schema.as_deref()
+            && is_zero(&config.increment)
+            && config.username.is_none()
+        {
+            SchemaOrSiteConfig::Schema(schema.to_string())
         } else {
             SchemaOrSiteConfig::Config(SiteConfig {
                 schema: config.schema.clone(),
@@ -348,7 +373,7 @@ mod tests {
     fn basic() -> Result<()> {
         let config: SerConfig = serde_yaml::from_str("sites:\n google.com: \"[A-Z]\"")?;
         let goog = &config.sites["google.com"];
-        assert_eq!("[A-Z]", goog.schema);
+        assert_eq!(Some("[A-Z]"), goog.schema.as_deref());
         Ok(())
     }
 
@@ -358,7 +383,7 @@ mod tests {
             serde_yaml::from_str("sites:\n abcd:\n  schema: \"A\"\n  increment: 1\n")?;
         let abcd = &config.sites["abcd"];
         assert_eq!(1, abcd.increment);
-        assert_eq!("A", abcd.schema);
+        assert_eq!(Some("A"), abcd.schema.as_deref());
         Ok(())
     }
 
@@ -366,6 +391,7 @@ mod tests {
     fn find_site_ok() -> Result<()> {
         let config = Config::from_str(
             r#"
+            default_schema: DEF
             sites:
                 google.com:
                     schema: A
@@ -374,6 +400,7 @@ mod tests {
                     schema: B
                 "http://localhost":
                     schema: C
+                example.com:
             "#,
         )?;
         let tests = [
@@ -384,18 +411,34 @@ mod tests {
             (Some(("https://apple.com/", "B")), "https://apple.com"),
             (Some(("http://localhost/", "C")), "http://localhost/"),
             (None, "localhost"),
+            (Some(("https://example.com/", "DEF")), "https://example.com"),
         ];
         for (want, input) in tests {
             let got = config.find_site(input)?;
             match (want, got) {
                 (Some((want_url, want_schema)), Some((got_url, got_config))) => {
                     assert_eq!(want_url, &got_url);
-                    assert_eq!(want_schema, got_config.schema);
+                    assert_eq!(want_schema, config.site_schema(got_config));
                 }
                 (None, None) => (),
                 (want, got) => panic!("mismatch: {want:?} / {got:?}"),
             };
         }
+        Ok(())
+    }
+
+    #[test]
+    fn find_incr() -> Result<()> {
+        let config = Config::from_str(
+            r#"
+            sites:
+                example.com:
+                    increment: 1
+            "#,
+        )?;
+        let (_, site) = config.find_site("example.com")?.context("fail")?;
+        assert_eq!(1, site.increment);
+        assert_eq!(DEFAULT_SCHEMA, config.site_schema(site));
         Ok(())
     }
 
@@ -412,7 +455,7 @@ mod tests {
         )?;
         let config = Config::from_file(Some(config_file.path()))?;
         let (u, site) = config.find_site("google.com")?.context("fail")?;
-        assert_eq!("[A-Z]{0}", &site.schema);
+        assert_eq!(Some("[A-Z]{0}"), site.schema.as_deref());
         assert_eq!("https://google.com/", &u);
         Ok(())
     }
@@ -446,7 +489,7 @@ mod tests {
         let config = Config::from_file(Some(config_file.path()))?;
         let (u, site) = config.find_site("google.com")?.context("fail")?;
         assert_eq!("https://google.com/", &u);
-        assert_eq!("[A-Z]{4}", &site.schema);
+        assert_eq!(Some("[A-Z]{4}"), site.schema.as_deref());
         assert_eq!(Some(b_words_path.canonicalize()?.into()), config.words_path);
         Ok(())
     }
