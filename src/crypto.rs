@@ -14,7 +14,7 @@
 
 use anyhow::Result;
 use argon2::{Algorithm, Argon2, Params, Version};
-use rand_chacha::ChaCha20Rng;
+use chacha20::ChaCha20Rng;
 use rand_core::{RngCore, SeedableRng};
 use zeroize::{ZeroizeOnDrop, Zeroizing, zeroize_flat_type};
 

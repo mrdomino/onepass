@@ -291,6 +291,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
+name = "chacha20"
+version = "0.10.0-rc.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99cbf41c6ec3c4b9eaf7f8f5c11a72cd7d3aa0428125c20d5ef4d09907a0f019"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "rand_core 0.10.0-rc-2",
+]
+
+[[package]]
 name = "char-iter"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1088,6 +1099,7 @@ version = "2.3.0"
 dependencies = [
  "anyhow",
  "argon2",
+ "chacha20",
  "char-iter",
  "clap",
  "crypto-bigint",
@@ -1099,8 +1111,7 @@ dependencies = [
  "objc2-foundation",
  "objc2-local-authentication",
  "objc2-security",
- "rand_chacha 0.9.0",
- "rand_core 0.9.3",
+ "rand_core 0.10.0-rc-2",
  "readpassphrase-3",
  "serde",
  "serde_yaml",
@@ -1282,7 +1293,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
 dependencies = [
  "libc",
- "rand_chacha 0.3.1",
+ "rand_chacha",
  "rand_core 0.6.4",
 ]
 
@@ -1297,31 +1308,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "rand_chacha"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3022b5f1df60f26e1ffddd6c66e8aa15de382ae63b3a0c1bfc0e4d3e3f325cb"
-dependencies = [
- "ppv-lite86",
- "rand_core 0.9.3",
-]
-
-[[package]]
 name = "rand_core"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom 0.2.16",
-]
-
-[[package]]
-name = "rand_core"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99d9a13982dcf210057a8a78572b2217b667c3beacbf3a0d8b454f6f82837d38"
-dependencies = [
- "getrandom 0.3.3",
 ]
 
 [[package]]
