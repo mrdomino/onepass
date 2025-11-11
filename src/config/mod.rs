@@ -105,7 +105,7 @@ impl Config {
         // This only applies base schemas to included sites; it does not apply included schemas
         // to base sites. To do the latter seems like it would require a more substantial rework
         // of the schema alias code.
-        for (k, mut config) in other.sites.into_iter() {
+        for (k, mut config) in other.sites {
             if let Some(schema) = config
                 .schema
                 .as_deref()

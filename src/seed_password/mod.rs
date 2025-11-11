@@ -50,7 +50,7 @@ pub(crate) fn delete() -> Result<()> {
     match get_entry()?.delete_credential() {
         Err(Error::NoEntry) => (),
         r => r.context("failed deleting password")?,
-    };
+    }
     Ok(())
 }
 

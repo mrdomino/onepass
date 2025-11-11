@@ -100,7 +100,8 @@ impl CharClass {
 }
 
 fn u256_to_usize(n: &U256) -> usize {
-    n.as_limbs()[0].0 as usize
+    assert!(n.bits() <= usize::BITS);
+    usize::try_from(n.as_limbs()[0].0).unwrap()
 }
 
 fn u256_saturating_pow(base: &U256, mut exp: u32) -> U256 {

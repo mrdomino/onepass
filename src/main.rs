@@ -191,7 +191,7 @@ fn read_words_str(args: &Args, config: &Config) -> Result<Option<Box<str>>> {
 fn words_arr(words: &'_ str) -> Box<[&'_ str]> {
     let set = words
         .lines()
-        .map(|l| l.trim())
+        .map(str::trim)
         .filter(|l| !l.is_empty())
         .collect::<BTreeSet<_>>();
     set.into_iter().collect()

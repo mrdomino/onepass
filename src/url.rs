@@ -21,7 +21,7 @@ pub(crate) fn canonicalize(input: &str, username: Option<&str>) -> Result<String
         .context("invalid url")?;
     if let Some(username) = username {
         url.set_username(username)
-            .map_err(|_| anyhow::anyhow!("failed setting username"))?;
+            .map_err(|()| anyhow::anyhow!("failed setting username"))?;
     }
     Ok(url.into())
 }

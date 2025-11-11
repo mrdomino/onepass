@@ -46,7 +46,7 @@ pub(crate) fn expand_home<P: AsRef<Path>>(path: P) -> Option<PathBuf> {
         Some(Component::Normal(os)) if os == OsStr::new("~") => {
             ret.push(current_home()?);
         }
-        Some(Component::Normal(os)) if os.to_str()?.starts_with("~") => {
+        Some(Component::Normal(os)) if os.to_str()?.starts_with('~') => {
             return None;
         }
         Some(component) => ret.push(component),
