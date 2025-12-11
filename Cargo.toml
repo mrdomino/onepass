@@ -35,7 +35,7 @@ readpass-vendored = ["readpassphrase-3/linux-vendored"]
 
 [dependencies]
 anyhow = "1.0.100"
-argon2 = { version = "0.6.0-rc.2", features = ["zeroize"] }
+argon2 = { version = "0.6.0-rc.4", features = ["zeroize"] }
 chacha20 = { version = "0.10.0-rc.2", features = ["rng"], default-features = false }
 char-iter = "0.1.0"
 clap = { version = "4.5.53", features = ["derive", "env", "unicode", "wrap_help"] }
