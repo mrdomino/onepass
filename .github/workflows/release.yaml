@@ -98,7 +98,7 @@ jobs:
             .root/onepass
         chmod +x .root/onepass
 
-    - uses: actions/upload-artifact@v5
+    - uses: actions/upload-artifact@v6
       with:
         name: onepass-signed-darwin
         path: .root/onepass
@@ -146,7 +146,7 @@ jobs:
         xcrun stapler staple onepass.pkg
         spctl --assess -vv --type install onepass.pkg
 
-    - uses: actions/upload-artifact@v5
+    - uses: actions/upload-artifact@v6
       with:
         name: onepass-pkg-darwin
         path: onepass.pkg
