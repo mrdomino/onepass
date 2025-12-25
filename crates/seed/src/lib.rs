@@ -1,5 +1,6 @@
 pub mod crypto;
 pub mod data;
+pub mod dict;
 
 /// Write the fields passed to this macro as tab-separated values with all inner TSV-meaningful
 /// characters escaped; see [`format_tsv_args`].

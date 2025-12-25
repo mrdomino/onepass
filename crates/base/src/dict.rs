@@ -36,6 +36,12 @@ impl<'a> BoxDict<'a> {
     }
 }
 
+impl<'a, 'b: 'a> RefDict<'a, 'b> {
+    pub const fn new(words: &'b [&'a str], hash: &'b [u8; 32]) -> Self {
+        RefDict(words, hash)
+    }
+}
+
 impl<'a> Dict<'a> for BoxDict<'a> {
     fn words(&self) -> &[&'a str] {
         &self.0
