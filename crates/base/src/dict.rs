@@ -117,8 +117,8 @@ mod tests {
                 Some("\0"),
             ),
             (
-                "5e38c93e4d35f7bf287f6dadafae08c10739ee2645da176623dc7d223c8fa162",
-                r#"\\\r\n\t"#,
+                "ff11901891de4daf46c9ffc4a5c23ae22c4fa2597dc1beb86d2ef5bf87d9c878",
+                "\\\r\n\t",
                 Some("\0"),
             ),
         ];
