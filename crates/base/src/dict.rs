@@ -121,6 +121,11 @@ mod tests {
                 "\\\r\n\t",
                 Some("\0"),
             ),
+            (
+                "dec3a7b8941401737abb9ff3f37cde4b47c79c5be60bba8ba2ffb02fb84864ba",
+                "a a",
+                None,
+            ),
         ];
         for (want, inp, sep) in tests {
             let dict = match sep {
