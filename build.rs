@@ -12,46 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{
-    env,
-    ffi::OsStr,
-    fs::File,
-    io::{BufRead, BufReader, Write},
-    path::Path,
-};
+use std::{env, ffi::OsStr};
 
 fn main() {
-    gen_eff_wordlist();
     embed_info_plist();
-}
-
-fn gen_eff_wordlist() {
-    println!("cargo:rerun-if-changed=data/eff_large_wordlist.txt");
-    let out_dir = env::var_os("OUT_DIR").unwrap();
-    let dest_path = Path::new(&out_dir).join("wordlist.rs");
-    let file = File::open("data/eff_large_wordlist.txt").unwrap();
-    let reader = BufReader::new(file);
-    let mut words = Vec::new();
-    for line in reader.lines() {
-        let line = line.unwrap();
-        let line = line.split('\t').nth(1).unwrap().trim();
-        if line.is_empty() {
-            continue;
-        }
-        words.push(line.to_string());
-    }
-
-    let mut output = File::create(&dest_path).unwrap();
-    writeln!(
-        output,
-        "// Generated at build time from data/eff_large_wordlist.txt"
-    )
-    .unwrap();
-    writeln!(output, "pub const EFF_WORDLIST: &[&str] = &[").unwrap();
-    for word in words {
-        writeln!(output, "    \"{word}\",").unwrap();
-    }
-    writeln!(output, "];").unwrap();
 }
 
 fn embed_info_plist() {

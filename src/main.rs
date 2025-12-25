@@ -20,7 +20,6 @@ mod seed_password;
 mod url;
 
 use std::{
-    collections::BTreeSet,
     fs::read_to_string,
     io::{IsTerminal, Write, stdout},
     path::Path,
@@ -30,7 +29,10 @@ use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, error::ErrorKind};
 use config::Config;
 use crypto_bigint::NonZero;
-use onepass_seed::crypto::secret_uniform;
+use onepass_seed::{
+    crypto::secret_uniform,
+    dict::{BoxDict, Dict, EFF_WORDLIST},
+};
 use randexp::{Enumerable, Expr, Quantifiable, Words};
 use url::canonicalize;
 use zeroize::Zeroizing;
@@ -120,8 +122,6 @@ struct Args {
     verbose: bool,
 }
 
-include!(concat!(env!("OUT_DIR"), "/wordlist.rs"));
-
 fn main() -> Result<()> {
     let mut args = Args::parse();
     if args.no_keyring {
@@ -146,17 +146,16 @@ fn main() -> Result<()> {
     }
     let seed = seed_password::read(use_keyring, args.confirm)?;
 
-    // The following construction gives us only two allocations: one to store the string data of
-    // the user word file and another to store the list of slices corresponding to the words. We
-    // need both declarations to be around so we can refer to the latter slice list as a &[&str]
-    // so it fits into the same type as the built-in EFF word list.
     let words: Option<_> = read_words_str(&args, &config)?;
-    let words = words.as_deref().map(words_arr);
-    let words = Words::from(words.as_deref().unwrap_or(EFF_WORDLIST));
+    let dict = words.as_deref().map(BoxDict::from_lines);
+    let dict: &dyn Dict = dict
+        .as_ref()
+        .map(|dict| dict as &dyn Dict)
+        .unwrap_or(&EFF_WORDLIST);
 
     let mut stdout = stdout();
     for site in &args.sites {
-        let res = gen_password_config(&seed, site, &config, &args, &words)?;
+        let res = gen_password_config(&seed, site, &config, &args, dict)?;
         stdout.write_all(res.as_bytes())?;
         if stdout.is_terminal() || args.sites.len() > 1 {
             writeln!(stdout)?;
@@ -187,22 +186,14 @@ fn read_words_str(args: &Args, config: &Config) -> Result<Option<Box<str>>> {
         .context("failed reading words file")
 }
 
-fn words_arr(words: &'_ str) -> Box<[&'_ str]> {
-    let set = words
-        .lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty())
-        .collect::<BTreeSet<_>>();
-    set.into_iter().collect()
-}
-
 fn gen_password_config(
     seed: &str,
     req: &str,
     config: &Config,
     args: &Args,
-    words: &Words,
+    dict: &dyn Dict,
 ) -> Result<Zeroizing<String>> {
+    let words = Words(dict.words());
     let site = config.find_site(req)?;
     let url = site.as_ref().map_or(req, |(url, _)| url);
     let url = canonicalize(
@@ -236,7 +227,7 @@ fn gen_password_config(
         eprintln!("salt: {salt:?}");
     }
 
-    gen_password(seed, &url, schema, &expr, increment, words)
+    gen_password(seed, &url, schema, &expr, increment, dict)
 }
 
 fn gen_password(
@@ -245,8 +236,9 @@ fn gen_password(
     schema: &str,
     expr: &Expr,
     increment: u32,
-    words: &Words,
+    dict: &dyn Dict,
 ) -> Result<Zeroizing<String>> {
+    let words = Words(dict.words());
     let size = words.size(expr);
     let site = onepass_seed::data::Site {
         url: url.into(),
@@ -263,6 +255,7 @@ fn gen_password(
 mod tests {
     use std::{fs::File, path::PathBuf};
 
+    use onepass_seed::dict::EFF_WORDLIST;
     use tempfile::TempDir;
 
     use super::*;
@@ -280,11 +273,11 @@ mod tests {
             ),
             ("!((-%(')*'\"/", "password", "apple.com", "[!-/]{12}", 1),
         ];
-        let words = Words(EFF_WORDLIST);
+        let dict = EFF_WORDLIST;
         for (want, seed, url, schema, increment) in tests {
             let url = canonicalize(url, None)?;
             let expr = Expr::parse(schema)?;
-            let got = gen_password(seed, &url, schema, &expr, increment, &words)?;
+            let got = gen_password(seed, &url, schema, &expr, increment, &dict)?;
             assert_eq!(want, *got);
         }
         Ok(())
@@ -316,8 +309,9 @@ mod tests {
         let args: [&str; 0] = [];
         let words = read_words_str(&Args::parse_from(args.iter()), &config)?
             .context("failed reading words file")?;
-        let words = words_arr(&words);
-        assert_eq!(Box::from(vec!["a", "bob", "dole"]), words);
+        let dict = BoxDict::from_lines(&words);
+        let words = dict.words();
+        assert_eq!(&["a", "bob", "dole"], words);
 
         Ok(())
     }
