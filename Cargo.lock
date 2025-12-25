@@ -1125,8 +1125,6 @@ name = "onepass"
 version = "3.0.0-pre.0"
 dependencies = [
  "anyhow",
- "argon2",
- "chacha20",
  "char-iter",
  "clap",
  "crypto-bigint",
@@ -1139,7 +1137,6 @@ dependencies = [
  "objc2-local-authentication",
  "objc2-security",
  "onepass-seed",
- "rand_core 0.10.0-rc-3",
  "readpassphrase-3",
  "serde",
  "serde_yaml",
@@ -1231,7 +1228,6 @@ version = "0.6.0-rc.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "383d290055c99f2dd7dece082088d89494dff6d79277fbac4a7da21c1bf2ab6b"
 dependencies = [
- "getrandom 0.3.3",
  "phc",
 ]
 
@@ -1248,7 +1244,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c61f960577aaac5c259bc0866d685ba315c0ed30793c602d7287f54980913863"
 dependencies = [
  "base64ct",
- "getrandom 0.3.3",
  "subtle",
 ]
 
