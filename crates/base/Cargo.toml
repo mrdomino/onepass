@@ -3,6 +3,7 @@ name = "onepass-base"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
+publish = false
 
 [dependencies]
 blake2 = { version = "0.11.0-rc.3", default-features = false }
