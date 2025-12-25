@@ -7,7 +7,7 @@ use crate::fmt::{DigestWriter, Lines, TsvField};
 
 pub trait Dict<'a> {
     fn words(&self) -> &[&'a str];
-    fn hash(&self) -> &[u8];
+    fn hash(&self) -> &[u8; 32];
 }
 
 pub struct BoxDict<'a>(Box<[&'a str]>, [u8; 32]);
@@ -40,7 +40,7 @@ impl<'a> Dict<'a> for BoxDict<'a> {
     fn words(&self) -> &[&'a str] {
         &self.0
     }
-    fn hash(&self) -> &[u8] {
+    fn hash(&self) -> &[u8; 32] {
         &self.1
     }
 }
@@ -49,7 +49,7 @@ impl<'a> Dict<'a> for RefDict<'a, '_> {
     fn words(&self) -> &[&'a str] {
         self.0
     }
-    fn hash(&self) -> &[u8] {
+    fn hash(&self) -> &[u8; 32] {
         self.1
     }
 }
