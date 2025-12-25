@@ -5,3 +5,4 @@ edition.workspace = true
 repository.workspace = true
 
 [dependencies]
+onepass-base = { path = "../base" }

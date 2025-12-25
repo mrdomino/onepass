@@ -1132,6 +1132,9 @@ dependencies = [
 [[package]]
 name = "onepass-seed"
 version = "3.0.0-pre.0"
+dependencies = [
+ "onepass-base",
+]
 
 [[package]]
 name = "openssl"
