@@ -30,7 +30,8 @@ use clap::{CommandFactory, Parser, error::ErrorKind};
 use config::Config;
 use crypto_bigint::NonZero;
 use onepass_seed::{
-    crypto::secret_uniform,
+    crypto::{Derivation, secret_uniform},
+    data::Site,
     dict::{BoxDict, Dict, EFF_WORDLIST},
 };
 use randexp::{Enumerable, Expr, Quantifiable, Words};
@@ -215,7 +216,13 @@ fn gen_password_config(
         .unwrap_or_else(|| site.map_or(0, |(_, site)| site.increment));
     let expr = Expr::parse(schema).context("invalid schema")?;
     let size = words.size(&expr);
-    let salt = format!("{0},{1}", increment, &url);
+    let site = Site {
+        url,
+        username: None,
+        schema: schema.to_string(),
+        increment,
+    };
+    let salt = format!("{}", Derivation(&site));
 
     if args.verbose {
         eprintln!(
@@ -227,25 +234,17 @@ fn gen_password_config(
         eprintln!("salt: {salt:?}");
     }
 
-    gen_password(seed, &url, schema, &expr, increment, dict)
+    gen_password(seed, &site, &expr, dict)
 }
 
 fn gen_password(
     seed: &str,
-    url: &str,
-    schema: &str,
+    site: &Site,
     expr: &Expr,
-    increment: u32,
     dict: &dyn Dict,
 ) -> Result<Zeroizing<String>> {
     let words = Words(dict.words());
     let size = words.size(expr);
-    let site = onepass_seed::data::Site {
-        url: url.into(),
-        username: None,
-        schema: schema.into(),
-        increment,
-    };
     let secret = site.secret(seed);
     let index = secret_uniform(&secret, &NonZero::new(size).unwrap());
     words.gen_at(expr, index)
@@ -277,7 +276,13 @@ mod tests {
         for (want, seed, url, schema, increment) in tests {
             let url = canonicalize(url, None)?;
             let expr = Expr::parse(schema)?;
-            let got = gen_password(seed, &url, schema, &expr, increment, &dict)?;
+            let site = Site {
+                url,
+                username: None,
+                schema: schema.to_string(),
+                increment,
+            };
+            let got = gen_password(seed, &site, &expr, &dict)?;
             assert_eq!(want, *got);
         }
         Ok(())

@@ -47,7 +47,7 @@ pub fn secret_uniform(secret: &[u8; 32], n: &NonZero<U256>) -> Zeroizing<U256> {
     }
 }
 
-pub struct Derivation<'a>(&'a Site);
+pub struct Derivation<'a>(pub &'a Site);
 
 impl Display for Derivation<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
