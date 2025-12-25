@@ -1,17 +1,17 @@
-use std::fmt::Write;
+use core::fmt::Write;
 
 use blake2::Blake2b256;
 use digest::Digest;
 
 use crate::fmt::{DigestWriter, Lines, TsvField};
 
-pub trait Dict {
+pub trait Dict<'a> {
+    fn words(&self) -> &[&'a str];
     fn hash(&self) -> &[u8];
-    fn as_ref(&self) -> &[&str];
 }
 
 pub struct BoxDict<'a>(Box<[&'a str]>, [u8; 32]);
-pub struct RefDict<'a>(&'a [&'a str], &'a [u8]);
+pub struct RefDict<'a, 'b: 'a>(&'b [&'a str], &'b [u8; 32]);
 
 impl<'a> BoxDict<'a> {
     pub fn from_lines(s: &'a str) -> Self {
@@ -36,21 +36,21 @@ impl<'a> BoxDict<'a> {
     }
 }
 
-impl Dict for BoxDict<'_> {
+impl<'a> Dict<'a> for BoxDict<'a> {
+    fn words(&self) -> &[&'a str] {
+        &self.0
+    }
     fn hash(&self) -> &[u8] {
         &self.1
     }
-    fn as_ref(&self) -> &[&str] {
-        &self.0
-    }
 }
 
-impl Dict for RefDict<'_> {
+impl<'a> Dict<'a> for RefDict<'a, '_> {
+    fn words(&self) -> &[&'a str] {
+        self.0
+    }
     fn hash(&self) -> &[u8] {
         self.1
-    }
-    fn as_ref(&self) -> &[&str] {
-        self.0
     }
 }
 
@@ -122,7 +122,7 @@ mod tests {
                 None => BoxDict::from_lines(inp),
                 Some(sep) => BoxDict::from_sep(inp, sep),
             };
-            assert_eq!(want, &hex::encode(dict.hash()), "{:?}", dict.as_ref());
+            assert_eq!(want, &hex::encode(dict.hash()), "{:?}", dict.words());
         }
     }
 }
