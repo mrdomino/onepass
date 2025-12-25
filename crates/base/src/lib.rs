@@ -1,3 +1,4 @@
+pub mod dict;
 pub mod fmt;
 
 /// Write the fields passed to this macro as tab-separated values with all inner TSV-meaningful
