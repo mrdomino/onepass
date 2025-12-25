@@ -1,9 +1,12 @@
+pub mod crypto;
+pub mod data;
+
 /// Write the fields passed to this macro as tab-separated values with all inner TSV-meaningful
 /// characters escaped; see [`format_tsv_args`].
 #[macro_export]
 macro_rules! write_tsv {
-    ($w:expr, $($args:tt)+) => {
-        $w.write_fmt($crate::format_tsv_args!($($args)+))
+    ($w:expr, $($args:expr),+ $(,)?) => {
+        $w.write_fmt($crate::format_tsv_args!($($args),+))
     };
 }
 
@@ -11,32 +14,48 @@ macro_rules! write_tsv {
 /// characters escaped; see [`format_tsv_args`].
 #[macro_export]
 macro_rules! format_tsv {
-    ($($args:tt)+) => {
-        std::fmt::format($crate::format_tsv_args!($($args)+))
+    ($($args:expr),+ $(,)?) => {
+        std::fmt::format($crate::format_tsv_args!($($args),+))
     };
 }
 
-/// Format the fields passed to this macro as a [`core::fmt::Arguments`] that formats the fields
-/// with TSV characters escaped.
+/// Present the fields passed to this macro as a [`core::fmt::Arguments`] that yields tab-separated
+/// values.
+///
+/// Each individual argument is passed through with the exception of the following four characters,
+/// which are escaped as their ANSI C escape sequences:
+///
+/// - `\\`
+/// - `\n`
+/// - `\r`
+/// - `\t`
+///
+/// Tabs are inserted between fields. No trailing tabs or newlines are included.
+///
+/// The intent of this transform is to be a simple, canonical, reversible text representation of
+/// data for use in derivation paths or salt parameters.
 #[macro_export]
 macro_rules! format_tsv_args {
-    ($first:expr $(, $($rest:tt)+)?) => {
+    () => {
+        compile_error!("need at least one field")
+    };
+    ($first:expr $(, $rest:expr)* $(,)?) => {
         $crate::format_tsv_args!(
             @build
             "{}",
             (onepass_base::fmt::TsvField($first))
-            $(, $($rest)+)?
+            $(, $rest)*
         )
     };
-    (@build $fmt:expr, ($($args:tt)+)) => {
-        core::format_args!($fmt, $($args)+)
+    (@build $fmt:expr, ($($args:expr),+)) => {
+        core::format_args!($fmt, $($args),+)
     };
-    (@build $fmt:expr, ($($args:tt)+), $next:expr $(, $($rest:tt)+)?) => {
+    (@build $fmt:expr, ($($args:expr),+), $next:expr $(, $rest:expr)*) => {
         $crate::format_tsv_args!(
             @build
             concat!($fmt, "\t{}"),
-            ($($args)+, onepass_base::fmt::TsvField($next))
-            $(, $($rest)+)?
+            ($($args,)+ onepass_base::fmt::TsvField($next))
+            $(, $rest)*
         )
     };
 }
