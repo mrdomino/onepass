@@ -5,7 +5,7 @@ set -eu
 # To use:
 #     git config --local core.hooksPath .githooks/
 #
-if ! cargo fmt -- --check
+if ! cargo fmt --all -- --check
 then
   echo 'There are some code style issues.' >&2
   echo 'Run cargo fmt first.' >&2
@@ -18,7 +18,7 @@ then
   exit 1
 fi
 
-if ! cargo test --locked
+if ! cargo test --locked --all
 then
   echo 'There are some test issues.'
   exit 1
