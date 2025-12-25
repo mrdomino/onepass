@@ -1,7 +1,7 @@
 use std::{
     env,
     fs::File,
-    io::{BufRead, BufReader, Error, ErrorKind, Write},
+    io::{BufRead, BufReader, Error, Write},
     path::PathBuf,
 };
 
@@ -19,12 +19,12 @@ fn main() {
         .try_fold(Vec::new(), |mut words, line| {
             let line = line?;
             if line.is_empty() {
-                return Err(Error::new(ErrorKind::Other, "empty line"));
+                return Err(Error::other("empty line"));
             }
             let word = line
                 .split('\t')
                 .nth(1)
-                .ok_or_else(|| Error::new(ErrorKind::Other, "malformatted word list"))?;
+                .ok_or_else(|| Error::other("malformed word list"))?;
             words.push(word.to_string());
             Ok(words)
         })
@@ -36,12 +36,12 @@ fn main() {
         "// Generated at build time from data/eff_large_wordlist.txt"
     )
     .unwrap();
-    writeln!(f, "const EFF_WORDLIST_HASH: [u8; 32] = [").unwrap();
+    writeln!(f, "static EFF_WORDLIST_HASH: [u8; 32] = [").unwrap();
     for &b in dict.hash() {
         writeln!(f, "    0x{:02x},", b).unwrap();
     }
     writeln!(f, "];").unwrap();
-    writeln!(f, "const EFF_WORDLIST_WORDS: [&str; 7776] = [").unwrap();
+    writeln!(f, "static EFF_WORDLIST_WORDS: [&str; 7776] = [").unwrap();
     for &word in dict.words() {
         writeln!(f, "    {word:?},").unwrap();
     }

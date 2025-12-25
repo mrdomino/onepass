@@ -41,9 +41,8 @@ pub fn secret_uniform(secret: &[u8; 32], n: &NonZero<U256>) -> Zeroizing<U256> {
         rng.fill_bytes(&mut ret[..n_bytes]);
         ret[n_bytes - 1] &= hi_mask;
         let ret = Zeroizing::new(U256::from_le_bytes(ret));
-        match ret.cmp(n) {
-            Ordering::Less => return ret,
-            _ => (),
+        if ret.cmp(n) == Ordering::Less {
+            return ret;
         }
     }
 }

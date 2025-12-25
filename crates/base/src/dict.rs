@@ -21,12 +21,11 @@ impl<'a> BoxDict<'a> {
     pub fn from_sep(s: &'a str, sep: &str) -> Self {
         Self::from_iter(s.split(sep))
     }
+}
 
-    pub fn from_iter<I>(it: I) -> Self
-    where
-        I: IntoIterator<Item = &'a str>,
-    {
-        let mut items: Vec<_> = it.into_iter().filter(|&l| !l.is_empty()).collect();
+impl<'a> FromIterator<&'a str> for BoxDict<'a> {
+    fn from_iter<T: IntoIterator<Item = &'a str>>(iter: T) -> Self {
+        let mut items: Vec<_> = iter.into_iter().filter(|&l| !l.is_empty()).collect();
         items.sort_unstable();
         items.dedup();
         let mut w = DigestWriter(Blake2b256::new());

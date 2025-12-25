@@ -252,7 +252,7 @@ fn gen_password(
         url: url.into(),
         username: None,
         schema: schema.into(),
-        increment: increment,
+        increment,
     };
     let secret = site.secret(seed);
     let index = secret_uniform(&secret, &NonZero::new(size).unwrap());

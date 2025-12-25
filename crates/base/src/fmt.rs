@@ -26,7 +26,7 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.0
             .clone()
-            .try_fold((), |(), line| write!(f, "{line}\n"))
+            .try_fold((), |(), line| writeln!(f, "{line}"))
     }
 }
 
