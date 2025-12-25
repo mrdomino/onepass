@@ -1130,6 +1130,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "onepass-seed"
+version = "3.0.0-pre.0"
+
+[[package]]
 name = "openssl"
 version = "0.10.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"

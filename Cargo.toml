@@ -20,7 +20,7 @@ exclude = [
 
 [workspace]
 resolver = "3"
-members = ["crates/base"]
+members = ["crates/base", "crates/seed"]
 
 [workspace.package]
 version = "3.0.0-pre.0"
