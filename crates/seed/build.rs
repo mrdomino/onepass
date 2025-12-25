@@ -41,7 +41,12 @@ fn main() {
         writeln!(f, "    0x{:02x},", b).unwrap();
     }
     writeln!(f, "];").unwrap();
-    writeln!(f, "static EFF_WORDLIST_WORDS: [&str; 7776] = [").unwrap();
+    writeln!(
+        f,
+        "static EFF_WORDLIST_WORDS: [&str; {}] = [",
+        dict.words().len()
+    )
+    .unwrap();
     for &word in dict.words() {
         writeln!(f, "    {word:?},").unwrap();
     }

@@ -14,5 +14,7 @@ mod tests {
             "323606b363ebdedff9f562cb84c50df1a21cbd4b597ff4566df92bb9f2cefdfd",
             hex::encode(EFF_WORDLIST.hash())
         );
+        assert_eq!(7776, EFF_WORDLIST.words().len());
+        assert_eq!("abstract", EFF_WORDLIST.words()[22]);
     }
 }
