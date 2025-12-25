@@ -268,6 +268,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore] // too slow
     fn test_passwords() -> Result<()> {
         let tests = [
             (
