@@ -257,7 +257,7 @@ pub(crate) trait Quantifiable<Node> {
 }
 
 pub(crate) trait Enumerable<Node>: Quantifiable<Node> {
-    fn gen_at(&self, node: &Node, index: U256) -> Result<Zeroizing<String>>;
+    fn gen_at(&self, node: &Node, index: Zeroizing<U256>) -> Result<Zeroizing<String>>;
 }
 
 pub(crate) struct WordCount(pub usize);
@@ -298,8 +298,7 @@ impl Quantifiable<Expr> for Words<'_> {
 }
 
 impl Enumerable<Expr> for Words<'_> {
-    fn gen_at(&self, expr: &Expr, index: U256) -> Result<Zeroizing<String>> {
-        let mut index = Zeroizing::new(index);
+    fn gen_at(&self, expr: &Expr, mut index: Zeroizing<U256>) -> Result<Zeroizing<String>> {
         let res = match expr {
             Expr::Word => String::from(self.0[u256_to_usize(&index)]),
             Expr::WOrd => {
@@ -330,7 +329,7 @@ impl Enumerable<Expr> for Words<'_> {
                     let sz = NonZero::new(self.size(expr)).unwrap();
                     let (next_index, j) = index.div_rem(&sz);
                     let (mut next_index, j) = (Zeroizing::new(next_index), Zeroizing::new(j));
-                    acc.push(self.gen_at(expr, *j)?);
+                    acc.push(self.gen_at(expr, j)?);
                     std::mem::swap(&mut index, &mut next_index);
                 }
                 let n: usize = acc.iter().map(|s| s.len()).sum();
@@ -351,7 +350,7 @@ impl Enumerable<Expr> for Words<'_> {
                             let (next_index, j) = index.div_rem(&base_size);
                             let (mut next_index, j) =
                                 (Zeroizing::new(next_index), Zeroizing::new(j));
-                            acc.push(self.gen_at(expr, *j)?);
+                            acc.push(self.gen_at(expr, j)?);
                             std::mem::swap(&mut index, &mut next_index);
                         }
                         let n: usize = acc.iter().map(|s| s.len()).sum();
@@ -485,7 +484,7 @@ mod tests {
         let words = ["a", "b"];
         let wl = Words(&words);
         let strs: Vec<_> = (0u32..6)
-            .map(|i| wl.gen_at(&expr, i.into()).unwrap())
+            .map(|i| wl.gen_at(&expr, Zeroizing::new(i.into())).unwrap())
             .collect();
         assert_eq!(
             vec!["1a", "2a", "3a", "1b", "2b", "3b"]
@@ -505,10 +504,10 @@ mod tests {
         let expr = Expr::parse("[:word:](-[:word:]){4}")?;
         let sz = U256::from_str_radix("28430288029929701376", 10)?;
         assert_eq!(sz, wl.size(&expr));
-        assert_eq!("(0)-(0)-(0)-(0)-(0)", *wl.gen_at(&expr, U256::ZERO)?);
+        assert_eq!("(0)-(0)-(0)-(0)-(0)", *wl.gen_at(&expr, U256::ZERO.into())?);
         assert_eq!(
             "(7775)-(7775)-(7775)-(7775)-(7775)",
-            *wl.gen_at(&expr, sz.checked_sub(&U256::ONE).unwrap())?
+            *wl.gen_at(&expr, sz.checked_sub(&U256::ONE).unwrap().into())?
         );
         Ok(())
     }
@@ -518,7 +517,7 @@ mod tests {
         let words = ["bob", "dole"];
         let wl = Words(&words);
         let expr = Expr::parse("[:Word:]")?;
-        assert_eq!("Bob", *wl.gen_at(&expr, U256::ZERO)?);
+        assert_eq!("Bob", *wl.gen_at(&expr, U256::ZERO.into())?);
         Ok(())
     }
 }

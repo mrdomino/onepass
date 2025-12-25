@@ -1138,6 +1138,7 @@ dependencies = [
  "objc2-foundation",
  "objc2-local-authentication",
  "objc2-security",
+ "onepass-seed",
  "rand_core 0.10.0-rc-3",
  "readpassphrase-3",
  "serde",

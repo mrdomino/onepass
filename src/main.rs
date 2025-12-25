@@ -13,7 +13,6 @@
 // limitations under the License.
 
 mod config;
-mod crypto;
 #[cfg(all(target_os = "macos", feature = "macos-biometry"))]
 mod macos_keychain;
 mod randexp;
@@ -30,8 +29,8 @@ use std::{
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, error::ErrorKind};
 use config::Config;
-use crypto::Rng;
-use crypto_bigint::{NonZero, RandomMod, U256};
+use crypto_bigint::NonZero;
+use onepass_seed::crypto::secret_uniform;
 use randexp::{Enumerable, Expr, Quantifiable, Words};
 use url::canonicalize;
 use zeroize::Zeroizing;
@@ -237,20 +236,26 @@ fn gen_password_config(
         eprintln!("salt: {salt:?}");
     }
 
-    gen_password(seed, &url, &expr, increment, words)
+    gen_password(seed, &url, schema, &expr, increment, words)
 }
 
 fn gen_password(
     seed: &str,
     url: &str,
+    schema: &str,
     expr: &Expr,
     increment: u32,
     words: &Words,
 ) -> Result<Zeroizing<String>> {
     let size = words.size(expr);
-    let salt = format!("{increment},{url}");
-    let mut rng = Rng::from_password_salt(seed, &salt)?;
-    let index = U256::random_mod(&mut rng, &NonZero::new(size).unwrap());
+    let site = onepass_seed::data::Site {
+        url: url.into(),
+        username: None,
+        schema: schema.into(),
+        increment: increment,
+    };
+    let secret = site.secret(seed);
+    let index = secret_uniform(&secret, &NonZero::new(size).unwrap());
     words.gen_at(expr, index)
 }
 
@@ -266,19 +271,19 @@ mod tests {
     fn test_passwords() -> Result<()> {
         let tests = [
             (
-                "pointing-unshaven-asparagus-geography",
+                "riches-quilt-librarian-engraved",
                 "arst",
                 "google.com",
                 "[:word:](-[:word:]){3}",
                 0,
             ),
-            ("!#()/!!%#&!%", "password", "apple.com", "[!-/]{12}", 1),
+            ("!((-%(')*'\"/", "password", "apple.com", "[!-/]{12}", 1),
         ];
         let words = Words(EFF_WORDLIST);
         for (want, seed, url, schema, increment) in tests {
             let url = canonicalize(url, None)?;
             let expr = Expr::parse(schema)?;
-            let got = gen_password(seed, &url, &expr, increment, &words)?;
+            let got = gen_password(seed, &url, schema, &expr, increment, &words)?;
             assert_eq!(want, *got);
         }
         Ok(())
