@@ -8,7 +8,7 @@ use onepass_base::dict::Dict;
 use zeroize::Zeroizing;
 
 use super::{
-    Eval,
+    EvalContext,
     util::{u256_saturating_pow, u256_to_word},
 };
 use crate::dict::EFF_WORDLIST;
@@ -22,32 +22,32 @@ pub trait GeneratorFunc {
     fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>, args: &[&str]) -> Result<()>;
 }
 
-pub struct GeneratorContext(HashMap<&'static str, Box<dyn GeneratorFunc>>);
+pub struct Context(HashMap<&'static str, Box<dyn GeneratorFunc>>);
 
 // TODO(someday): multiple dict lookup by hash
 pub struct Word<'a, 'b>(&'a dyn Dict<'b>);
 
 pub struct Words<'a, 'b>(&'a dyn Dict<'b>);
 
-impl Eval for (&'_ Generator, &'_ GeneratorContext) {
-    fn size(&self) -> U256 {
-        let name = self.0.name();
-        let func = self
-            .1
+impl EvalContext for Generator {
+    type Context = Context;
+
+    fn size(&self, context: &Context) -> U256 {
+        let name = self.name();
+        let func = context
             .get(name)
             .ok_or_else(|| format!("unknown generator {name}"))
             .unwrap();
-        func.size(&self.0.args())
+        func.size(&self.args())
     }
 
-    fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()> {
-        let name = self.0.name();
-        let func = self
-            .1
+    fn write_to(&self, context: &Context, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()> {
+        let name = self.name();
+        let func = context
             .get(name)
             .ok_or_else(|| format!("unknown generator {name}"))
             .unwrap();
-        func.write_to(w, index, &self.0.args())
+        func.write_to(w, index, &self.args())
     }
 }
 
@@ -75,19 +75,23 @@ impl Generator {
     }
 }
 
-impl GeneratorContext {
+impl Context {
+    pub fn empty() -> Self {
+        Context(HashMap::new())
+    }
+
     pub fn get<'a>(&'a self, name: &str) -> Option<&'a dyn GeneratorFunc> {
         self.0.get(name).map(Box::as_ref)
     }
 }
 
-impl Default for GeneratorContext {
+impl Default for Context {
     fn default() -> Self {
         let generators: Vec<Box<dyn GeneratorFunc>> = vec![
             Box::new(Word(&EFF_WORDLIST)),
             Box::new(Words(&EFF_WORDLIST)),
         ];
-        GeneratorContext(generators.into_iter().map(|g| (g.name(), g)).collect())
+        Context(generators.into_iter().map(|g| (g.name(), g)).collect())
     }
 }
 
@@ -162,44 +166,25 @@ impl GeneratorFunc for Words<'_, '_> {
 
 #[cfg(test)]
 mod tests {
-    use std::io::BufWriter;
-
-    use super::*;
+    use super::{super::util::*, *};
 
     #[test]
     fn test_generators() {
-        let ctx = GeneratorContext::default();
+        let ctx = Context::default();
         let g = Generator::new("word");
-        assert_eq!(U256::from_u32(7776), (&g, &ctx).size());
-
-        let mut buf = BufWriter::new(Vec::new());
-        (&g, &ctx)
-            .write_to(&mut buf, U256::from_u32(0).into())
-            .unwrap();
-        let s = String::from_utf8(buf.into_inner().unwrap()).unwrap();
-        assert_eq!("abacus", &s);
-
-        let mut buf = BufWriter::new(Vec::new());
-        (&g, &ctx)
-            .write_to(&mut buf, U256::from_u32(7775).into())
-            .unwrap();
-        let s = String::from_utf8(buf.into_inner().unwrap()).unwrap();
-        assert_eq!("zoom", &s);
+        assert_eq!(U256::from_u32(7776), g.size(&ctx));
+        assert_eq!("abacus", &format_at_ctx(&g, &ctx, U256::from_u32(0)));
+        assert_eq!("zoom", &format_at_ctx(&g, &ctx, U256::from_u32(7775)));
 
         let g = Generator::new("words:4:-");
-        assert_eq!(U256::from_u64(0xCFD41B9100000), (&g, &ctx).size());
-        let mut buf = BufWriter::new(Vec::new());
-        (&g, &ctx)
-            .write_to(&mut buf, U256::from_u32(0).into())
-            .unwrap();
-        let s = String::from_utf8(buf.into_inner().unwrap()).unwrap();
-        assert_eq!("abacus-abacus-abacus-abacus", &s);
-
-        let mut buf = BufWriter::new(Vec::new());
-        (&g, &ctx)
-            .write_to(&mut buf, U256::from_u64(0xCFD41B90FFFFF).into())
-            .unwrap();
-        let s = String::from_utf8(buf.into_inner().unwrap()).unwrap();
-        assert_eq!("zoom-zoom-zoom-zoom", &s);
+        assert_eq!(U256::from_u64(0xCFD41B9100000), g.size(&ctx));
+        assert_eq!(
+            "abacus-abacus-abacus-abacus",
+            &format_at_ctx(&g, &ctx, U256::from_u32(0))
+        );
+        assert_eq!(
+            "zoom-zoom-zoom-zoom",
+            &format_at_ctx(&g, &ctx, U256::from_u64(0xCFD41B90FFFFF))
+        );
     }
 }

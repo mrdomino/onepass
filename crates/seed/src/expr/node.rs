@@ -3,12 +3,9 @@ use std::io::{Result, Write};
 use crypto_bigint::{CheckedSub, NonZero, One, U256, Word, Zero};
 use zeroize::Zeroizing;
 
-use super::{
-    Eval,
-    chars::Chars,
-    generator::{Generator, GeneratorContext},
-    util::u256_saturating_pow,
-};
+pub use super::generator::Context;
+
+use super::{Eval, EvalContext, chars::Chars, generator::Generator, util::u256_saturating_pow};
 
 #[derive(Clone, Debug)]
 pub enum Node {
@@ -19,17 +16,19 @@ pub enum Node {
     Generator(Generator),
 }
 
-impl Eval for (&'_ Node, &'_ GeneratorContext) {
-    fn size(&self) -> U256 {
-        match self.0 {
+impl EvalContext for Node {
+    type Context = Context;
+
+    fn size(&self, context: &Context) -> U256 {
+        match self {
             Node::Literal(_) => U256::ONE,
             Node::Chars(chars) => chars.size(),
             Node::List(nodes) => nodes.into_iter().fold(U256::ONE, |acc, node| {
-                acc.saturating_mul(&(node, self.1).size())
+                acc.saturating_mul(&node.size(context))
             }),
 
             Node::Count(node, min, max) => {
-                let n = (&**node, self.1).size();
+                let n = node.size(context);
                 if n.is_one().into() {
                     return (*max - *min + 1).into();
                 }
@@ -47,12 +46,12 @@ impl Eval for (&'_ Node, &'_ GeneratorContext) {
                 x
             }
 
-            Node::Generator(generator) => (generator, self.1).size(),
+            Node::Generator(generator) => generator.size(context),
         }
     }
 
-    fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()> {
-        match self.0 {
+    fn write_to(&self, context: &Context, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()> {
+        match self {
             Node::Literal(s) => write!(w, "{s}"),
             Node::Chars(chars) => chars.write_to(w, index),
 
@@ -60,9 +59,9 @@ impl Eval for (&'_ Node, &'_ GeneratorContext) {
                 .into_iter()
                 .try_fold(index, |mut index, node| {
                     let node_index;
-                    let (a, b) = index.div_rem(&NonZero::new((node, self.1).size()).unwrap());
+                    let (a, b) = index.div_rem(&NonZero::new(node.size(context)).unwrap());
                     (index, node_index) = (Zeroizing::new(a), Zeroizing::new(b));
-                    (node, self.1).write_to(w, node_index)?;
+                    node.write_to(context, w, node_index)?;
                     Ok(index)
                 })
                 .map(|_| ()),
@@ -70,7 +69,7 @@ impl Eval for (&'_ Node, &'_ GeneratorContext) {
             Node::Count(node, min, max) => {
                 let mut index = index;
                 let node = node.as_ref();
-                let base = Zeroizing::new(NonZero::new((node, self.1).size()).unwrap());
+                let base = Zeroizing::new(NonZero::new(node.size(context)).unwrap());
                 let mut count = *min;
                 let mut n = Zeroizing::new(u256_saturating_pow(&base, Word::from(*min)));
                 while *n <= *index {
@@ -83,28 +82,26 @@ impl Eval for (&'_ Node, &'_ GeneratorContext) {
                     let node_index;
                     let (a, b) = index.div_rem(&base);
                     (index, node_index) = (Zeroizing::new(a), Zeroizing::new(b));
-                    (node, self.1).write_to(w, node_index)?;
+                    node.write_to(context, w, node_index)?;
                 }
                 assert!(bool::from(index.is_zero()));
                 Ok(())
             }
 
-            Node::Generator(generator) => (generator, self.1).write_to(w, index),
+            Node::Generator(generator) => generator.write_to(context, w, index),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::io::BufWriter;
-
     use num_traits::PrimInt;
 
-    use super::*;
+    use super::{super::util::*, *};
 
     #[test]
     fn test_counts() {
-        let context = GeneratorContext::default();
+        let context = Context::empty();
 
         let tests = [
             ("a", 1, 1, 0, Some(1)),
@@ -114,15 +111,14 @@ mod tests {
             ("aaaaa", 1, 5, 4, None),
         ];
         for (want, min, max, index, want_size) in tests {
-            let index = Zeroizing::new(U256::from_u32(index));
             let prim = Node::Literal("a".into());
             let count = Node::Count(prim.into(), min, max);
-            let mut buf = BufWriter::new(Vec::new());
-            (&count, &context).write_to(&mut buf, index).unwrap();
-            let s = String::from_utf8(buf.into_inner().unwrap()).unwrap();
-            assert_eq!(want, &s);
+            assert_eq!(
+                want,
+                &format_at_ctx(&count, &context, U256::from_u32(index))
+            );
             if let Some(size) = want_size {
-                assert_eq!(U256::from_u32(size), (&count, &context).size());
+                assert_eq!(U256::from_u32(size), count.size(&context));
             }
         }
 
@@ -135,14 +131,12 @@ mod tests {
         ];
         let prim = Node::Chars(Chars::from_ranges([('a', 'z')]));
         let count = Node::Count(prim.into(), 1, 5);
-        assert_eq!(U256::from_u32(12356630), (&count, &context).size());
+        assert_eq!(U256::from_u32(12356630), count.size(&context));
         for (want, index) in tests {
-            let mut buf = BufWriter::new(Vec::new());
-            (&count, &context)
-                .write_to(&mut buf, U256::from_u32(index).into())
-                .unwrap();
-            let s = String::from_utf8(buf.into_inner().unwrap()).unwrap();
-            assert_eq!(want, &s);
+            assert_eq!(
+                want,
+                &format_at_ctx(&count, &context, U256::from_u32(index))
+            );
         }
 
         let tests = [
@@ -156,20 +150,18 @@ mod tests {
         ];
         let prim = Node::Chars(Chars::from_ranges([('a', 'z')]));
         let count = Node::Count(prim.into(), 2, 5);
-        assert_eq!(U256::from_u32(12356604), (&count, &context).size());
+        assert_eq!(U256::from_u32(12356604), count.size(&context));
         for (want, index) in tests {
-            let mut buf = BufWriter::new(Vec::new());
-            (&count, &context)
-                .write_to(&mut buf, U256::from_u32(index).into())
-                .unwrap();
-            let s = String::from_utf8(buf.into_inner().unwrap()).unwrap();
-            assert_eq!(want, &s);
+            assert_eq!(
+                want,
+                &format_at_ctx(&count, &context, U256::from_u32(index))
+            );
         }
     }
 
     #[test]
     fn test_lists() {
-        let context = GeneratorContext::default();
+        let context = Context::empty();
         let prim = || Node::Chars(Chars::from_ranges([('a', 'z')]));
         let tests = [
             ("a", 1, 0),
@@ -186,13 +178,20 @@ mod tests {
             let list = vec![prim(); rep];
             let node = Node::List(list.into());
             let size = 26.pow(rep as u32);
-            assert_eq!(U256::from_u32(size), (&node, &context).size());
-            let mut buf = BufWriter::new(Vec::new());
-            (&node, &context)
-                .write_to(&mut buf, U256::from_u32(index).into())
-                .unwrap();
-            let s = String::from_utf8(buf.into_inner().unwrap()).unwrap();
-            assert_eq!(want, &s);
+            assert_eq!(U256::from_u32(size), node.size(&context));
+            assert_eq!(want, &format_at_ctx(&node, &context, U256::from_u32(index)));
         }
+    }
+
+    #[test]
+    fn test_generators() {
+        let context = Context::default();
+        let node = Node::Generator(Generator::new("word"));
+        assert_eq!(U256::from_u32(7776), node.size(&context));
+        assert_eq!("abacus", &format_at_ctx(&node, &context, U256::ZERO));
+        assert_eq!(
+            "zoom",
+            &format_at_ctx(&node, &context, U256::from_u32(7775))
+        );
     }
 }

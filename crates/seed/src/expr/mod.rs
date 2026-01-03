@@ -12,3 +12,14 @@ pub trait Eval {
     fn size(&self) -> U256;
     fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()>;
 }
+
+pub trait EvalContext {
+    type Context: ?Sized;
+    fn size(&self, context: &Self::Context) -> U256;
+    fn write_to(
+        &self,
+        context: &Self::Context,
+        w: &mut dyn Write,
+        index: Zeroizing<U256>,
+    ) -> Result<()>;
+}
