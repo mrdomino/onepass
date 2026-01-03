@@ -1163,6 +1163,7 @@ dependencies = [
  "chacha20",
  "crypto-bigint",
  "hex",
+ "num-traits",
  "onepass-base",
  "rand_core 0.10.0-rc-3",
  "zeroize",
