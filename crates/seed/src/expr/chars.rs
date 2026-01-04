@@ -9,12 +9,12 @@ use zeroize::Zeroizing;
 use super::{Eval, util::u256_to_word};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Chars(Box<[CharRange]>);
+pub struct Chars(pub Box<[CharRange]>);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CharRange {
-    start: char,
-    end: char,
+    pub start: char,
+    pub end: char,
 }
 
 impl From<(char, char)> for CharRange {
