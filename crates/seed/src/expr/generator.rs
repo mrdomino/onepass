@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     io::{Result, Write},
+    sync::Arc,
 };
 
 use crypto_bigint::{NonZero, U256, Word as _Word, Zero};
@@ -16,18 +17,18 @@ use crate::dict::EFF_WORDLIST;
 #[derive(Clone, Debug)]
 pub struct Generator(Box<str>);
 
-pub trait GeneratorFunc {
+pub trait GeneratorFunc: Send + Sync {
     fn name(&self) -> &'static str;
     fn size(&self, args: &[&str]) -> U256;
     fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>, args: &[&str]) -> Result<()>;
 }
 
-pub struct Context(HashMap<&'static str, Box<dyn GeneratorFunc>>);
+pub struct Context(HashMap<&'static str, Arc<dyn GeneratorFunc>>);
 
 // TODO(someday): multiple dict lookup by hash
-pub struct Word<'a, 'b>(&'a dyn Dict<'b>);
+pub struct Word<'a, 'b>(&'a (dyn Dict<'b> + Sync));
 
-pub struct Words<'a, 'b>(&'a dyn Dict<'b>);
+pub struct Words<'a, 'b>(&'a (dyn Dict<'b> + Sync));
 
 impl EvalContext for Generator {
     type Context = Context;
@@ -81,15 +82,15 @@ impl Context {
     }
 
     pub fn get<'a>(&'a self, name: &str) -> Option<&'a dyn GeneratorFunc> {
-        self.0.get(name).map(Box::as_ref)
+        self.0.get(name).map(Arc::as_ref)
     }
 }
 
 impl Default for Context {
     fn default() -> Self {
-        let generators: Vec<Box<dyn GeneratorFunc>> = vec![
-            Box::new(Word(&EFF_WORDLIST)),
-            Box::new(Words(&EFF_WORDLIST)),
+        let generators: Vec<Arc<dyn GeneratorFunc>> = vec![
+            Arc::new(Word(&EFF_WORDLIST)),
+            Arc::new(Words(&EFF_WORDLIST)),
         ];
         Context(generators.into_iter().map(|g| (g.name(), g)).collect())
     }

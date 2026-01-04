@@ -3,14 +3,54 @@ pub mod generator;
 pub mod node;
 mod util;
 
-use std::io::{Result, Write};
+use std::{
+    io::{Result, Write},
+    sync::LazyLock,
+};
 
 use crypto_bigint::U256;
 use zeroize::Zeroizing;
 
+pub use node::{Context, Node};
+
+pub struct Expr {
+    pub root: Node,
+    pub context: Option<Context>,
+}
+
+static DEFAULT_CONTEXT: LazyLock<Context> = LazyLock::new(Context::default);
+
+impl Expr {
+    pub fn new(root: Node) -> Self {
+        Expr {
+            root,
+            context: None,
+        }
+    }
+
+    pub fn with_context(root: Node, context: Context) -> Self {
+        Expr {
+            root,
+            context: Some(context),
+        }
+    }
+}
+
 pub trait Eval {
     fn size(&self) -> U256;
     fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()>;
+}
+
+impl Eval for Expr {
+    fn size(&self) -> U256 {
+        self.root
+            .size(self.context.as_ref().unwrap_or(&DEFAULT_CONTEXT))
+    }
+
+    fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()> {
+        self.root
+            .write_to(self.context.as_ref().unwrap_or(&DEFAULT_CONTEXT), w, index)
+    }
 }
 
 pub trait EvalContext {
