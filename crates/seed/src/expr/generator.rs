@@ -165,6 +165,12 @@ impl GeneratorFunc for Words<'_, '_> {
     }
 }
 
+impl PartialEq for Generator {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{super::util::*, *};

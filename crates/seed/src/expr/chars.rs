@@ -8,10 +8,10 @@ use zeroize::Zeroizing;
 
 use super::{Eval, util::u256_to_word};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Chars(Box<[CharRange]>);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CharRange {
     start: char,
     end: char,

@@ -7,7 +7,7 @@ pub use super::generator::Context;
 
 use super::{Eval, EvalContext, chars::Chars, generator::Generator, util::u256_saturating_pow};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Node {
     Literal(Box<str>),
     Chars(Chars),
