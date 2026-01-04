@@ -32,8 +32,19 @@ impl Site {
 
 pub fn secret_uniform(secret: &[u8; 32], n: &NonZero<U256>) -> Zeroizing<U256> {
     let mut rng = ChaCha20Rng::from_seed(*secret);
+    let mut n_bits = n.bits_vartime();
+    if n_bits == 1 {
+        return U256::ZERO.into();
+    }
+
+    // For powers of 2, we do not need rejection-sampling.
+    // We can merely generate `n_bits - 1` random bits.
+    if n.trailing_zeros_vartime() == n_bits - 1 {
+        n_bits -= 1;
+    }
+    let n_bits = n_bits;
+
     let mut ret = U256::ZERO.to_le_bytes();
-    let n_bits = n.bits_vartime();
     let n_bytes = n_bits.div_ceil(8) as usize;
     let hi_mask = !0 >> ((8 - (n_bits % 8)) % 8);
 
@@ -113,6 +124,16 @@ mod tests {
             "dc4354071b6b73bc8021f2b9d190298155fe79e8eff746a7290299110899c8e4",
             hex::encode(site2.secret("testpass"))
         );
+    }
+
+    #[test]
+    fn secret_uniform_short() {
+        let tests = [(1, 0x3c5), (2, 0xf6a), (3, 0x180), (4, 0x390), (5, 0x19d)];
+        for (seed, want) in tests {
+            let secret = U256::from_u32(seed).to_le_bytes();
+            let n = NonZero::new(U256::from_u32(0x1000)).unwrap();
+            assert_eq!(U256::from_u32(want), *secret_uniform(&secret, &n));
+        }
     }
 
     #[test]
