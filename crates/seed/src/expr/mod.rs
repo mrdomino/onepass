@@ -1,6 +1,7 @@
 pub mod chars;
 pub mod generator;
 pub mod node;
+pub mod parse;
 mod util;
 
 use std::{
