@@ -24,6 +24,16 @@ impl From<(char, char)> for CharRange {
 }
 
 impl Chars {
+    /// # Safety
+    /// This function is only safe for evaluation if the ranges are non-overlapping.
+    pub unsafe fn from_ranges_unchecked<T, V>(ranges: V) -> Self
+    where
+        V: IntoIterator<Item = T>,
+        T: Into<CharRange>,
+    {
+        Chars(ranges.into_iter().map(Into::into).collect())
+    }
+
     pub fn from_ranges<T, V>(ranges: V) -> Self
     where
         V: IntoIterator<Item = T>,
@@ -34,7 +44,10 @@ impl Chars {
         let mut i = 0;
         let mut j = 1;
         while j < ranges.len() {
-            if ranges[i].end >= ranges[j].start {
+            let Some(next) = next_char(ranges[i].end) else {
+                break;
+            };
+            if next >= ranges[j].start {
                 ranges[i].end = max(ranges[i].end, ranges[j].end);
                 j += 1;
                 continue;
@@ -63,6 +76,13 @@ impl Chars {
         }
         unreachable!()
     }
+}
+
+fn next_char(c: char) -> Option<char> {
+    char::from_u32(match c {
+        '\u{d799}' => 0xe00,
+        _ => u32::from(c) + 1,
+    })
 }
 
 impl CharRange {
