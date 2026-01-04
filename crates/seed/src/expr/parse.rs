@@ -272,9 +272,9 @@ mod tests {
 
     #[test]
     fn test_literal() {
-        let node = "cats".parse::<Node>().unwrap();
+        let node = "cats".parse().unwrap();
         assert_eq!(Node::Literal("cats".into()), node);
-        let node = r#"\\cats\tand\[dogs\]{{woof}}"#.parse::<Node>().unwrap();
+        let node = r#"\\cats\tand\[dogs\]{{woof}}"#.parse().unwrap();
         assert_eq!(Node::Literal("\\cats\tand[dogs]{woof}".into()), node);
     }
 
