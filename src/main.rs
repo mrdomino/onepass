@@ -15,13 +15,11 @@
 mod config;
 #[cfg(all(target_os = "macos", feature = "macos-biometry"))]
 mod macos_keychain;
-mod randexp;
 mod seed_password;
 mod url;
 
 use std::{
-    fs::read_to_string,
-    io::{IsTerminal, Write, stdout},
+    io::{BufWriter, IsTerminal, Write, stdout},
     path::Path,
 };
 
@@ -32,9 +30,8 @@ use crypto_bigint::NonZero;
 use onepass_seed::{
     crypto::{Derivation, secret_uniform},
     data::Site,
-    dict::{BoxDict, Dict, EFF_WORDLIST},
+    expr::{Eval, Expr},
 };
-use randexp::{Enumerable, Expr, Quantifiable, Words};
 use url::canonicalize;
 use zeroize::Zeroizing;
 
@@ -147,16 +144,17 @@ fn main() -> Result<()> {
     }
     let seed = seed_password::read(use_keyring, args.confirm)?;
 
-    let words: Option<_> = read_words_str(&args, &config)?;
-    let dict = words.as_deref().map(BoxDict::from_lines);
-    let dict: &dyn Dict = dict
-        .as_ref()
-        .map(|dict| dict as &dyn Dict)
-        .unwrap_or(&EFF_WORDLIST);
+    // TODO(now): re-enable custom word lists
+    // let words: Option<_> = read_words_str(&args, &config)?;
+    // let dict = words.as_deref().map(BoxDict::from_lines);
+    // let dict: &dyn Dict = dict
+    //     .as_ref()
+    //     .map(|dict| dict as &dyn Dict)
+    //     .unwrap_or(&EFF_WORDLIST);
 
     let mut stdout = stdout();
     for site in &args.sites {
-        let res = gen_password_config(&seed, site, &config, &args, dict)?;
+        let res = gen_password_config(&seed, site, &config, &args)?;
         stdout.write_all(res.as_bytes())?;
         if stdout.is_terminal() || args.sites.len() > 1 {
             writeln!(stdout)?;
@@ -180,7 +178,10 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
 fn read_words_str(args: &Args, config: &Config) -> Result<Option<Box<str>>> {
+    use std::fs::read_to_string;
+
     let path = args.words_path.as_deref().or(config.words_path.as_deref());
     path.map(|p| read_to_string(p).map(|s| s.into_boxed_str()))
         .transpose()
@@ -192,9 +193,7 @@ fn gen_password_config(
     req: &str,
     config: &Config,
     args: &Args,
-    dict: &dyn Dict,
 ) -> Result<Zeroizing<String>> {
-    let words = Words(dict.words());
     let site = config.find_site(req)?;
     let url = site.as_ref().map_or(req, |(url, _)| url);
     let url = canonicalize(
@@ -214,8 +213,9 @@ fn gen_password_config(
     let increment = args
         .increment
         .unwrap_or_else(|| site.map_or(0, |(_, site)| site.increment));
-    let expr = Expr::parse(schema).context("invalid schema")?;
-    let size = words.size(&expr);
+    let node = schema.parse().context("invalid schema")?;
+    let expr = Expr::new(node);
+    let size = expr.size();
     let site = Site {
         url,
         username: None,
@@ -234,27 +234,24 @@ fn gen_password_config(
         eprintln!("salt: {salt:?}");
     }
 
-    gen_password(seed, &site, &expr, dict)
+    gen_password(seed, &site, &expr)
 }
 
-fn gen_password(
-    seed: &str,
-    site: &Site,
-    expr: &Expr,
-    dict: &dyn Dict,
-) -> Result<Zeroizing<String>> {
-    let words = Words(dict.words());
-    let size = words.size(expr);
+fn gen_password(seed: &str, site: &Site, expr: &Expr) -> Result<Zeroizing<String>> {
+    let size = expr.size();
     let secret = site.secret(seed);
     let index = secret_uniform(&secret, &NonZero::new(size).unwrap());
-    words.gen_at(expr, index)
+    let mut buf = BufWriter::new(Vec::new());
+    expr.write_to(&mut buf, index)
+        .context("failed generating password")?;
+    Ok(Zeroizing::new(String::from_utf8(buf.into_inner()?)?))
 }
 
 #[cfg(test)]
 mod tests {
     use std::{fs::File, path::PathBuf};
 
-    use onepass_seed::dict::EFF_WORDLIST;
+    use onepass_seed::dict::{BoxDict, Dict};
     use tempfile::TempDir;
 
     use super::*;
@@ -264,25 +261,24 @@ mod tests {
     fn test_passwords() -> Result<()> {
         let tests = [
             (
-                "riches-quilt-librarian-engraved",
+                "pureblood-structure-squishy-jigsaw",
                 "arst",
                 "google.com",
-                "[:word:](-[:word:]){3}",
+                "{words:4:-}",
                 0,
             ),
             ("!((-%(')*'\"/", "password", "apple.com", "[!-/]{12}", 1),
         ];
-        let dict = EFF_WORDLIST;
         for (want, seed, url, schema, increment) in tests {
             let url = canonicalize(url, None)?;
-            let expr = Expr::parse(schema)?;
+            let expr = Expr::new(schema.parse()?);
             let site = Site {
                 url,
                 username: None,
                 schema: schema.to_string(),
                 increment,
             };
-            let got = gen_password(seed, &site, &expr, &dict)?;
+            let got = gen_password(seed, &site, &expr)?;
             assert_eq!(want, *got);
         }
         Ok(())
