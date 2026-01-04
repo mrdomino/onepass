@@ -20,24 +20,24 @@ impl EvalContext for Node {
     type Context = Context;
 
     fn size(&self, context: &Context) -> U256 {
-        match self {
+        match *self {
             Node::Literal(_) => U256::ONE,
-            Node::Chars(chars) => chars.size(),
-            Node::List(nodes) => nodes.into_iter().fold(U256::ONE, |acc, node| {
+            Node::Chars(ref chars) => chars.size(),
+            Node::List(ref nodes) => nodes.into_iter().fold(U256::ONE, |acc, node| {
                 acc.saturating_mul(&node.size(context))
             }),
 
-            Node::Count(node, min, max) => {
+            Node::Count(ref node, min, max) => {
                 let n = node.size(context);
                 if n.is_one().into() {
-                    return (*max - *min + 1).into();
+                    return (max - min + 1).into();
                 }
                 // Closed form of n^k + … + n^l
                 //              = n^k (1 + … + n^(l-k))
                 //              = n^k (n^(l-k+1) - 1) / (n - 1)
                 //              = (n^(l+1) - n^k) / (n - 1)
-                let k = *min;
-                let l = *max;
+                let k = min;
+                let l = max;
                 let x = u256_saturating_pow(&n, (l + 1).into())
                     .checked_sub(&u256_saturating_pow(&n, Word::from(k)))
                     .unwrap();
@@ -46,16 +46,16 @@ impl EvalContext for Node {
                 x
             }
 
-            Node::Generator(generator) => generator.size(context),
+            Node::Generator(ref generator) => generator.size(context),
         }
     }
 
     fn write_to(&self, context: &Context, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()> {
-        match self {
-            Node::Literal(s) => write!(w, "{s}"),
-            Node::Chars(chars) => chars.write_to(w, index),
+        match *self {
+            Node::Literal(ref s) => write!(w, "{s}"),
+            Node::Chars(ref chars) => chars.write_to(w, index),
 
-            Node::List(nodes) => nodes
+            Node::List(ref nodes) => nodes
                 .into_iter()
                 .try_fold(index, |mut index, node| {
                     let node_index;
@@ -66,18 +66,18 @@ impl EvalContext for Node {
                 })
                 .map(|_| ()),
 
-            Node::Count(node, min, max) => {
+            Node::Count(ref node, min, max) => {
                 let mut index = index;
                 let node = node.as_ref();
                 let base = Zeroizing::new(NonZero::new(node.size(context)).unwrap());
-                let mut count = *min;
-                let mut n = Zeroizing::new(u256_saturating_pow(&base, Word::from(*min)));
+                let mut count = min;
+                let mut n = Zeroizing::new(u256_saturating_pow(&base, Word::from(min)));
                 while *n <= *index {
                     count += 1;
                     *index -= *n;
                     *n = n.saturating_mul(&base);
                 }
-                assert!(count <= *max);
+                assert!(count <= max);
                 for _ in 0..count {
                     let node_index;
                     let (a, b) = index.div_rem(&base);
@@ -88,7 +88,7 @@ impl EvalContext for Node {
                 Ok(())
             }
 
-            Node::Generator(generator) => generator.write_to(context, w, index),
+            Node::Generator(ref generator) => generator.write_to(context, w, index),
         }
     }
 }
