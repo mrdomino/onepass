@@ -53,6 +53,10 @@ impl EvalContext for Generator {
 }
 
 impl Generator {
+    pub fn from(s: impl Into<Box<str>>) -> Self {
+        Generator(s.into())
+    }
+
     pub fn new(s: &str) -> Self {
         Generator(s.into())
     }
