@@ -35,6 +35,10 @@ impl Expr {
             context: Some(context),
         }
     }
+
+    pub fn get_context(&self) -> &Context {
+        self.context.as_ref().unwrap_or(&DEFAULT_CONTEXT)
+    }
 }
 
 pub trait Eval {
@@ -44,13 +48,11 @@ pub trait Eval {
 
 impl Eval for Expr {
     fn size(&self) -> U256 {
-        self.root
-            .size(self.context.as_ref().unwrap_or(&DEFAULT_CONTEXT))
+        self.root.size(self.get_context())
     }
 
     fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()> {
-        self.root
-            .write_to(self.context.as_ref().unwrap_or(&DEFAULT_CONTEXT), w, index)
+        self.root.write_to(self.get_context(), w, index)
     }
 }
 
