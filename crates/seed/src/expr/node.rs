@@ -4,7 +4,6 @@ use crypto_bigint::{CheckedSub, NonZero, One, U256, Word, Zero};
 use zeroize::Zeroizing;
 
 pub use super::generator::Context;
-
 use super::{Eval, EvalContext, chars::Chars, generator::Generator, util::u256_saturating_pow};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -95,9 +94,9 @@ impl EvalContext for Node {
 
 #[cfg(test)]
 mod tests {
-    use num_traits::PrimInt;
-
     use super::{super::util::*, *};
+
+    use num_traits::PrimInt;
 
     #[test]
     fn test_counts() {
