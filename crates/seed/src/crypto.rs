@@ -1,5 +1,9 @@
 use core::fmt::{Display, Write};
-use std::cmp::Ordering;
+use std::{
+    cmp::Ordering,
+    io::{Error, Result},
+    mem,
+};
 
 use argon2::{Algorithm, Argon2, Params, Version};
 use blake2::{Blake2b256, Digest};
@@ -9,9 +13,25 @@ use onepass_base::fmt::DigestWriter;
 use rand_core::{RngCore, SeedableRng};
 use zeroize::Zeroizing;
 
-use crate::{data::Site, write_tsv};
+use crate::{data::Site, expr::Eval, write_tsv};
 
 impl Site {
+    pub fn password(&self, seed_password: &str) -> Result<Zeroizing<String>> {
+        let size = self.schema.size();
+        let secret = self.secret(seed_password);
+        let index = secret_uniform(&secret, &NonZero::new(size).unwrap());
+        // Write to a fixed-size buffer to avoid reallocations leaking data.
+        let mut buf = Zeroizing::new(vec![0u8; 4096]);
+        self.schema.write_to(&mut &mut *buf, index)?;
+        if let Some(pos) = buf.iter().position(|&b| b == 0) {
+            buf.truncate(pos);
+        }
+        let _ = str::from_utf8(&buf).map_err(Error::other)?;
+        let buf = mem::take(&mut *buf);
+        let res = unsafe { String::from_utf8_unchecked(buf) };
+        Ok(Zeroizing::new(res))
+    }
+
     pub fn salt(&self) -> [u8; 32] {
         let mut w = DigestWriter(Blake2b256::new());
         write!(w, "{}", Derivation(self)).unwrap();

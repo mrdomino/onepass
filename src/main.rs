@@ -19,16 +19,15 @@ mod seed_password;
 mod url;
 
 use std::{
-    io::{BufWriter, IsTerminal, Write, stdout},
+    io::{IsTerminal, Write, stdout},
     path::Path,
 };
 
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, error::ErrorKind};
 use config::Config;
-use crypto_bigint::NonZero;
 use onepass_seed::{
-    crypto::{Derivation, secret_uniform},
+    crypto::Derivation,
     data::Site,
     expr::{Eval, Expr},
 };
@@ -234,18 +233,7 @@ fn gen_password_config(
         eprintln!("salt: {salt:?}");
     }
 
-    gen_password(seed, &site)
-}
-
-fn gen_password(seed: &str, site: &Site) -> Result<Zeroizing<String>> {
-    let size = site.schema.size();
-    let secret = site.secret(seed);
-    let index = secret_uniform(&secret, &NonZero::new(size).unwrap());
-    let mut buf = BufWriter::new(Vec::new());
-    site.schema
-        .write_to(&mut buf, index)
-        .context("failed generating password")?;
-    Ok(Zeroizing::new(String::from_utf8(buf.into_inner()?)?))
+    site.password(seed).context("failed generating password")
 }
 
 #[cfg(test)]
@@ -279,7 +267,7 @@ mod tests {
                 schema: expr,
                 increment,
             };
-            let got = gen_password(seed, &site)?;
+            let got = site.password(seed)?;
             assert_eq!(want, *got);
         }
         Ok(())
