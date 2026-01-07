@@ -1,4 +1,5 @@
 pub mod chars;
+pub mod fmt;
 pub mod generator;
 pub mod node;
 pub mod parse;

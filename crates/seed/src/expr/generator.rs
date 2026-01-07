@@ -1,3 +1,4 @@
+use core::fmt;
 use std::{
     collections::HashMap,
     io::{Result, Write},
@@ -21,6 +22,15 @@ pub trait GeneratorFunc: Send + Sync {
     fn name(&self) -> &'static str;
     fn size(&self, args: &[&str]) -> U256;
     fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>, args: &[&str]) -> Result<()>;
+
+    fn fmt(&self, f: &mut fmt::Formatter<'_>, args: &[&str]) -> fmt::Result {
+        write!(f, "{}", self.name())?;
+        // TODO(now): find first available punctuation char, proper escaping
+        for arg in args {
+            write!(f, ":{arg}")?;
+        }
+        Ok(())
+    }
 }
 
 pub struct Context(HashMap<&'static str, Arc<dyn GeneratorFunc>>);
@@ -100,6 +110,25 @@ impl Default for Context {
     }
 }
 
+fn fmt_with_hash(f: &mut fmt::Formatter<'_>, hash: &[u8; 32], args: &[&str]) -> fmt::Result {
+    if !args.iter().copied().any(|arg| {
+        let mut out = vec![0u8; 32];
+        let Ok(()) = hex::decode_to_slice(arg, &mut out) else {
+            return false;
+        };
+        out == hash
+    }) {
+        let mut out = vec![0u8; 64];
+        hex::encode_to_slice(hash, &mut out).unwrap();
+        let out = String::from_utf8(out).unwrap();
+        write!(f, ":{out}")?;
+    };
+    for &arg in args {
+        write!(f, ":{arg}")?;
+    }
+    Ok(())
+}
+
 impl GeneratorFunc for Word<'_, '_> {
     fn name(&self) -> &'static str {
         "word"
@@ -115,6 +144,11 @@ impl GeneratorFunc for Word<'_, '_> {
         // TODO(soon): case transformations
         let _ = args;
         write!(w, "{}", self.0.words()[u256_to_word(&index) as usize])
+    }
+
+    fn fmt(&self, f: &mut fmt::Formatter<'_>, args: &[&str]) -> fmt::Result {
+        write!(f, "{}", self.name())?;
+        fmt_with_hash(f, self.0.hash(), args)
     }
 }
 
@@ -166,6 +200,11 @@ impl GeneratorFunc for Words<'_, '_> {
         }
         assert!(bool::from(index.is_zero()));
         Ok(())
+    }
+
+    fn fmt(&self, f: &mut fmt::Formatter<'_>, args: &[&str]) -> fmt::Result {
+        write!(f, "{}", self.name())?;
+        fmt_with_hash(f, self.0.hash(), args)
     }
 }
 

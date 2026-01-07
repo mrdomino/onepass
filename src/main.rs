@@ -219,7 +219,7 @@ fn gen_password_config(
     let site = Site {
         url,
         username: None,
-        schema: schema.to_string(),
+        schema: expr,
         increment,
     };
     let salt = format!("{}", Derivation(&site));
@@ -234,15 +234,16 @@ fn gen_password_config(
         eprintln!("salt: {salt:?}");
     }
 
-    gen_password(seed, &site, &expr)
+    gen_password(seed, &site)
 }
 
-fn gen_password(seed: &str, site: &Site, expr: &Expr) -> Result<Zeroizing<String>> {
-    let size = expr.size();
+fn gen_password(seed: &str, site: &Site) -> Result<Zeroizing<String>> {
+    let size = site.schema.size();
     let secret = site.secret(seed);
     let index = secret_uniform(&secret, &NonZero::new(size).unwrap());
     let mut buf = BufWriter::new(Vec::new());
-    expr.write_to(&mut buf, index)
+    site.schema
+        .write_to(&mut buf, index)
         .context("failed generating password")?;
     Ok(Zeroizing::new(String::from_utf8(buf.into_inner()?)?))
 }
@@ -275,10 +276,10 @@ mod tests {
             let site = Site {
                 url,
                 username: None,
-                schema: schema.to_string(),
+                schema: expr,
                 increment,
             };
-            let got = gen_password(seed, &site, &expr)?;
+            let got = gen_password(seed, &site)?;
             assert_eq!(want, *got);
         }
         Ok(())

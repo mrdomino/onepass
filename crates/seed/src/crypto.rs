@@ -73,13 +73,15 @@ impl Display for Derivation<'_> {
 
 #[cfg(test)]
 mod tests {
+    use crate::expr::Expr;
+
     use super::*;
 
     fn test_site() -> Site {
         Site {
             url: "https://google.com/".into(),
             username: None,
-            schema: "{placeholder}".into(),
+            schema: Expr::new("{word}".parse().unwrap()),
             increment: 0,
         }
     }
@@ -87,7 +89,7 @@ mod tests {
     #[test]
     fn derivation_works() {
         assert_eq!(
-            "v3\thttps://google.com/\t\t{placeholder}\t0",
+            "v3\thttps://google.com/\t\t{word:323606b363ebdedff9f562cb84c50df1a21cbd4b597ff4566df92bb9f2cefdfd}\t0",
             &format!("{}", Derivation(&test_site()))
         );
     }
@@ -95,13 +97,13 @@ mod tests {
     #[test]
     fn salt_works() {
         assert_eq!(
-            "6305a00d24a5b1551d3ae57054b9346a43399e8419cd8be6e39d59d742a8e193",
+            "d02d5004a00973dcb1e0707e31626014a13beb7f7dcb36d88bebf37101f43342",
             hex::encode(test_site().salt())
         );
         let mut site2 = test_site();
         site2.username = Some("me@example.com".into());
         assert_eq!(
-            "0142f0bc29fce5d4d6814c346acc1022f5b02d47528654c18ff80603e7d5776d",
+            "35be685c1c577cf6604164666e01ec01db080de08d942c67e5c44ab14d307bf0",
             hex::encode(site2.salt())
         );
     }
