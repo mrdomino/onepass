@@ -16,7 +16,7 @@ pub enum Node {
 }
 
 impl EvalContext for Node {
-    type Context = Context;
+    type Context<'a> = Context<'a>;
 
     fn size(&self, context: &Context) -> NonZero<U256> {
         match *self {

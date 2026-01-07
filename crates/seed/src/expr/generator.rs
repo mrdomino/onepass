@@ -33,7 +33,7 @@ pub trait GeneratorFunc: Send + Sync {
     }
 }
 
-pub struct Context(HashMap<&'static str, Arc<dyn GeneratorFunc>>);
+pub struct Context<'a>(HashMap<&'static str, Arc<dyn GeneratorFunc + 'a>>);
 
 // TODO(someday): multiple dict lookup by hash
 pub struct Word<'a, 'b>(&'a (dyn Dict<'b> + Sync));
@@ -41,7 +41,7 @@ pub struct Word<'a, 'b>(&'a (dyn Dict<'b> + Sync));
 pub struct Words<'a, 'b>(&'a (dyn Dict<'b> + Sync));
 
 impl EvalContext for Generator {
-    type Context = Context;
+    type Context<'a> = Context<'a>;
 
     fn size(&self, context: &Context) -> NonZero<U256> {
         let name = self.name();
@@ -90,7 +90,15 @@ impl Generator {
     }
 }
 
-impl Context {
+impl<'a> Context<'a> {
+    pub fn with_dict<'b>(dict: &'a (dyn Dict<'b> + Sync)) -> Self {
+        let generators: Vec<Arc<dyn GeneratorFunc + 'a>> =
+            vec![Arc::new(Word(dict)), Arc::new(Words(dict))];
+        Context(generators.into_iter().map(|g| (g.name(), g)).collect())
+    }
+}
+
+impl Context<'_> {
     pub fn empty() -> Self {
         Context(HashMap::new())
     }
@@ -100,7 +108,7 @@ impl Context {
     }
 }
 
-impl Default for Context {
+impl Default for Context<'static> {
     fn default() -> Self {
         let generators: Vec<Arc<dyn GeneratorFunc>> = vec![
             Arc::new(Word(&EFF_WORDLIST)),
@@ -217,6 +225,7 @@ impl PartialEq for Generator {
 #[cfg(test)]
 mod tests {
     use super::{super::util::*, *};
+    use crate::dict::BoxDict;
 
     #[test]
     fn test_generators() {
@@ -236,5 +245,16 @@ mod tests {
             "zoom-zoom-zoom-zoom",
             &format_at_ctx(&g, &ctx, U256::from_u64(0xCFD41B90FFFFF))
         );
+    }
+
+    #[test]
+    fn test_lifetimes() {
+        let s = "bob\ndole".to_string();
+        let dict = BoxDict::from_lines(&s);
+        let ctx = Context::with_dict(&dict);
+        let g = Generator::new("word");
+        assert_eq!(U256::from_u32(2), *g.size(&ctx));
+        assert_eq!("bob", &format_at_ctx(&g, &ctx, U256::from_u32(0)));
+        assert_eq!("dole", &format_at_ctx(&g, &ctx, U256::from_u32(1)));
     }
 }

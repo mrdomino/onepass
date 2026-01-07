@@ -15,7 +15,7 @@ use zeroize::Zeroizing;
 
 use crate::{data::Site, expr::Eval, write_tsv};
 
-impl Site {
+impl Site<'_> {
     pub fn password(&self, seed_password: &str) -> Result<Zeroizing<String>> {
         let size = self.schema.size();
         let secret = self.secret(seed_password);
@@ -78,9 +78,9 @@ pub fn secret_uniform(secret: &[u8; 32], n: &NonZero<U256>) -> Zeroizing<U256> {
     }
 }
 
-pub struct Derivation<'a>(pub &'a Site);
+pub struct Derivation<'a, 'b>(pub &'a Site<'b>);
 
-impl Display for Derivation<'_> {
+impl Display for Derivation<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = self.0;
         let url = &s.url;
@@ -97,7 +97,7 @@ mod tests {
 
     use super::*;
 
-    fn test_site() -> Site {
+    fn test_site() -> Site<'static> {
         Site {
             url: "https://google.com/".into(),
             username: None,

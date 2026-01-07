@@ -26,7 +26,7 @@ pub(super) fn u256_saturating_pow(base: &U256, mut n: Word) -> U256 {
 }
 
 #[cfg(test)]
-pub(super) fn format_at_ctx<E: EvalContext>(e: &E, ctx: &E::Context, index: U256) -> String {
+pub(super) fn format_at_ctx<E: EvalContext>(e: &E, ctx: &E::Context<'_>, index: U256) -> String {
     use std::io::BufWriter;
 
     let mut buf = BufWriter::new(Vec::new());

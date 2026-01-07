@@ -15,29 +15,31 @@ use zeroize::Zeroizing;
 
 pub use node::{Context, Node};
 
-pub struct Expr {
+pub struct Expr<'a> {
     pub root: Node,
-    pub context: Option<Context>,
+    pub context: Option<Context<'a>>,
 }
 
 static DEFAULT_CONTEXT: LazyLock<Context> = LazyLock::new(Context::default);
 
-impl Expr {
+impl Expr<'_> {
     pub fn new(root: Node) -> Self {
         Expr {
             root,
             context: None,
         }
     }
+}
 
-    pub fn with_context(root: Node, context: Context) -> Self {
+impl<'a> Expr<'a> {
+    pub fn with_context(root: Node, context: Context<'a>) -> Self {
         Expr {
             root,
             context: Some(context),
         }
     }
 
-    pub fn get_context(&self) -> &Context {
+    pub fn get_context(&self) -> &Context<'a> {
         self.context.as_ref().unwrap_or(&DEFAULT_CONTEXT)
     }
 }
@@ -47,7 +49,7 @@ pub trait Eval {
     fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()>;
 }
 
-impl Eval for Expr {
+impl Eval for Expr<'_> {
     fn size(&self) -> NonZero<U256> {
         self.root.size(self.get_context())
     }
@@ -58,11 +60,11 @@ impl Eval for Expr {
 }
 
 pub trait EvalContext {
-    type Context: ?Sized;
-    fn size(&self, context: &Self::Context) -> NonZero<U256>;
+    type Context<'a>: ?Sized + 'a;
+    fn size(&self, context: &Self::Context<'_>) -> NonZero<U256>;
     fn write_to(
         &self,
-        context: &Self::Context,
+        context: &Self::Context<'_>,
         w: &mut dyn Write,
         index: Zeroizing<U256>,
     ) -> Result<()>;

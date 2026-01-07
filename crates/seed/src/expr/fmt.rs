@@ -6,9 +6,9 @@ use crate::expr::{
     chars::{CharRange, Chars},
 };
 
-struct FmtState<'a>(bool, &'a Context);
+struct FmtState<'a, 'b>(bool, &'a Context<'b>);
 
-impl FmtState<'_> {
+impl FmtState<'_, '_> {
     pub fn fmt(&mut self, f: &mut fmt::Formatter<'_>, node: &Node) -> Result {
         match *node {
             Node::Literal(ref s) => fmt_literal(f, s),
@@ -47,7 +47,7 @@ impl FmtState<'_> {
     }
 }
 
-impl fmt::Display for Expr {
+impl fmt::Display for Expr<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
         FmtState(false, self.get_context()).fmt(f, &self.root)
     }
