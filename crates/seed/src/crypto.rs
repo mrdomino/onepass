@@ -98,7 +98,7 @@ mod tests {
         Site {
             url: "https://google.com/".into(),
             username: None,
-            schema: Expr::new("{word}".parse().unwrap()),
+            schema: Expr::new("{words}".parse().unwrap()),
             increment: 0,
         }
     }
@@ -106,7 +106,7 @@ mod tests {
     #[test]
     fn derivation_works() {
         assert_eq!(
-            "v3\thttps://google.com/\t\t{word:323606b363ebdedff9f562cb84c50df1a21cbd4b597ff4566df92bb9f2cefdfd}\t0",
+            "v3\thttps://google.com/\t\t{words:323606b363ebdedff9f562cb84c50df1a21cbd4b597ff4566df92bb9f2cefdfd}\t0",
             &format!("{}", Derivation(&test_site()))
         );
     }
@@ -114,13 +114,13 @@ mod tests {
     #[test]
     fn salt_works() {
         assert_eq!(
-            "d02d5004a00973dcb1e0707e31626014a13beb7f7dcb36d88bebf37101f43342",
+            "1bbfdc8d16e76a78d65a37402fd4966a367e1f4740787e8126b42b3f6e5fc67a",
             hex::encode(test_site().salt())
         );
         let mut site2 = test_site();
         site2.username = Some("me@example.com".into());
         assert_eq!(
-            "35be685c1c577cf6604164666e01ec01db080de08d942c67e5c44ab14d307bf0",
+            "9653ee2d8cc225dfc9902d4c967619dcff2aca60b56c75cb3f04f224adeb64fc",
             hex::encode(site2.salt())
         );
     }
@@ -129,18 +129,18 @@ mod tests {
     #[ignore] // too slow in debug
     fn secret() {
         assert_eq!(
-            "2f21f544f636d0903131f05a63035cfc3a767584de1fe6879e72391cdd7a7648",
+            "bdff45de9afd8b221ba249dcf12ad2739daa18bf53f7a9ba712f4d6b044c437b",
             hex::encode(test_site().secret("testpass"))
         );
         assert_eq!(
-            "d5dcad3906ee8d7a91df2e6baa5fa8030b34c13b46d1ac7514680c9073a58586",
+            "28ec03675de3b3501a75ca2bb25f29311eb767e5016e734b77b9af81e36f6d92",
             hex::encode(test_site().secret("testpass2"))
         );
         let mut site2 = test_site();
         site2.increment = 1;
         site2.username = Some("you@example.com".into());
         assert_eq!(
-            "0a174792252a6de97545af65ba6108cd0a625ec7157fd936630283ed06342e8d",
+            "27ebb569a8e97fb64aaad70ca1dee5538fd2008a1ed45ab359ea9fcbc12f2736",
             hex::encode(site2.secret("testpass"))
         );
     }
@@ -204,6 +204,9 @@ mod tests {
     #[test]
     #[ignore]
     fn password_e2e() {
-        assert_eq!("casket", &*test_site().password("testpass").unwrap());
+        assert_eq!(
+            "nature swirl unusable zookeeper wind",
+            &*test_site().password("testpass").unwrap()
+        );
     }
 }
