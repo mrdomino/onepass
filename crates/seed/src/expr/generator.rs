@@ -86,7 +86,7 @@ impl Generator {
         let Some(sep) = self.0.chars().find(|&c| !c.is_ascii_lowercase()) else {
             return [].into();
         };
-        self.0.split(sep).collect()
+        self.0.split(sep).skip(1).collect()
     }
 }
 
@@ -108,7 +108,7 @@ impl Context<'_> {
     }
 }
 
-impl Default for Context<'static> {
+impl Default for Context<'_> {
     fn default() -> Self {
         let generators: Vec<Arc<dyn GeneratorFunc>> = vec![
             Arc::new(Word(&EFF_WORDLIST)),

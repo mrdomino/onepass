@@ -23,13 +23,14 @@ use std::{
     path::Path,
 };
 
-use anyhow::{Context, Result};
+use anyhow::{Context as _Context, Result};
 use clap::{CommandFactory, Parser, error::ErrorKind};
 use config::Config;
 use onepass_seed::{
     crypto::Derivation,
     data::Site,
-    expr::{Eval, Expr},
+    dict::BoxDict,
+    expr::{Context, Eval, Expr},
 };
 use url::canonicalize;
 use zeroize::Zeroizing;
@@ -143,17 +144,14 @@ fn main() -> Result<()> {
     }
     let seed = seed_password::read(use_keyring, args.confirm)?;
 
-    // TODO(now): re-enable custom word lists
-    // let words: Option<_> = read_words_str(&args, &config)?;
-    // let dict = words.as_deref().map(BoxDict::from_lines);
-    // let dict: &dyn Dict = dict
-    //     .as_ref()
-    //     .map(|dict| dict as &dyn Dict)
-    //     .unwrap_or(&EFF_WORDLIST);
+    let words: Option<_> = read_words_str(&args, &config)?;
+    let dict = words.as_deref().map(BoxDict::from_lines);
 
     let mut stdout = stdout();
     for site in &args.sites {
-        let res = gen_password_config(&seed, site, &config, &args)?;
+        let context = dict.as_ref().map(|dict| Context::with_dict(dict));
+        let context = context.unwrap_or_else(Context::default);
+        let res = gen_password_config(&seed, site, &config, &args, context)?;
         stdout.write_all(res.as_bytes())?;
         if stdout.is_terminal() || args.sites.len() > 1 {
             writeln!(stdout)?;
@@ -177,7 +175,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
 fn read_words_str(args: &Args, config: &Config) -> Result<Option<Box<str>>> {
     use std::fs::read_to_string;
 
@@ -192,6 +189,7 @@ fn gen_password_config(
     req: &str,
     config: &Config,
     args: &Args,
+    context: Context<'_>,
 ) -> Result<Zeroizing<String>> {
     let site = config.find_site(req)?;
     let url = site.as_ref().map_or(req, |(url, _)| url);
@@ -212,8 +210,8 @@ fn gen_password_config(
     let increment = args
         .increment
         .unwrap_or_else(|| site.map_or(0, |(_, site)| site.increment));
-    let node = schema.parse().context("invalid schema")?;
-    let expr = Expr::new(node);
+    let root = schema.parse().context("invalid schema")?;
+    let expr = Expr::with_context(root, context);
     let size = expr.size();
     let site = Site {
         url,
@@ -250,7 +248,7 @@ mod tests {
     fn test_passwords() -> Result<()> {
         let tests = [
             (
-                "pureblood-structure-squishy-jigsaw",
+                "humorless-clamor-rebuild-stiffen",
                 "arst",
                 "google.com",
                 "{words:4:-}",

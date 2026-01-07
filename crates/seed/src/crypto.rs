@@ -1,8 +1,7 @@
 use core::fmt::{Display, Write};
 use std::{
     cmp::Ordering,
-    io::{Error, Result},
-    mem,
+    io::{BufWriter, Error, Result},
 };
 
 use argon2::{Algorithm, Argon2, Params, Version};
@@ -20,16 +19,14 @@ impl Site<'_> {
         let size = self.schema.size();
         let secret = self.secret(seed_password);
         let index = secret_uniform(&secret, &size);
-        // Write to a fixed-size buffer to avoid reallocations leaking data.
-        let mut buf = Zeroizing::new(vec![0u8; 4096]);
-        self.schema.write_to(&mut &mut *buf, index)?;
-        if let Some(pos) = buf.iter().position(|&b| b == 0) {
-            buf.truncate(pos);
-        }
-        let _ = str::from_utf8(&buf).map_err(Error::other)?;
-        let buf = mem::take(&mut *buf);
-        let res = unsafe { String::from_utf8_unchecked(buf) };
-        Ok(Zeroizing::new(res))
+        // TODO(now): ensure no reallocations
+        let mut buf = BufWriter::new(Vec::with_capacity(4096));
+        self.schema.write_to(&mut buf, index)?;
+        let buf = buf.into_inner().unwrap();
+        assert!(buf.len() <= 4096);
+        Ok(Zeroizing::new(
+            String::from_utf8(buf).map_err(Error::other)?,
+        ))
     }
 
     pub fn salt(&self) -> [u8; 32] {
@@ -132,18 +129,18 @@ mod tests {
     #[ignore] // too slow in debug
     fn secret() {
         assert_eq!(
-            "a96d610f969d8befcc5a8f7db635976eeb5c83718a2a0d9974a4bb1b6423fac9",
+            "2f21f544f636d0903131f05a63035cfc3a767584de1fe6879e72391cdd7a7648",
             hex::encode(test_site().secret("testpass"))
         );
         assert_eq!(
-            "cd319a18cd2e86ef74805e91ce0b74b52db8b9b6252bc6dbb38cd9c3fdc07191",
+            "d5dcad3906ee8d7a91df2e6baa5fa8030b34c13b46d1ac7514680c9073a58586",
             hex::encode(test_site().secret("testpass2"))
         );
         let mut site2 = test_site();
         site2.increment = 1;
         site2.username = Some("you@example.com".into());
         assert_eq!(
-            "dc4354071b6b73bc8021f2b9d190298155fe79e8eff746a7290299110899c8e4",
+            "0a174792252a6de97545af65ba6108cd0a625ec7157fd936630283ed06342e8d",
             hex::encode(site2.secret("testpass"))
         );
     }
@@ -202,5 +199,11 @@ mod tests {
                 ),
             );
         }
+    }
+
+    #[test]
+    #[ignore]
+    fn password_e2e() {
+        assert_eq!("casket", &*test_site().password("testpass").unwrap());
     }
 }
