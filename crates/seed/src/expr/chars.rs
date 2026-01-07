@@ -3,7 +3,7 @@ use std::{
     io::{Result, Write},
 };
 
-use crypto_bigint::U256;
+use crypto_bigint::{NonZero, U256};
 use zeroize::Zeroizing;
 
 use super::{Eval, util::u256_to_word};
@@ -115,8 +115,8 @@ impl CharRange {
 }
 
 impl Eval for Chars {
-    fn size(&self) -> U256 {
-        Chars::size(self).into()
+    fn size(&self) -> NonZero<U256> {
+        NonZero::new(Chars::size(self).into()).unwrap()
     }
 
     fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()> {

@@ -19,7 +19,7 @@ impl Site {
     pub fn password(&self, seed_password: &str) -> Result<Zeroizing<String>> {
         let size = self.schema.size();
         let secret = self.secret(seed_password);
-        let index = secret_uniform(&secret, &NonZero::new(size).unwrap());
+        let index = secret_uniform(&secret, &size);
         // Write to a fixed-size buffer to avoid reallocations leaking data.
         let mut buf = Zeroizing::new(vec![0u8; 4096]);
         self.schema.write_to(&mut &mut *buf, index)?;

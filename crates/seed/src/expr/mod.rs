@@ -10,7 +10,7 @@ use std::{
     sync::LazyLock,
 };
 
-use crypto_bigint::U256;
+use crypto_bigint::{NonZero, U256};
 use zeroize::Zeroizing;
 
 pub use node::{Context, Node};
@@ -43,12 +43,12 @@ impl Expr {
 }
 
 pub trait Eval {
-    fn size(&self) -> U256;
+    fn size(&self) -> NonZero<U256>;
     fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()>;
 }
 
 impl Eval for Expr {
-    fn size(&self) -> U256 {
+    fn size(&self) -> NonZero<U256> {
         self.root.size(self.get_context())
     }
 
@@ -59,7 +59,7 @@ impl Eval for Expr {
 
 pub trait EvalContext {
     type Context: ?Sized;
-    fn size(&self, context: &Self::Context) -> U256;
+    fn size(&self, context: &Self::Context) -> NonZero<U256>;
     fn write_to(
         &self,
         context: &Self::Context,

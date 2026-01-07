@@ -18,18 +18,21 @@ pub enum Node {
 impl EvalContext for Node {
     type Context = Context;
 
-    fn size(&self, context: &Context) -> U256 {
+    fn size(&self, context: &Context) -> NonZero<U256> {
         match *self {
-            Node::Literal(_) => U256::ONE,
+            Node::Literal(_) => NonZero::new(U256::ONE).unwrap(),
             Node::Chars(ref chars) => chars.size(),
-            Node::List(ref nodes) => nodes.into_iter().fold(U256::ONE, |acc, node| {
-                acc.saturating_mul(&node.size(context))
-            }),
+            Node::List(ref nodes) => {
+                NonZero::new(nodes.into_iter().fold(U256::ONE, |acc, node| {
+                    acc.saturating_mul(&node.size(context))
+                }))
+                .unwrap()
+            }
 
             Node::Count(ref node, min, max) => {
                 let n = node.size(context);
                 if n.is_one().into() {
-                    return (max - min + 1).into();
+                    return NonZero::new((max - min + 1).into()).unwrap();
                 }
                 // Closed form of n^k + … + n^l
                 //              = n^k (1 + … + n^(l-k))
@@ -42,7 +45,7 @@ impl EvalContext for Node {
                     .unwrap();
                 let (x, rem) = x.div_rem(&NonZero::new(n.saturating_sub(&U256::ONE)).unwrap());
                 assert!(bool::from(rem.is_zero()));
-                x
+                NonZero::new(x).unwrap()
             }
 
             Node::Generator(ref generator) => generator.size(context),
@@ -58,7 +61,7 @@ impl EvalContext for Node {
                 .into_iter()
                 .try_fold(index, |mut index, node| {
                     let node_index;
-                    let (a, b) = index.div_rem(&NonZero::new(node.size(context)).unwrap());
+                    let (a, b) = index.div_rem(&node.size(context));
                     (index, node_index) = (Zeroizing::new(a), Zeroizing::new(b));
                     node.write_to(context, w, node_index)?;
                     Ok(index)
@@ -68,7 +71,7 @@ impl EvalContext for Node {
             Node::Count(ref node, min, max) => {
                 let mut index = index;
                 let node = node.as_ref();
-                let base = Zeroizing::new(NonZero::new(node.size(context)).unwrap());
+                let base = Zeroizing::new(node.size(context));
                 let mut count = min;
                 let mut n = Zeroizing::new(u256_saturating_pow(&base, Word::from(min)));
                 while *n <= *index {
@@ -117,7 +120,7 @@ mod tests {
                 &format_at_ctx(&count, &context, U256::from_u32(index))
             );
             if let Some(size) = want_size {
-                assert_eq!(U256::from_u32(size), count.size(&context));
+                assert_eq!(U256::from_u32(size), *count.size(&context));
             }
         }
 
@@ -130,7 +133,7 @@ mod tests {
         ];
         let prim = Node::Chars(Chars::from_ranges([('a', 'z')]));
         let count = Node::Count(prim.into(), 1, 5);
-        assert_eq!(U256::from_u32(12356630), count.size(&context));
+        assert_eq!(U256::from_u32(12356630), *count.size(&context));
         for (want, index) in tests {
             assert_eq!(
                 want,
@@ -149,7 +152,7 @@ mod tests {
         ];
         let prim = Node::Chars(Chars::from_ranges([('a', 'z')]));
         let count = Node::Count(prim.into(), 2, 5);
-        assert_eq!(U256::from_u32(12356604), count.size(&context));
+        assert_eq!(U256::from_u32(12356604), *count.size(&context));
         for (want, index) in tests {
             assert_eq!(
                 want,
@@ -177,7 +180,7 @@ mod tests {
             let list = vec![prim(); rep];
             let node = Node::List(list.into());
             let size = 26.pow(rep as u32);
-            assert_eq!(U256::from_u32(size), node.size(&context));
+            assert_eq!(U256::from_u32(size), *node.size(&context));
             assert_eq!(want, &format_at_ctx(&node, &context, U256::from_u32(index)));
         }
     }
@@ -186,7 +189,7 @@ mod tests {
     fn test_generators() {
         let context = Context::default();
         let node = Node::Generator(Generator::new("word"));
-        assert_eq!(U256::from_u32(7776), node.size(&context));
+        assert_eq!(U256::from_u32(7776), *node.size(&context));
         assert_eq!("abacus", &format_at_ctx(&node, &context, U256::ZERO));
         assert_eq!(
             "zoom",

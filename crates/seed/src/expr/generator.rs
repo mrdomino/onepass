@@ -20,7 +20,7 @@ pub struct Generator(Box<str>);
 
 pub trait GeneratorFunc: Send + Sync {
     fn name(&self) -> &'static str;
-    fn size(&self, args: &[&str]) -> U256;
+    fn size(&self, args: &[&str]) -> NonZero<U256>;
     fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>, args: &[&str]) -> Result<()>;
 
     fn fmt(&self, f: &mut fmt::Formatter<'_>, args: &[&str]) -> fmt::Result {
@@ -43,7 +43,7 @@ pub struct Words<'a, 'b>(&'a (dyn Dict<'b> + Sync));
 impl EvalContext for Generator {
     type Context = Context;
 
-    fn size(&self, context: &Context) -> U256 {
+    fn size(&self, context: &Context) -> NonZero<U256> {
         let name = self.name();
         let func = context
             .get(name)
@@ -134,10 +134,10 @@ impl GeneratorFunc for Word<'_, '_> {
         "word"
     }
 
-    fn size(&self, args: &[&str]) -> U256 {
+    fn size(&self, args: &[&str]) -> NonZero<U256> {
         // TODO(soon): dict hash checking
         let _ = args;
-        _Word::try_from(self.0.words().len()).unwrap().into()
+        NonZero::new(_Word::try_from(self.0.words().len()).unwrap().into()).unwrap()
     }
 
     fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>, args: &[&str]) -> Result<()> {
@@ -177,17 +177,17 @@ impl GeneratorFunc for Words<'_, '_> {
         "words"
     }
 
-    fn size(&self, args: &[&str]) -> U256 {
+    fn size(&self, args: &[&str]) -> NonZero<U256> {
         let (count, _) = Self::parse_args(args);
         // TODO(soon): hash checking
         let base = Word(self.0).size(&[]);
-        u256_saturating_pow(&base, count.into())
+        NonZero::new(u256_saturating_pow(&base, count.into())).unwrap()
     }
 
     fn write_to(&self, w: &mut dyn Write, mut index: Zeroizing<U256>, args: &[&str]) -> Result<()> {
         let (count, sep) = Self::parse_args(args);
         // TODO(soon): hash checking
-        let base = NonZero::new(Word(self.0).size(&[])).expect("empty word list");
+        let base = Word(self.0).size(&[]);
         for i in 0..count {
             if i != 0 {
                 write!(w, "{sep}")?;
@@ -222,12 +222,12 @@ mod tests {
     fn test_generators() {
         let ctx = Context::default();
         let g = Generator::new("word");
-        assert_eq!(U256::from_u32(7776), g.size(&ctx));
+        assert_eq!(U256::from_u32(7776), *g.size(&ctx));
         assert_eq!("abacus", &format_at_ctx(&g, &ctx, U256::from_u32(0)));
         assert_eq!("zoom", &format_at_ctx(&g, &ctx, U256::from_u32(7775)));
 
         let g = Generator::new("words:4:-");
-        assert_eq!(U256::from_u64(0xCFD41B9100000), g.size(&ctx));
+        assert_eq!(U256::from_u64(0xCFD41B9100000), *g.size(&ctx));
         assert_eq!(
             "abacus-abacus-abacus-abacus",
             &format_at_ctx(&g, &ctx, U256::from_u32(0))
