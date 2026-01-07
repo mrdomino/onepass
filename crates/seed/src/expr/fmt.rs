@@ -108,7 +108,7 @@ pub fn fmt_charclass(f: &mut fmt::Formatter<'_>, cr: &CharRange) -> Result {
     fmt_escape(f, cr.start)?;
     if cr.end != cr.start {
         write!(f, "-")?;
+        fmt_escape(f, cr.end)?;
     }
-    fmt_escape(f, cr.end)?;
     Ok(())
 }
