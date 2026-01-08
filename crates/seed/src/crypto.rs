@@ -1,7 +1,8 @@
 use core::fmt::{Display, Write};
 use std::{
     cmp::Ordering,
-    io::{BufWriter, Error, Result},
+    io::{Error, Result},
+    mem,
 };
 
 use argon2::{Algorithm, Argon2, Params, Version};
@@ -19,14 +20,17 @@ impl Site<'_> {
         let size = self.schema.size();
         let secret = self.secret(seed_password);
         let index = secret_uniform(&secret, &size);
-        // TODO(now): ensure no reallocations
-        let mut buf = BufWriter::new(Vec::with_capacity(4096));
-        self.schema.write_to(&mut buf, index)?;
-        let buf = buf.into_inner().unwrap();
-        assert!(buf.len() <= 4096);
-        Ok(Zeroizing::new(
-            String::from_utf8(buf).map_err(Error::other)?,
-        ))
+        // Write to a pre-allocated buffer to prevent reallocations leaking sensitive data.
+        let mut buf = Zeroizing::new(vec![0u8; 2048]);
+        // XXX double borrow to get a `&mut dyn Write`, as
+        // `Write` is implemented on `&mut [u8]`, not `[u8]`.
+        self.schema.write_to(&mut &mut buf[..], index)?;
+        if let Some(pos) = buf.iter().position(|&b| b == 0) {
+            buf.truncate(pos);
+        }
+        let _ = str::from_utf8(&buf).map_err(Error::other)?;
+        let buf = mem::take(&mut *buf);
+        Ok(Zeroizing::new(unsafe { String::from_utf8_unchecked(buf) }))
     }
 
     pub fn salt(&self) -> [u8; 32] {
