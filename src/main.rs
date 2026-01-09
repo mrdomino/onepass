@@ -27,9 +27,9 @@ use clap::{CommandFactory, Parser, error::ErrorKind};
 use config::Config;
 use onepass_seed::{
     crypto::Derivation,
-    data::Site,
     dict::BoxDict,
     expr::{Context, Eval, Expr},
+    site::Site,
     url::normalize,
 };
 use zeroize::Zeroizing;

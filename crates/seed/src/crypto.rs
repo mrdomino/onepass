@@ -13,7 +13,7 @@ use onepass_base::fmt::DigestWriter;
 use rand_core::{RngCore, SeedableRng};
 use zeroize::Zeroizing;
 
-use crate::{data::Site, expr::Eval, write_tsv};
+use crate::{expr::Eval, site::Site, write_tsv};
 
 impl Site<'_> {
     pub fn password(&self, seed_password: &str) -> Result<Zeroizing<String>> {
