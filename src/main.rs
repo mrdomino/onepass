@@ -26,11 +26,9 @@ use anyhow::{Context as _Context, Result};
 use clap::{CommandFactory, Parser, error::ErrorKind};
 use config::Config;
 use onepass_seed::{
-    crypto::Derivation,
     dict::BoxDict,
-    expr::{Context, Eval, Expr},
+    expr::{Context, Eval},
     site::Site,
-    url::normalize,
 };
 use zeroize::Zeroizing;
 
@@ -196,7 +194,6 @@ fn gen_password_config(
         .as_deref()
         .or_else(|| site.as_ref().and_then(|(_, site)| site.username.as_deref()));
     let url = site.as_ref().map_or(req, |(url, _)| url);
-    let url = normalize(url)?;
     let schema = args.schema.as_ref().map_or_else(
         || {
             site.as_ref().map_or(config.default_schema(), |(_, site)| {
@@ -207,17 +204,10 @@ fn gen_password_config(
     );
     let increment = args
         .increment
-        .unwrap_or_else(|| site.map_or(0, |(_, site)| site.increment));
-    let root = schema.parse().context("invalid schema")?;
-    let expr = Expr::with_context(root, context);
-    let size = expr.size();
-    let site = Site {
-        url,
-        username: username.map(str::to_string),
-        schema: expr,
-        increment,
-    };
-    let salt = format!("{}", Derivation(&site));
+        .unwrap_or_else(|| site.as_ref().map_or(0, |(_, site)| site.increment));
+    let site = Site::with_context(context, url, username, schema, increment)?;
+    let size = site.expr.size();
+    let salt = format!("{site}");
 
     if args.verbose {
         eprintln!(
@@ -255,14 +245,7 @@ mod tests {
             ("!((-%(')*'\"/", "password", "apple.com", "[!-/]{12}", 1),
         ];
         for (want, seed, url, schema, increment) in tests {
-            let url = normalize(url)?;
-            let expr = Expr::new(schema.parse()?);
-            let site = Site {
-                url,
-                username: None,
-                schema: expr,
-                increment,
-            };
+            let site = Site::new(url, None, schema, increment)?;
             let got = site.password(seed)?;
             assert_eq!(want, *got);
         }

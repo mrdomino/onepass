@@ -1,4 +1,4 @@
-use core::fmt::{Display, Write};
+use core::fmt::Write;
 use std::{
     cmp::Ordering,
     io::{Error, Result},
@@ -13,18 +13,18 @@ use onepass_base::fmt::DigestWriter;
 use rand_core::{RngCore, SeedableRng};
 use zeroize::Zeroizing;
 
-use crate::{expr::Eval, site::Site, write_tsv};
+use crate::{expr::Eval, site::Site};
 
 impl Site<'_> {
     pub fn password(&self, seed_password: &str) -> Result<Zeroizing<String>> {
-        let size = self.schema.size();
+        let size = self.expr.size();
         let secret = self.secret(seed_password);
         let index = secret_uniform(&secret, &size);
         // Write to a pre-allocated buffer to prevent reallocations leaking sensitive data.
         let mut buf = Zeroizing::new(vec![0u8; 2048]);
         // XXX double borrow to get a `&mut dyn Write`, as
         // `Write` is implemented on `&mut [u8]`, not `[u8]`.
-        self.schema.write_to(&mut &mut buf[..], index)?;
+        self.expr.write_to(&mut &mut buf[..], index)?;
         if let Some(pos) = buf.iter().position(|&b| b == 0) {
             buf.truncate(pos);
         }
@@ -35,7 +35,7 @@ impl Site<'_> {
 
     pub fn salt(&self) -> [u8; 32] {
         let mut w = DigestWriter(Blake2b256::new());
-        write!(w, "{}", Derivation(self)).unwrap();
+        write!(w, "{self}").unwrap();
         w.0.finalize().into()
     }
 
@@ -79,39 +79,19 @@ pub fn secret_uniform(secret: &[u8; 32], n: &NonZero<U256>) -> Zeroizing<U256> {
     }
 }
 
-pub struct Derivation<'a, 'b>(pub &'a Site<'b>);
-
-impl Display for Derivation<'_, '_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = self.0;
-        let url = &s.url;
-        let username = s.username.as_deref().unwrap_or("");
-        let schema = &s.schema;
-        let increment = s.increment;
-        write_tsv!(f, "v3", url, username, schema, increment)
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::expr::Expr;
-
     use super::*;
 
     fn test_site() -> Site<'static> {
-        Site {
-            url: "https://google.com/".into(),
-            username: None,
-            schema: Expr::new("{words}".parse().unwrap()),
-            increment: 0,
-        }
+        Site::new("google.com", None, "{words}", 0).unwrap()
     }
 
     #[test]
     fn derivation_works() {
         assert_eq!(
             "v3\thttps://google.com/\t\t{words|323606b363ebdedff9f562cb84c50df1a21cbd4b597ff4566df92bb9f2cefdfd}\t0",
-            &format!("{}", Derivation(&test_site()))
+            &format!("{}", &test_site())
         );
     }
 

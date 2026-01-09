@@ -1,8 +1,110 @@
-use crate::expr::Expr;
+use crate::expr::{Context, Expr};
+
+use crate::expr::parse::Error as ParseError;
+use crate::url::{Error as UrlError, normalize};
+use crate::write_tsv;
+
+#[derive(Clone, Debug)]
+pub enum Error {
+    Parse(ParseError),
+    Url(UrlError),
+}
 
 pub struct Site<'a> {
     pub url: String,
     pub username: Option<String>,
-    pub schema: Expr<'a>,
+    pub expr: Expr<'a>,
     pub increment: u32,
+}
+
+impl Site<'_> {
+    pub fn new(
+        url: &str,
+        username: Option<&str>,
+        schema: &str,
+        increment: u32,
+    ) -> Result<Self, Error> {
+        let url = normalize(url)?;
+        let username = username.map(str::to_string);
+        let expr = Expr::new(schema.parse()?);
+        Ok(Site {
+            url,
+            username,
+            expr,
+            increment,
+        })
+    }
+}
+
+impl<'a> Site<'a> {
+    pub fn with_expr(
+        url: &str,
+        username: Option<&str>,
+        expr: Expr<'a>,
+        increment: u32,
+    ) -> Result<Self, Error> {
+        let url = normalize(url)?;
+        let username = username.map(str::to_string);
+        Ok(Site {
+            url,
+            username,
+            expr,
+            increment,
+        })
+    }
+
+    pub fn with_context(
+        ctx: Context<'a>,
+        url: &str,
+        username: Option<&str>,
+        schema: &str,
+        increment: u32,
+    ) -> Result<Self, Error> {
+        let expr = Expr::with_context(schema.parse()?, ctx);
+        Self::with_expr(url, username, expr, increment)
+    }
+}
+
+impl core::fmt::Display for Site<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write_tsv!(
+            f,
+            "v3",
+            &self.url,
+            &self.username.as_deref().unwrap_or(""),
+            &self.expr,
+            self.increment
+        )
+    }
+}
+
+impl core::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        use Error::*;
+
+        Some(match self {
+            Parse(e) => e,
+            Url(e) => e,
+        })
+    }
+}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use core::error::Error;
+
+        core::fmt::Display::fmt(self.source().unwrap(), f)
+    }
+}
+
+impl From<ParseError> for Error {
+    fn from(e: ParseError) -> Self {
+        Self::Parse(e)
+    }
+}
+
+impl From<UrlError> for Error {
+    fn from(e: UrlError) -> Self {
+        Self::Url(e)
+    }
 }
