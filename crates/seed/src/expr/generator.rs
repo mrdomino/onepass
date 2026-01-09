@@ -170,9 +170,19 @@ impl GeneratorFunc for Word<'_, '_> {
     }
 
     fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>, args: &[&str]) -> Result<()> {
-        // TODO(soon): case transformations
-        let _ = args;
-        write!(w, "{}", self.0.words()[u256_to_word(&index) as usize])
+        let upper = args.iter().copied().any(|s| s == "U");
+        if !upper {
+            write!(w, "{}", self.0.words()[u256_to_word(&index) as usize])?;
+            return Ok(());
+        }
+        let word = self.0.words()[u256_to_word(&index) as usize];
+        let mut iter = word.chars();
+        let first = iter.next().unwrap();
+        write!(w, "{}", first.to_uppercase())?;
+        for c in iter {
+            write!(w, "{c}")?;
+        }
+        Ok(())
     }
 
     fn fmt(&self, f: &mut fmt::Formatter<'_>, args: &[&str]) -> fmt::Result {
@@ -208,7 +218,7 @@ impl GeneratorFunc for Words<'_, '_> {
 
     fn size(&self, args: &[&str]) -> NonZero<U256> {
         let (count, _) = Self::parse_args(args);
-        // TODO(soon): hash checking
+        // TODO(soon): hash checking, case transform
         let base = Word(self.0).size(&[]);
         NonZero::new(u256_saturating_pow(&base, count.into())).unwrap()
     }
@@ -275,6 +285,13 @@ mod tests {
                 assert_eq!(s, &format_at_ctx(&g, &ctx, U256::from_u64(*i)));
             }
         }
+    }
+
+    #[test]
+    fn test_case() {
+        let ctx = Context::default();
+        let g = Generator::new("word:U");
+        assert_eq!("Abacus", &format_at_ctx(&g, &ctx, U256::ZERO));
     }
 
     #[test]
