@@ -41,16 +41,6 @@ impl Node {
         }
         Ok((input, Node::List(list.into_boxed_slice())))
     }
-
-    pub fn parse_single(input: &str) -> IResult<&str, Node> {
-        alt((
-            map(parse_literal, Node::Literal),
-            map(parse_chars, Node::Chars),
-            map(parse_generator, Node::Generator),
-            parse_list,
-        ))
-        .parse(input)
-    }
 }
 
 impl str::FromStr for Node {
@@ -65,6 +55,37 @@ impl str::FromStr for Node {
             }),
         }
     }
+}
+
+fn parse_count(input: &str) -> IResult<&str, Node> {
+    let (input, node) = parse_single(input)?;
+    let (input, count) = opt(delimited(
+        char('{'),
+        alt((
+            separated_pair(complete::u32, char(','), complete::u32),
+            map(complete::u32, |n| (n, n)),
+            map(preceded(char(','), complete::u32), |n| (0, n)),
+        )),
+        char('}'),
+    ))
+    .parse(input)?;
+    Ok((
+        input,
+        match count {
+            None => node,
+            Some((a, b)) => Node::Count(node.into(), a, b),
+        },
+    ))
+}
+
+fn parse_single(input: &str) -> IResult<&str, Node> {
+    alt((
+        map(parse_literal, Node::Literal),
+        map(parse_chars, Node::Chars),
+        map(parse_generator, Node::Generator),
+        parse_list,
+    ))
+    .parse(input)
 }
 
 fn parse_literal(input: &str) -> IResult<&str, Box<str>> {
@@ -95,20 +116,16 @@ fn parse_literal_fragment(input: &str) -> IResult<&str, StringFragment<'_>> {
 }
 
 fn parse_literal_escaped(input: &str) -> IResult<&str, char> {
-    alt((
-        value('{', tag("{{")),
-        value('}', tag("}}")),
-        preceded(
-            char('\\'),
-            alt((
-                value('\n', char('n')),
-                value('\r', char('r')),
-                value('\t', char('t')),
-                verify(anychar, |&c| !c.is_ascii_alphanumeric()),
-                // TODO(soon): unicode/hex digits
-            )),
-        ),
-    ))
+    preceded(
+        char('\\'),
+        alt((
+            value('\n', char('n')),
+            value('\r', char('r')),
+            value('\t', char('t')),
+            verify(anychar, |&c| !c.is_ascii_alphanumeric()),
+            // TODO(soon): unicode/hex digits
+        )),
+    )
     .parse(input)
 }
 
@@ -228,42 +245,17 @@ fn parse_generator(input: &str) -> IResult<&str, Generator> {
 fn parse_generator_fragment(input: &str) -> IResult<&str, StringFragment<'_>> {
     alt((
         map(parse_generator_verbatim, StringFragment::Verbatim),
-        map(parse_generator_escaped, StringFragment::Escaped),
+        map(parse_literal_escaped, StringFragment::Escaped),
     ))
     .parse(input)
 }
 
 fn parse_generator_verbatim(input: &str) -> IResult<&str, &str> {
-    verify(is_not("}"), |s: &str| !s.is_empty()).parse(input)
-}
-
-fn parse_generator_escaped(input: &str) -> IResult<&str, char> {
-    value('}', tag("}}")).parse(input)
+    verify(is_not("\\}"), |s: &str| !s.is_empty()).parse(input)
 }
 
 fn parse_list(input: &str) -> IResult<&str, Node> {
     delimited(char('('), Node::parse, char(')')).parse(input)
-}
-
-fn parse_count(input: &str) -> IResult<&str, Node> {
-    let (input, node) = Node::parse_single(input)?;
-    let (input, count) = opt(delimited(
-        char('{'),
-        alt((
-            separated_pair(complete::u32, char(','), complete::u32),
-            map(complete::u32, |n| (n, n)),
-            map(preceded(char(','), complete::u32), |n| (0, n)),
-        )),
-        char('}'),
-    ))
-    .parse(input)?;
-    Ok((
-        input,
-        match count {
-            None => node,
-            Some((a, b)) => Node::Count(node.into(), a, b),
-        },
-    ))
 }
 
 #[cfg(test)]
@@ -274,7 +266,7 @@ mod tests {
     fn test_literal() {
         let node = "cats".parse().unwrap();
         assert_eq!(Node::Literal("cats".into()), node);
-        let node = r#"\\cats\tand\[dogs\]{{woof}}"#.parse().unwrap();
+        let node = r#"\\cats\tand\[dogs\]\{woof\}}"#.parse().unwrap();
         assert_eq!(Node::Literal("\\cats\tand[dogs]{woof}".into()), node);
     }
 
@@ -312,8 +304,8 @@ mod tests {
     #[test]
     fn test_generators() {
         assert_eq!(
-            Node::Generator(Generator::new("word\\tup\\")),
-            "{word\\tup\\}".parse().unwrap()
+            Node::Generator(Generator::new("word\tup}")),
+            "{word\\tup\\}}".parse().unwrap()
         );
     }
 
