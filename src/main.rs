@@ -30,7 +30,7 @@ use onepass_seed::{
     data::Site,
     dict::BoxDict,
     expr::{Context, Eval, Expr},
-    url::canonicalize,
+    url::normalize,
 };
 use zeroize::Zeroizing;
 
@@ -192,7 +192,7 @@ fn gen_password_config(
 ) -> Result<Zeroizing<String>> {
     let site = config.find_site(req)?;
     let url = site.as_ref().map_or(req, |(url, _)| url);
-    let url = canonicalize(
+    let url = normalize(
         url,
         args.username
             .as_deref()
@@ -256,7 +256,7 @@ mod tests {
             ("!((-%(')*'\"/", "password", "apple.com", "[!-/]{12}", 1),
         ];
         for (want, seed, url, schema, increment) in tests {
-            let url = canonicalize(url, None)?;
+            let url = normalize(url, None)?;
             let expr = Expr::new(schema.parse()?);
             let site = Site {
                 url,

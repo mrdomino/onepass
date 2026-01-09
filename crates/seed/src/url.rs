@@ -23,7 +23,7 @@ pub enum Error {
 #[derive(Clone, Copy, Debug)]
 pub struct SetUsernameError;
 
-pub fn canonicalize(input: &str, username: Option<&str>) -> Result<String, Error> {
+pub fn normalize(input: &str, username: Option<&str>) -> Result<String, Error> {
     let mut url = Url::parse(input)
         .or_else(|_| Url::parse(format!("https://{input}").as_ref()))
         .map_err(Error::ParseError)?;
@@ -57,19 +57,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn canonicalize_identity() {
+    fn normalize_identity() {
         let tests = [
             "https://google.com/",
             "mailto:me@example.com",
             "http://localhost/",
         ];
         for url in tests {
-            assert_eq!(String::from(url), canonicalize(url, None).unwrap());
+            assert_eq!(String::from(url), normalize(url, None).unwrap());
         }
     }
 
     #[test]
-    fn canonicalize_host() {
+    fn normalize_host() {
         let tests = [
             ("https://google.com/", "google.com"),
             ("https://iphone.local/", "iphone.local"),
@@ -79,12 +79,12 @@ mod tests {
             ("https://xn--4db.ws/", "https://א.ws"),
         ];
         for (want, inp) in tests {
-            assert_eq!(String::from(want), canonicalize(inp, None).unwrap());
+            assert_eq!(String::from(want), normalize(inp, None).unwrap());
         }
     }
 
     #[test]
-    fn canonicalize_username() {
+    fn normalize_username() {
         let tests = [
             ("https://test@example.com/", ("example.com", "test")),
             (
@@ -93,10 +93,7 @@ mod tests {
             ),
         ];
         for (want, (url, username)) in tests {
-            assert_eq!(
-                String::from(want),
-                canonicalize(url, Some(username)).unwrap()
-            );
+            assert_eq!(String::from(want), normalize(url, Some(username)).unwrap());
         }
     }
 }

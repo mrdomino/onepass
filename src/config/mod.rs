@@ -25,7 +25,7 @@ use anyhow::{Context, Result};
 use dirs::{config_dir, expand_home};
 use serde::{Deserialize, Serialize};
 
-use onepass_seed::url::canonicalize;
+use onepass_seed::url::normalize;
 
 pub(crate) struct Config {
     pub words_path: Option<Box<Path>>,
@@ -67,11 +67,11 @@ impl Config {
     }
 
     pub fn find_site(&self, url: &str) -> Result<Option<(String, &SiteConfig)>> {
-        let url = canonicalize(url, None)?;
+        let url = normalize(url, None)?;
         let Some(site) = self.sites.get(&url) else {
             return Ok(None);
         };
-        let url = canonicalize(&url, site.username.as_deref())?;
+        let url = normalize(&url, site.username.as_deref())?;
         Ok(Some((url, site)))
     }
 
@@ -145,7 +145,7 @@ impl Config {
                     config.schema = Some(schema.clone());
                 }
                 // TODO: print warnings on parse errors here
-                if let Ok(url) = canonicalize(&site, None) {
+                if let Ok(url) = normalize(&site, None) {
                     site = url;
                 }
                 (site, config)
