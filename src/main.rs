@@ -248,7 +248,7 @@ mod tests {
     fn test_passwords() -> Result<()> {
         let tests = [
             (
-                "humorless-clamor-rebuild-stiffen",
+                "deprive-cargo-richly-sibling",
                 "arst",
                 "google.com",
                 "{words:4:-}",

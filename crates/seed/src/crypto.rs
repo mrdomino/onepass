@@ -110,7 +110,7 @@ mod tests {
     #[test]
     fn derivation_works() {
         assert_eq!(
-            "v3\thttps://google.com/\t\t{words:323606b363ebdedff9f562cb84c50df1a21cbd4b597ff4566df92bb9f2cefdfd}\t0",
+            "v3\thttps://google.com/\t\t{words|323606b363ebdedff9f562cb84c50df1a21cbd4b597ff4566df92bb9f2cefdfd}\t0",
             &format!("{}", Derivation(&test_site()))
         );
     }
@@ -118,13 +118,13 @@ mod tests {
     #[test]
     fn salt_works() {
         assert_eq!(
-            "1bbfdc8d16e76a78d65a37402fd4966a367e1f4740787e8126b42b3f6e5fc67a",
+            "54fdc7b0a714e494b08563043429c9343e32680cbc7a9d4b23287db322c583ba",
             hex::encode(test_site().salt())
         );
         let mut site2 = test_site();
         site2.username = Some("me@example.com".into());
         assert_eq!(
-            "9653ee2d8cc225dfc9902d4c967619dcff2aca60b56c75cb3f04f224adeb64fc",
+            "8c6ffa25db380192f6aa494eb01d281aae89d39d1f8e6ea343f60b97e6d26a9a",
             hex::encode(site2.salt())
         );
     }
@@ -133,18 +133,18 @@ mod tests {
     #[ignore] // too slow in debug
     fn secret() {
         assert_eq!(
-            "bdff45de9afd8b221ba249dcf12ad2739daa18bf53f7a9ba712f4d6b044c437b",
+            "a89b5d180f4bda7a2ab4b090c18668f8d673d5743f7d9b58d737fede04bd7e12",
             hex::encode(test_site().secret("testpass"))
         );
         assert_eq!(
-            "28ec03675de3b3501a75ca2bb25f29311eb767e5016e734b77b9af81e36f6d92",
+            "008db9755077550ceeb16500552f726f7bb7d8736e50ee5ebd47a1941d2cbb38",
             hex::encode(test_site().secret("testpass2"))
         );
         let mut site2 = test_site();
         site2.increment = 1;
         site2.username = Some("you@example.com".into());
         assert_eq!(
-            "27ebb569a8e97fb64aaad70ca1dee5538fd2008a1ed45ab359ea9fcbc12f2736",
+            "4a7d78a751f1c72ea279b31951a7a3dc8004bb1ada0685f2e919218f582a54d4",
             hex::encode(site2.secret("testpass"))
         );
     }
@@ -209,7 +209,7 @@ mod tests {
     #[ignore]
     fn password_e2e() {
         assert_eq!(
-            "nature swirl unusable zookeeper wind",
+            "gab sporting subduing defrost sixties",
             &*test_site().password("testpass").unwrap()
         );
     }

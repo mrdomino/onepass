@@ -13,7 +13,7 @@ use super::{
     EvalContext,
     util::{u256_saturating_pow, u256_to_word},
 };
-use crate::dict::EFF_WORDLIST;
+use crate::{dict::EFF_WORDLIST, expr::fmt::fmt_literal};
 
 #[derive(Clone, Debug)]
 pub struct Generator(Box<str>);
@@ -25,12 +25,19 @@ pub trait GeneratorFunc: Send + Sync {
 
     fn fmt(&self, f: &mut fmt::Formatter<'_>, args: &[&str]) -> fmt::Result {
         write!(f, "{}", self.name())?;
-        // TODO(now): find first available punctuation char, proper escaping
-        for arg in args {
-            write!(f, ":{arg}")?;
+        for &arg in args {
+            fmt_arg_sep(f, arg)?;
         }
         Ok(())
     }
+}
+
+fn fmt_arg_sep(f: &mut fmt::Formatter<'_>, arg: &str) -> fmt::Result {
+    use fmt::Write;
+
+    f.write_char('|')?;
+    fmt_literal(f, arg)?;
+    Ok(())
 }
 
 pub struct Context<'a>(HashMap<&'static str, Arc<dyn GeneratorFunc + 'a>>);
@@ -129,10 +136,10 @@ fn fmt_with_hash(f: &mut fmt::Formatter<'_>, hash: &[u8; 32], args: &[&str]) -> 
         let mut out = vec![0u8; 64];
         hex::encode_to_slice(hash, &mut out).unwrap();
         let out = String::from_utf8(out).unwrap();
-        write!(f, ":{out}")?;
+        fmt_arg_sep(f, &out)?;
     };
     for &arg in args {
-        write!(f, ":{arg}")?;
+        fmt_arg_sep(f, arg)?;
     }
     Ok(())
 }
@@ -225,7 +232,10 @@ impl PartialEq for Generator {
 #[cfg(test)]
 mod tests {
     use super::{super::util::*, *};
-    use crate::dict::BoxDict;
+    use crate::{
+        dict::BoxDict,
+        expr::{Expr, Node},
+    };
 
     #[test]
     fn test_generators() {
@@ -256,5 +266,14 @@ mod tests {
         assert_eq!(U256::from_u32(2), *g.size(&ctx));
         assert_eq!("bob", &format_at_ctx(&g, &ctx, U256::from_u32(0)));
         assert_eq!("dole", &format_at_ctx(&g, &ctx, U256::from_u32(1)));
+    }
+
+    #[test]
+    fn test_fmt() {
+        let expr = Expr::new(Node::Generator(Generator::new("word")));
+        assert_eq!(
+            "{word|323606b363ebdedff9f562cb84c50df1a21cbd4b597ff4566df92bb9f2cefdfd}",
+            &format!("{expr}")
+        );
     }
 }
