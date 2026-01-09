@@ -6,7 +6,7 @@ use nom::{
     bytes::complete::{is_not, tag},
     character::complete::{self, anychar, char, none_of},
     combinator::{map, opt, peek, value, verify},
-    error::{Error, ErrorKind},
+    error::{self, ErrorKind},
     multi::{fold, many1},
     sequence::{delimited, preceded, separated_pair},
 };
@@ -22,6 +22,8 @@ enum CharFragment {
     Single((char, char)),
     Multi(&'static [(char, char)]),
 }
+
+pub type Error = nom::error::Error<String>;
 
 static LOWER: &[(char, char)] = &[('a', 'z')];
 static UPPER: &[(char, char)] = &[('A', 'Z')];
@@ -44,12 +46,12 @@ impl Node {
 }
 
 impl str::FromStr for Node {
-    type Err = Error<String>;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match Node::parse(s).finish() {
             Ok((_remaining, node)) => Ok(node),
-            Err(Error { input, code }) => Err(Error {
+            Err(error::Error { input, code }) => Err(Error {
                 input: input.to_string(),
                 code,
             }),
@@ -148,7 +150,10 @@ fn parse_chars(input: &str) -> IResult<&str, Chars> {
 fn parse_legacy_words_err(input: &str) -> IResult<&str, Chars> {
     let res = alt((tag("[:word:]"), tag("[:Word:]"))).parse(input);
     match res {
-        Ok(_) => Err(nom::Err::Failure(Error::new(input, ErrorKind::Verify))),
+        Ok(_) => Err(nom::Err::Failure(error::Error::new(
+            input,
+            ErrorKind::Verify,
+        ))),
         Err(e) => Err(e),
     }
 }
@@ -209,7 +214,10 @@ fn parse_chars_range(input: &str) -> IResult<&str, (char, char)> {
         if a <= b {
             return Ok((input2, (a, b)));
         }
-        return Err(nom::Err::Failure(Error::new(input, ErrorKind::Verify)));
+        return Err(nom::Err::Failure(error::Error::new(
+            input,
+            ErrorKind::Verify,
+        )));
     }
     map(parse_chars_single, |c| (c, c)).parse(input)
 }
