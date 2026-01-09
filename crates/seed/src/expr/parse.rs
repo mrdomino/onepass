@@ -73,7 +73,7 @@ fn parse_count(input: &str) -> IResult<&str, Node> {
         input,
         match count {
             None => node,
-            Some((a, b)) => Node::Count(node.into(), a, b),
+            Some((a, b)) => Node::Count(Box::new(node), a, b),
         },
     ))
 }

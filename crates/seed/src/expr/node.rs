@@ -54,7 +54,7 @@ impl EvalContext for Node {
 
     fn write_to(&self, context: &Context, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()> {
         match *self {
-            Node::Literal(ref s) => write!(w, "{s}"),
+            Node::Literal(ref s) => w.write_all(s.as_bytes()),
             Node::Chars(ref chars) => chars.write_to(w, index),
 
             Node::List(ref nodes) => nodes

@@ -23,16 +23,18 @@ pub trait GeneratorFunc: Send + Sync {
     fn size(&self, args: &[&str]) -> NonZero<U256>;
     fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>, args: &[&str]) -> Result<()>;
 
+    // `GeneratorFunc`s know how to format themselves, which they may use to e.g. inject dictionary
+    // hashes for canonical serialization.
     fn fmt(&self, f: &mut fmt::Formatter<'_>, args: &[&str]) -> fmt::Result {
         write!(f, "{}", self.name())?;
         for &arg in args {
-            fmt_arg_sep(f, arg)?;
+            fmt_sep_arg(f, arg)?;
         }
         Ok(())
     }
 }
 
-fn fmt_arg_sep(f: &mut fmt::Formatter<'_>, arg: &str) -> fmt::Result {
+fn fmt_sep_arg(f: &mut fmt::Formatter<'_>, arg: &str) -> fmt::Result {
     use fmt::Write;
 
     f.write_char('|')?;
@@ -136,10 +138,10 @@ fn fmt_with_hash(f: &mut fmt::Formatter<'_>, hash: &[u8; 32], args: &[&str]) -> 
         let mut out = vec![0u8; 64];
         hex::encode_to_slice(hash, &mut out).unwrap();
         let out = String::from_utf8(out).unwrap();
-        fmt_arg_sep(f, &out)?;
+        fmt_sep_arg(f, &out)?;
     };
     for &arg in args {
-        fmt_arg_sep(f, arg)?;
+        fmt_sep_arg(f, arg)?;
     }
     Ok(())
 }

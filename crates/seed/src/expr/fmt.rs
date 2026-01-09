@@ -14,8 +14,8 @@ impl FmtState<'_, '_> {
             Node::Literal(ref s) => fmt_literal(f, s),
             Node::Chars(ref chars) => write!(f, "{chars}"),
             Node::List(ref list) => {
-                let nested = self.0;
-                self.0 = true;
+                let nested;
+                (nested, self.0) = (self.0, true);
                 if nested {
                     write!(f, "(")?;
                 }
