@@ -191,13 +191,12 @@ fn gen_password_config(
     context: Context<'_>,
 ) -> Result<Zeroizing<String>> {
     let site = config.find_site(req)?;
+    let username = args
+        .username
+        .as_deref()
+        .or_else(|| site.as_ref().and_then(|(_, site)| site.username.as_deref()));
     let url = site.as_ref().map_or(req, |(url, _)| url);
-    let url = normalize(
-        url,
-        args.username
-            .as_deref()
-            .or_else(|| site.as_ref().and_then(|(_, site)| site.username.as_deref())),
-    )?;
+    let url = normalize(url)?;
     let schema = args.schema.as_ref().map_or_else(
         || {
             site.as_ref().map_or(config.default_schema(), |(_, site)| {
@@ -214,7 +213,7 @@ fn gen_password_config(
     let size = expr.size();
     let site = Site {
         url,
-        username: None,
+        username: username.map(str::to_string),
         schema: expr,
         increment,
     };
@@ -256,7 +255,7 @@ mod tests {
             ("!((-%(')*'\"/", "password", "apple.com", "[!-/]{12}", 1),
         ];
         for (want, seed, url, schema, increment) in tests {
-            let url = normalize(url, None)?;
+            let url = normalize(url)?;
             let expr = Expr::new(schema.parse()?);
             let site = Site {
                 url,

@@ -67,11 +67,10 @@ impl Config {
     }
 
     pub fn find_site(&self, url: &str) -> Result<Option<(String, &SiteConfig)>> {
-        let url = normalize(url, None)?;
+        let url = normalize(url)?;
         let Some(site) = self.sites.get(&url) else {
             return Ok(None);
         };
-        let url = normalize(&url, site.username.as_deref())?;
         Ok(Some((url, site)))
     }
 
@@ -145,7 +144,7 @@ impl Config {
                     config.schema = Some(schema.clone());
                 }
                 // TODO: print warnings on parse errors here
-                if let Ok(url) = normalize(&site, None) {
+                if let Ok(url) = normalize(&site) {
                     site = url;
                 }
                 (site, config)
@@ -405,20 +404,24 @@ mod tests {
         )?;
         let tests = [
             (
-                Some(("https://test%40gmail.com@google.com/", "A")),
+                Some(("https://google.com/", "A", Some("test@gmail.com"))),
                 "google.com",
             ),
-            (Some(("https://apple.com/", "B")), "https://apple.com"),
-            (Some(("http://localhost/", "C")), "http://localhost/"),
+            (Some(("https://apple.com/", "B", None)), "https://apple.com"),
+            (Some(("http://localhost/", "C", None)), "http://localhost/"),
             (None, "localhost"),
-            (Some(("https://example.com/", "DEF")), "https://example.com"),
+            (
+                Some(("https://example.com/", "DEF", None)),
+                "https://example.com",
+            ),
         ];
         for (want, input) in tests {
             let got = config.find_site(input)?;
             match (want, got) {
-                (Some((want_url, want_schema)), Some((got_url, got_config))) => {
+                (Some((want_url, want_schema, want_username)), Some((got_url, got_config))) => {
                     assert_eq!(want_url, &got_url);
                     assert_eq!(want_schema, config.site_schema(got_config));
+                    assert_eq!(want_username, got_config.username.as_deref());
                 }
                 (None, None) => (),
                 (want, got) => panic!("mismatch: {want:?} / {got:?}"),
