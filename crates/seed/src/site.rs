@@ -1,8 +1,8 @@
-use crate::expr::{Context, Expr};
-
-use crate::expr::parse::Error as ParseError;
-use crate::url::{Error as UrlError, normalize};
-use crate::write_tsv;
+use crate::{
+    expr::{Context, Expr, parse::Error as ParseError},
+    url::{Error as UrlError, normalize},
+    write_tsv,
+};
 
 #[derive(Clone, Debug)]
 pub enum Error {
