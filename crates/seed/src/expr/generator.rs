@@ -273,7 +273,17 @@ mod tests {
         let expr = Expr::new(Node::Generator(Generator::new("word")));
         assert_eq!(
             "{word|323606b363ebdedff9f562cb84c50df1a21cbd4b597ff4566df92bb9f2cefdfd}",
-            &format!("{expr}")
+            &format!("{expr}"),
+        );
+        let expr = Expr::new(Node::Generator(Generator::new("word:up|:too")));
+        assert_eq!(
+            "{word|323606b363ebdedff9f562cb84c50df1a21cbd4b597ff4566df92bb9f2cefdfd|up\\||too}",
+            &format!("{expr}"),
+        );
+        let expr = Expr::new(Node::Generator(Generator::new("word|up:|too")));
+        assert_eq!(
+            "{word|323606b363ebdedff9f562cb84c50df1a21cbd4b597ff4566df92bb9f2cefdfd|up:|too}",
+            &format!("{expr}"),
         );
     }
 }
