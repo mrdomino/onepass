@@ -255,11 +255,11 @@ impl PartialEq for Generator {
 
 #[cfg(test)]
 mod tests {
-    use super::{super::util::*, *};
-    use crate::{
-        dict::BoxDict,
-        expr::{Expr, Node},
+    use super::{
+        super::{Expr, Node, util::*},
+        *,
     };
+    use crate::dict::BoxDict;
 
     #[test]
     fn test_generators() {
