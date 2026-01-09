@@ -49,6 +49,9 @@ mod tests {
             ("https://google.com/", "google.com"),
             ("https://iphone.local/", "iphone.local"),
             ("https://localhost/", "localhost"),
+            ("https://google.com/", "https://GOOGLE.COM/"),
+            ("http://www.google.com/", "http://WWW.GOogle.COM"),
+            ("https://xn--4db.ws/", "https://א.ws"),
         ];
         for (want, inp) in tests {
             assert_eq!(String::from(want), canonicalize(inp, None)?);
