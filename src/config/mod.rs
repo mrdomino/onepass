@@ -25,7 +25,7 @@ use anyhow::{Context, Result};
 use dirs::{config_dir, expand_home};
 use serde::{Deserialize, Serialize};
 
-use crate::url::canonicalize;
+use onepass_seed::url::canonicalize;
 
 pub(crate) struct Config {
     pub words_path: Option<Box<Path>>,

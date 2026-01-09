@@ -16,7 +16,6 @@ mod config;
 #[cfg(all(target_os = "macos", feature = "macos-biometry"))]
 mod macos_keychain;
 mod seed_password;
-mod url;
 
 use std::{
     io::{IsTerminal, Write, stdout},
@@ -31,8 +30,8 @@ use onepass_seed::{
     data::Site,
     dict::BoxDict,
     expr::{Context, Eval, Expr},
+    url::canonicalize,
 };
-use url::canonicalize;
 use zeroize::Zeroizing;
 
 #[derive(Debug, Parser)]

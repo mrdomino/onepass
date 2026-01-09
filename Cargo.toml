@@ -52,7 +52,6 @@ nom = "8.0.0"
 onepass-seed = { path = "crates/seed" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
-url = "2.5.6"
 zeroize = "1.8.2"
 
 [dependencies.readpassphrase-3]

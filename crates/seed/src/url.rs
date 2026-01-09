@@ -12,18 +12,44 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use anyhow::{Context, Result};
 use url::Url;
 
-pub(crate) fn canonicalize(input: &str, username: Option<&str>) -> Result<String> {
+#[derive(Clone, Copy, Debug)]
+pub enum Error {
+    SetUsernameError,
+    ParseError(url::ParseError),
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct SetUsernameError;
+
+pub fn canonicalize(input: &str, username: Option<&str>) -> Result<String, Error> {
     let mut url = Url::parse(input)
         .or_else(|_| Url::parse(format!("https://{input}").as_ref()))
-        .context("invalid url")?;
+        .map_err(Error::ParseError)?;
     if let Some(username) = username {
         url.set_username(username)
-            .map_err(|()| anyhow::anyhow!("failed setting username"))?;
+            .map_err(|()| Error::SetUsernameError)?
     }
     Ok(url.into())
+}
+
+impl core::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::SetUsernameError => None,
+            Self::ParseError(e) => Some(e),
+        }
+    }
+}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::SetUsernameError => f.write_str("failed setting username"),
+            Self::ParseError(e) => e.fmt(f),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -31,20 +57,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn canonicalize_identity() -> Result<()> {
+    fn canonicalize_identity() {
         let tests = [
             "https://google.com/",
             "mailto:me@example.com",
             "http://localhost/",
         ];
         for url in tests {
-            assert_eq!(String::from(url), canonicalize(url, None)?);
+            assert_eq!(String::from(url), canonicalize(url, None).unwrap());
         }
-        Ok(())
     }
 
     #[test]
-    fn canonicalize_host() -> Result<()> {
+    fn canonicalize_host() {
         let tests = [
             ("https://google.com/", "google.com"),
             ("https://iphone.local/", "iphone.local"),
@@ -54,13 +79,12 @@ mod tests {
             ("https://xn--4db.ws/", "https://א.ws"),
         ];
         for (want, inp) in tests {
-            assert_eq!(String::from(want), canonicalize(inp, None)?);
+            assert_eq!(String::from(want), canonicalize(inp, None).unwrap());
         }
-        Ok(())
     }
 
     #[test]
-    fn canonicalize_username() -> Result<()> {
+    fn canonicalize_username() {
         let tests = [
             ("https://test@example.com/", ("example.com", "test")),
             (
@@ -69,8 +93,10 @@ mod tests {
             ),
         ];
         for (want, (url, username)) in tests {
-            assert_eq!(String::from(want), canonicalize(url, Some(username))?);
+            assert_eq!(
+                String::from(want),
+                canonicalize(url, Some(username)).unwrap()
+            );
         }
-        Ok(())
     }
 }
