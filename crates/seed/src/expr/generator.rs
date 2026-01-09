@@ -242,21 +242,27 @@ mod tests {
     #[test]
     fn test_generators() {
         let ctx = Context::default();
-        let g = Generator::new("word");
-        assert_eq!(U256::from_u32(7776), *g.size(&ctx));
-        assert_eq!("abacus", &format_at_ctx(&g, &ctx, U256::from_u32(0)));
-        assert_eq!("zoom", &format_at_ctx(&g, &ctx, U256::from_u32(7775)));
-
-        let g = Generator::new("words:4:-");
-        assert_eq!(U256::from_u64(0xCFD41B9100000), *g.size(&ctx));
-        assert_eq!(
-            "abacus-abacus-abacus-abacus",
-            &format_at_ctx(&g, &ctx, U256::from_u32(0))
-        );
-        assert_eq!(
-            "zoom-zoom-zoom-zoom",
-            &format_at_ctx(&g, &ctx, U256::from_u64(0xCFD41B90FFFFF))
-        );
+        let tests: [(&str, u64, &[(&str, u64)]); _] = [
+            ("word", 7776, &[("abacus", 0), ("zoom", 7775)]),
+            (
+                "words:4:-",
+                0xCFD41B9100000,
+                &[
+                    ("abacus-abacus-abacus-abacus", 0),
+                    ("abdomen-abacus-abacus-abacus", 1),
+                    ("abacus-abdomen-abacus-abacus", 7776),
+                    ("zoology-zoom-zoom-zoom", 0xCFD41B90FFFFE),
+                    ("zoom-zoom-zoom-zoom", 0xCFD41B90FFFFF),
+                ],
+            ),
+        ];
+        for (g, sz, tt) in tests {
+            let g = Generator::new(g);
+            assert_eq!(U256::from_u64(sz), *g.size(&ctx));
+            for (s, i) in tt {
+                assert_eq!(s, &format_at_ctx(&g, &ctx, U256::from_u64(*i)));
+            }
+        }
     }
 
     #[test]
