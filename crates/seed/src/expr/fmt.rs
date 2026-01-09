@@ -85,9 +85,10 @@ impl fmt::Display for Chars {
         if let Some(hyphen) = self.0.iter().find(|cr| cr.start == '-') {
             fmt_charclass(f, hyphen)?;
         }
-        for cr in &self.0 {
-            fmt_charclass(f, cr)?;
-        }
+        self.0
+            .iter()
+            .filter(|&cr| cr.start != '-' && cr.end != '-')
+            .try_fold((), |(), cr| fmt_charclass(f, cr))?;
         if let Some(hyphen) = self.0.iter().find(|cr| cr.end == '-' && cr.start != '-') {
             fmt_charclass(f, hyphen)?;
         }
@@ -111,4 +112,22 @@ pub fn fmt_charclass(f: &mut fmt::Formatter<'_>, cr: &CharRange) -> Result {
         fmt_escape(f, cr.end)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_chars_hyphens() {
+        let tests: [(&str, &[(char, char)]); _] = [
+            ("[-a]", &[('-', '-'), ('a', 'a')]),
+            ("[Za--]", &[('Z', 'Z'), ('a', '-')]),
+        ];
+        for (want, cs) in tests {
+            let cs = Chars::from_ranges(cs.iter().copied());
+            eprintln!("{:?}", cs);
+            assert_eq!(want, &format!("{cs}"));
+        }
+    }
 }
