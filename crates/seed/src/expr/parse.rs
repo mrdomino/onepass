@@ -136,12 +136,21 @@ fn parse_literal_verbatim(input: &str) -> IResult<&str, &str> {
 
 fn parse_chars(input: &str) -> IResult<&str, Chars> {
     alt((
+        parse_legacy_words_err,
         parse_chars_brackets,
         map(parse_chars_special, |ps| {
             Chars::from_ranges(ps.iter().copied())
         }),
     ))
     .parse(input)
+}
+
+fn parse_legacy_words_err(input: &str) -> IResult<&str, Chars> {
+    let res = alt((tag("[:word:]"), tag("[:Word:]"))).parse(input);
+    match res {
+        Ok(_) => Err(nom::Err::Failure(Error::new(input, ErrorKind::Verify))),
+        Err(e) => Err(e),
+    }
 }
 
 fn parse_chars_brackets(input: &str) -> IResult<&str, Chars> {
@@ -190,7 +199,7 @@ fn parse_chars_posix(input: &str) -> IResult<&str, &'static [(char, char)]> {
 }
 
 fn parse_chars_range(input: &str) -> IResult<&str, (char, char)> {
-    if let (input, Some((a, b))) = opt(separated_pair(
+    if let (input2, Some((a, b))) = opt(separated_pair(
         parse_chars_single,
         char('-'),
         parse_chars_single,
@@ -198,7 +207,7 @@ fn parse_chars_range(input: &str) -> IResult<&str, (char, char)> {
     .parse(input)?
     {
         if a <= b {
-            return Ok((input, (a, b)));
+            return Ok((input2, (a, b)));
         }
         return Err(nom::Err::Failure(Error::new(input, ErrorKind::Verify)));
     }
@@ -280,6 +289,8 @@ mod tests {
         );
         let res = Node::parse("[z-a]");
         assert!(res.is_err(), "{res:?}");
+        let e = format!("{}", res.unwrap_err());
+        assert!(e.contains(r#"input: "z-a]""#));
     }
 
     #[test]
@@ -331,6 +342,15 @@ mod tests {
                 .into()
             ),
             "{word}(-{word}){4}".parse().unwrap(),
+        );
+    }
+
+    #[test]
+    fn test_legacy_words_err() {
+        let res = "[:word:]".parse::<Node>();
+        assert_eq!(
+            "error Verify at: [:word:]",
+            &format!("{}", res.unwrap_err())
         );
     }
 }
