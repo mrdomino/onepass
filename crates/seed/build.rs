@@ -37,7 +37,7 @@ fn main() {
     writeln!(f, "];").unwrap();
 
     let words = dict.words();
-    writeln!(f, "static EFF_WORDLIST_WORDS: [&str; {}] = [", words.len(),).unwrap();
+    writeln!(f, "static EFF_WORDLIST_WORDS: [&str; {}] = [", words.len()).unwrap();
     for &word in words {
         writeln!(f, "    {word:?},").unwrap();
     }
