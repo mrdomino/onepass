@@ -103,7 +103,7 @@ impl<'a> Context<'a> {
     pub fn with_dict<'b>(dict: &'a (dyn Dict<'b> + Sync)) -> Self {
         let generators: Vec<Arc<dyn GeneratorFunc + 'a>> =
             vec![Arc::new(Word(dict)), Arc::new(Words(dict))];
-        Context(generators.into_iter().map(|g| (g.name(), g)).collect())
+        Self::from_iter(generators)
     }
 }
 
@@ -123,7 +123,19 @@ impl Default for Context<'_> {
             Arc::new(Word(&EFF_WORDLIST)),
             Arc::new(Words(&EFF_WORDLIST)),
         ];
-        Context(generators.into_iter().map(|g| (g.name(), g)).collect())
+        Self::from_iter(generators)
+    }
+}
+
+impl<'a> FromIterator<Arc<dyn GeneratorFunc + 'a>> for Context<'a> {
+    fn from_iter<T: IntoIterator<Item = Arc<dyn GeneratorFunc + 'a>>>(iter: T) -> Self {
+        Context(iter.into_iter().map(|g| (g.name(), g)).collect())
+    }
+}
+
+impl<'a> Extend<Arc<dyn GeneratorFunc + 'a>> for Context<'a> {
+    fn extend<T: IntoIterator<Item = Arc<dyn GeneratorFunc + 'a>>>(&mut self, iter: T) {
+        self.0.extend(iter.into_iter().map(|g| (g.name(), g)));
     }
 }
 
