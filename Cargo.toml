@@ -45,10 +45,7 @@ readpass-vendored = ["readpassphrase-3/linux-vendored"]
 
 [dependencies]
 anyhow = "1.0.100"
-char-iter = "0.1.0"
 clap = { version = "4.5.53", features = ["derive", "env", "unicode", "wrap_help"] }
-crypto-bigint = { version = "0.7.0-rc.10", features = ["rand_core", "zeroize"] }
-nom = "8.0.0"
 onepass-seed = { path = "crates/seed" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
@@ -80,5 +77,4 @@ objc2-local-authentication = { version = "0.3.2", optional = true }
 objc2-security = { version = "0.3.2", optional = true }
 
 [dev-dependencies]
-num-traits = "0.2.19"
 tempfile = "3.24.0"
