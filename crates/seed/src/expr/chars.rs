@@ -91,7 +91,7 @@ impl CharRange {
     pub fn size(&self) -> u32 {
         let start = self.start as u32;
         let end = self.end as u32;
-        assert!(start <= end);
+        assert!(start <= end, "{:?} > {:?}", self.start, self.end);
         let count = end - start + 1;
         if start < 0xD800 && 0xE000 <= end {
             count - 0x800

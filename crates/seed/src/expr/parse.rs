@@ -31,7 +31,7 @@ static ALPHA: &[(char, char)] = &[('A', 'Z'), ('a', 'z')];
 static ALNUM: &[(char, char)] = &[('0', '9'), ('A', 'Z'), ('a', 'z')];
 static DIGIT: &[(char, char)] = &[('0', '9')];
 static XDIGIT: &[(char, char)] = &[('0', '9'), ('a', 'f')];
-static PUNCT: &[(char, char)] = &[('!', '/'), (':', '@'), ('[', '`'), ('{', '-')];
+static PUNCT: &[(char, char)] = &[('!', '/'), (':', '@'), ('[', '`'), ('{', '~')];
 static PRINT: &[(char, char)] = &[(' ', '~')];
 static WORD: &[(char, char)] = &[('0', '9'), ('A', 'Z'), ('_', '_'), ('a', 'z')];
 
@@ -310,7 +310,11 @@ mod tests {
             (vec![('a', 'a'), ('c', 'c')], "[ac]"),
             (vec![('0', '9'), ('A', 'Z'), ('_', '_'), ('a', 'z')], "\\w"),
             (vec![('a', 'z')], "[[:lower:]]"),
-            (vec![('!', 'z')], "[[:punct:]\\w]"),
+            (
+                vec![('!', '/'), (':', '@'), ('[', '`'), ('{', '~')],
+                "[[:punct:]]",
+            ),
+            (vec![('!', '~')], "[[:punct:]\\w]"),
         ];
         for (ranges, inp) in tests {
             assert_eq!(
