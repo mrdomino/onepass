@@ -1,11 +1,12 @@
 use core::str;
+use std::str::Utf8Error;
 
 use nom::{
     Finish, IResult, Parser,
     branch::alt,
-    bytes::complete::{is_not, tag},
+    bytes::complete::{is_not, tag, take_while_m_n},
     character::complete::{self, anychar, char, none_of},
-    combinator::{map, opt, peek, value, verify},
+    combinator::{map, map_res, opt, peek, value, verify},
     error::{self, ErrorKind},
     multi::{fold, many1},
     sequence::{delimited, preceded, separated_pair},
@@ -118,15 +119,89 @@ fn parse_literal_fragment(input: &str) -> IResult<&str, StringFragment<'_>> {
 }
 
 fn parse_literal_escaped(input: &str) -> IResult<&str, char> {
+    alt((
+        preceded(
+            char('\\'),
+            alt((
+                value('\n', char('n')),
+                value('\r', char('r')),
+                value('\t', char('t')),
+                verify(anychar, |&c| !c.is_ascii_alphanumeric()),
+            )),
+        ),
+        parse_hex_char,
+        parse_unicode_char,
+    ))
+    .parse(input)
+}
+
+fn parse_unicode_char(input: &str) -> IResult<&str, char> {
+    map_res(parse_unicode_digits, char::try_from).parse(input)
+}
+
+fn parse_unicode_digits(input: &str) -> IResult<&str, u32> {
     preceded(
-        char('\\'),
-        alt((
-            value('\n', char('n')),
-            value('\r', char('r')),
-            value('\t', char('t')),
-            verify(anychar, |&c| !c.is_ascii_alphanumeric()),
-            // TODO(soon): unicode/hex digits
-        )),
+        tag("\\u"),
+        map_res(
+            alt((
+                take_while_m_n(4, 4, |c: char| c.is_ascii_hexdigit()),
+                delimited(
+                    char('{'),
+                    take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit()),
+                    char('}'),
+                ),
+            )),
+            |s| u32::from_str_radix(s, 16),
+        ),
+    )
+    .parse(input)
+}
+
+fn parse_hex_char(input: &str) -> IResult<&str, char> {
+    let (input, b) = parse_hex_byte(input)?;
+    if b < 0b1000_0000 {
+        return Ok((input, b as char));
+    }
+    if b & 0b1110_0000 == 0b1100_0000 {
+        map_res(parse_hex_byte, |b2| {
+            let bs = [b, b2];
+            str_to_char(&bs)
+        })
+        .parse(input)
+    } else if b & 0b1111_0000 == 0b1110_0000 {
+        map_res((parse_hex_byte, parse_hex_byte), |(b2, b3)| {
+            let bs = [b, b2, b3];
+            str_to_char(&bs)
+        })
+        .parse(input)
+    } else if b & 0b1111_1000 == 0b1111_0000 {
+        map_res(
+            (parse_hex_byte, parse_hex_byte, parse_hex_byte),
+            |(b2, b3, b4)| {
+                let bs = [b, b2, b3, b4];
+                str_to_char(&bs)
+            },
+        )
+        .parse(input)
+    } else {
+        Err(nom::Err::Error(error::Error::new(input, ErrorKind::Verify)))
+    }
+}
+
+fn str_to_char(bs: &[u8]) -> Result<char, Utf8Error> {
+    let s = str::from_utf8(bs)?;
+    let mut iter = s.chars();
+    let c = iter.next().expect(s);
+    assert!(iter.next().is_none());
+    Ok(c)
+}
+
+fn parse_hex_byte(input: &str) -> IResult<&str, u8> {
+    preceded(
+        tag("\\x"),
+        map_res(take_while_m_n(2, 2, |c: char| c.is_ascii_hexdigit()), |s| {
+            u8::from_str_radix(s, 16)
+        }),
     )
     .parse(input)
 }
@@ -358,6 +433,30 @@ mod tests {
         assert_eq!(
             "error Verify at: [:word:]",
             &format!("{}", res.unwrap_err())
+        );
+    }
+
+    #[test]
+    fn test_literal_digits() {
+        assert_eq!(
+            Node::Literal("—".into()),
+            r#"\xe2\x80\x94"#.parse().unwrap()
+        );
+        assert_eq!(Node::Literal("—".into()), "\\u2014".parse().unwrap());
+        assert_eq!(Node::Literal("—".into()), "\\u{002014}".parse().unwrap());
+        assert_eq!(
+            Err(error::Error {
+                input: "\\x80".into(),
+                code: ErrorKind::Char
+            }),
+            "\\x80".parse::<Node>(),
+        );
+        assert_eq!(
+            Err(error::Error {
+                input: "\\ud800".into(),
+                code: ErrorKind::Char
+            }),
+            "\\ud800".parse::<Node>(),
         );
     }
 }
