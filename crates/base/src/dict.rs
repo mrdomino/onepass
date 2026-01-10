@@ -6,19 +6,35 @@ use digest::Digest;
 
 use crate::fmt::{DigestWriter, Lines, TsvField};
 
+/// This trait implements a hashed word list suitable for use in deterministic password generation.
+/// The hash may be used as part of a derivation path to make generated passwords depend upon the
+/// exact word list used.
 pub trait Dict<'a>: Sync {
+    /// Return the full word list.
     fn words(&self) -> &[&'a str];
+
+    /// Return the unique BLAKE2b256 hash of this word list.
     fn hash(&self) -> &[u8; 32];
 }
 
+/// This is a runtime generated, owned [`Dict`] with string slices out of some backing store.
+/// These slices may come from a `Vec<String>`, or else from slices out of a single `String`.
 pub struct BoxDict<'a>(Box<[&'a str]>, [u8; 32]);
+
+/// This type provides a [`Dict`] over non-owned data. It may be used in tests, or to implement a
+/// static compile-time dictionary, giving the compiler maximum freedom as to how to lay out the
+/// string slices.
 pub struct RefDict<'a, 'b>(&'b [&'a str], &'b [u8; 32]);
 
 impl<'a> BoxDict<'a> {
+    /// Construct a dictionary from a single string slice, taking each non-empty line, with leading
+    /// and trailing whitespace trimmed, as a single word.
     pub fn from_lines(s: &'a str) -> Self {
         Self::from_iter(s.lines().map(str::trim))
     }
 
+    /// Construct a dictionary from a single string slice, with fields separated by a separator.
+    /// Individual words are not trimmed.
     pub fn from_sep(s: &'a str, sep: &str) -> Self {
         Self::from_iter(s.split(sep))
     }
@@ -37,7 +53,11 @@ impl<'a> FromIterator<&'a str> for BoxDict<'a> {
 }
 
 impl<'a, 'b> RefDict<'a, 'b> {
-    pub const fn new(words: &'b [&'a str], hash: &'b [u8; 32]) -> Self {
+    /// Construct a dictionary from the given word slice and hash reference.
+    /// # Safety
+    /// This function is only safe if `hash` is the `BLAKE2b256` hash of the word list as if
+    /// constructed via `BoxDict::from_iter(words.into_iter())`.
+    pub const unsafe fn new(words: &'b [&'a str], hash: &'b [u8; 32]) -> Self {
         RefDict(words, hash)
     }
 }
