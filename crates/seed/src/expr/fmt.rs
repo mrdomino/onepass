@@ -68,8 +68,8 @@ pub fn fmt_literal(f: &mut fmt::Formatter<'_>, s: &str) -> Result {
             b')' => Str("\\)"),
             b'[' => Str("\\["),
             b']' => Str("\\]"),
-            b'{' => Str("{{"),
-            b'}' => Str("}}"),
+            b'{' => Str("\\{"),
+            b'}' => Str("\\}"),
             b'|' => Str("\\|"),
             b'\x00'..b'\x20' | b'\x7f' => Hex,
             _ => continue,
@@ -160,5 +160,13 @@ mod tests {
             assert_eq!(want, &format!("{}", Expr::new(root.clone())));
             assert_eq!(root, want.parse().unwrap());
         }
+    }
+
+    #[test]
+    fn test_literal() {
+        assert_eq!(
+            r#"\{\}"#,
+            &format!("{}", Expr::new(Node::Literal("{}".into())))
+        );
     }
 }
