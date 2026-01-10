@@ -3,8 +3,12 @@ use std::io::{Result, Write};
 use crypto_bigint::{CheckedSub, NonZero, One, U256, Word};
 use zeroize::Zeroizing;
 
-pub use super::generator::Context;
-use super::{Eval, EvalContext, chars::Chars, generator::Generator, util::u256_saturating_pow};
+use super::{
+    Eval, EvalContext,
+    chars::Chars,
+    generator::{Context, Generator},
+    util::u256_saturating_pow,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Node {
