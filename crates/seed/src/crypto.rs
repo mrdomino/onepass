@@ -66,7 +66,7 @@ impl Site<'_> {
 
 /// Randomly sample a [`U256`] from the given 256-bit secret. Uses rejection sampling to prevent
 /// bias in the results.
-pub fn secret_uniform(secret: &[u8; 32], n: &NonZero<U256>) -> Zeroizing<U256> {
+fn secret_uniform(secret: &[u8; 32], n: &NonZero<U256>) -> Zeroizing<U256> {
     let mut rng = ChaCha20Rng::from_seed(*secret);
     let n_bits = n.bits_vartime();
     if n_bits == 1 {

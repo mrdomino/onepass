@@ -1,5 +1,5 @@
 /// Write the fields passed to this macro as tab-separated values with all inner TSV-meaningful
-/// characters escaped; see [`format_tsv_args`].
+/// characters escaped; see [`crate::format_tsv_args`].
 #[macro_export]
 macro_rules! write_tsv {
     ($w:expr, $($args:expr),+ $(,)?) => {
@@ -8,7 +8,7 @@ macro_rules! write_tsv {
 }
 
 /// Format the fields passed to this macro as tab-separated values with all inner TSV-meaningful
-/// characters escaped; see [`format_tsv_args`].
+/// characters escaped; see [`crate::format_tsv_args`].
 #[macro_export]
 macro_rules! format_tsv {
     ($($args:expr),+ $(,)?) => {

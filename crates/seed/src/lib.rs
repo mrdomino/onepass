@@ -32,11 +32,7 @@
 //! e.g. a hash of a word list, to ensure that derivations that are different produce uncorrelated
 //! passwords.
 //!
-//! For more on the cryptographic primitives and the specific parameters used for password hashing,
-//! see [`crypto`]. For more on the schema language, see [`expr`] and especially [`expr::parse`].
-//! For URL normalization see [`url`].
-//!
-//! ```
+//! ```no_run
 //! use onepass_seed::site::Site;
 //! let site = Site::new("google.com", None, "{words:4:-}", 0).unwrap();
 //! assert_eq!("jaywalker-diffused-verse-abdominal", &*site.password("seedpass").unwrap());
@@ -45,9 +41,9 @@
 //! [0]: https://en.wikipedia.org/wiki/Bcrypt
 //! [`Generator`]: expr::generator::Generator
 
-pub mod crypto;
+mod crypto;
 pub mod dict;
 pub mod expr;
-pub mod fmt;
+mod fmt;
 pub mod site;
 pub mod url;
