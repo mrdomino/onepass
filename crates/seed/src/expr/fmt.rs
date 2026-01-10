@@ -71,8 +71,8 @@ pub fn fmt_literal(f: &mut fmt::Formatter<'_>, s: &str) -> Result {
             b'{' => Str("{{"),
             b'}' => Str("}}"),
             b'|' => Str("\\|"),
-            b'\x20'..=b'\x7e' => continue,
-            _ => Hex,
+            b'\x00'..b'\x20' | b'\x7f' => Hex,
+            _ => continue,
         };
         if pos != i {
             f.write_str(&s[pos..i])?;
@@ -155,8 +155,7 @@ mod tests {
                 "[\u{2014}-\u{2026}]",
                 Node::Chars(Chars::from_ranges([('—', '…')])),
             ),
-            // XXX we do UTF-8 byte-oriented printing on literals atm
-            (r#"\x00\xe2\x80\x94"#, Node::Literal("\0—".into())),
+            (r#"\x00—\x7f"#, Node::Literal("\0—\x7f".into())),
         ] {
             assert_eq!(want, &format!("{}", Expr::new(root.clone())));
             assert_eq!(root, want.parse().unwrap());
