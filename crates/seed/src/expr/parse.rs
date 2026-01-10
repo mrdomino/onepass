@@ -235,10 +235,8 @@ fn parse_chars_special(input: &str) -> IResult<&str, &'static [(char, char)]> {
 }
 
 fn parse_generator(input: &str) -> IResult<&str, Generator> {
-    let (input, _) = char('{').parse(input)?;
-    let (input, _) = peek(verify(anychar, |c| c.is_ascii_alphabetic())).parse(input)?;
-
-    let (input, generator) = map(
+    let verify_inner = peek(verify(anychar, |c| c.is_ascii_alphabetic()));
+    let parse_inner = map(
         fold(
             1..,
             parse_generator_fragment,
@@ -252,11 +250,8 @@ fn parse_generator(input: &str) -> IResult<&str, Generator> {
             },
         ),
         Generator::from,
-    )
-    .parse(input)?;
-
-    let (input, _) = char('}').parse(input)?;
-    Ok((input, generator))
+    );
+    delimited(char('{'), preceded(verify_inner, parse_inner), char('}')).parse(input)
 }
 
 fn parse_generator_fragment(input: &str) -> IResult<&str, StringFragment<'_>> {
