@@ -11,9 +11,10 @@ use zeroize::Zeroizing;
 
 use super::{
     EvalContext,
+    fmt::fmt_literal,
     util::{u256_saturating_pow, u256_to_word},
 };
-use crate::{dict::EFF_WORDLIST, expr::fmt::fmt_literal};
+use crate::dict::EFF_WORDLIST;
 
 #[derive(Clone, Debug)]
 pub struct Generator(Box<str>);
