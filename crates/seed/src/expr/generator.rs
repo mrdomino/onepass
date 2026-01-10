@@ -82,14 +82,11 @@ impl Generator {
     }
 
     pub fn name(&self) -> &str {
-        &self.0[..self
+        let n = self
             .0
-            .bytes()
-            .enumerate()
-            .filter(|&(_, b)| !b.is_ascii_lowercase())
-            .map(|(i, _)| i)
-            .next()
-            .unwrap_or(self.0.len())]
+            .find(|c: char| !c.is_ascii_lowercase())
+            .unwrap_or(self.0.len());
+        &self.0[..n]
     }
 
     pub fn args(&self) -> Box<[&str]> {
