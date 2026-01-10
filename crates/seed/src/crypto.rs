@@ -73,9 +73,9 @@ fn secret_uniform(secret: &[u8; 32], n: &NonZero<U256>) -> Zeroizing<U256> {
         return U256::ZERO.into();
     }
 
-    // For powers of 2, we do not need rejection-sampling.
-    // We can simply generate `n_bits - 1` random bits.
     Zeroizing::new(if n.trailing_zeros_vartime() == n_bits - 1 {
+        // For powers of 2, we do not need rejection-sampling.
+        // We can simply generate `n_bits - 1` random bits.
         RandomBits::random_bits(&mut rng, n_bits - 1)
     } else {
         RandomMod::random_mod_vartime(&mut rng, n)
