@@ -1,82 +1,3 @@
-//! Expressions can be parsed from UTF-8 strings.
-//!
-//! The following syntax is supported:
-//!
-//! ## String literals
-//! Any literal string that does not otherwise consist of syntax characters stands for itself. A
-//! schema consisting of a literal string generates itself as the single password. Other characters
-//! may be escaped with `'\\'`; aside from newline, carriage return, and tab, any non-alphanumeric
-//! character stands for itself as a literal value when preceded by a backslash.
-//! ```
-//! # use {onepass_seed::expr::Node, core::str::FromStr};
-//! assert_eq!(Node::Literal("test".into()), "test".parse().unwrap());
-//! assert_eq!(Node::Literal("(escape){}[]".into()), r#"\(escape\)\{\}\[\]"#.parse().unwrap());
-//! ```
-//!
-//! Arbitrary Unicode characters may also be insterted as `\uXXXX`, or hex sequences (so long as
-//! they encode valid ASCII or UTF-8 byte sequences) as `\xXX`.
-//!
-//! ## Character classes
-//! The special character classes `\w` and `\d` stand for word (alphanumeric plus underscore) and
-//! digit characters respectively. They may show up anywhere in an expression and stand for a
-//! single character in their range.
-//!
-//! Square bracket character classes are also supported, including the following POSIX character
-//! classes:
-//! - `[:lower:]` - lowercase ASCII letters
-//! - `[:upper:]` - uppercase ASCII letters
-//! - `[:alpha:]` - upper or lowercase ASCII letters
-//! - `[:digit:]` - decimal digits
-//! - `[:xdigit:]` - lowercase hexadecimal digits
-//! - `[:punct:]` - ASCII punctuation, aka special characters
-//! - `[:print:]` - printable ASCII characters
-//!
-//! Single characters (`[a]`) and unicode character ranges (`[a-z]`) are also supported.
-//!
-//! Any of these ranges may be combined within square brackets; `[[:upper:][a-z]\d]` corresponds to
-//! uppercase ASCII, lowercase ASCII, and decimal digits.
-//!
-//! ```
-//! # use {onepass_seed::expr::Node, core::str::FromStr};
-//! assert_eq!("[a-z]".parse::<Node>().unwrap(), "[[:lower:]]".parse().unwrap());
-//! assert_eq!("[A-Za-z0-9_]".parse::<Node>().unwrap(), "\\w".parse().unwrap());
-//! ```
-//!
-//! ## Lists
-//! A sequence of nodes is represented by its concatenation. A nested list may be created using
-//! parentheses (`()`). This is of limited utility since the language does not support choices, but
-//! does allow e.g. setting a count on a sequence, like: `([[:lower:]][[:digit:]][[:lower:]]){3}`.
-//!
-//! ```
-//! # use core::str::FromStr;
-//! # use crypto_bigint::{NonZero, U256};
-//! # use num_traits::pow;
-//! # use onepass_seed::expr::{Eval, Expr};
-//! assert_eq!(
-//!     NonZero::new(U256::from_u64((26u64*10*26).pow(3))).unwrap(),
-//!     Expr::new("([[:lower:]][[:digit:]][[:lower:]]){3}".parse().unwrap()).size()
-//! );
-//! ```
-//!
-//! ## Counts
-//! As alluded to, expressions may be repeated for specified counts. The syntax is
-//! `expr{min,max}`. If `max` is omitted, i.e. `expr{min}`, then `max == min`. If `min` is omitted,
-//! i.e. `expr{,max}`, `min == 0`.
-//!
-//! ## Generators
-//! Arbitrary library-suppliable generators may be called. The library includes two: `word` to
-//! produce a single word, and `words` to produce a sequence of words. Generators are surrounded by
-//! curly braces and must start with a lowercase ASCII letter, e.g. `{word}`.
-//!
-//! Generators may take arguments. The first non–lowercase-ASCII character in a generator
-//! expression is taken as an argument separator, so e.g. `{words:2:U}` calls generator `words`
-//! with arguments `"2"` and `"U"`.
-//!
-//! ## Reserved syntax
-//! The `|` character may be used inside of generators as an argument separator, like `{word|U}`,
-//! but may not be used unescaped anywhere else in an expression. This syntax is reserved for
-//! possible future expansion.
-
 use core::str;
 use std::str::Utf8Error;
 
@@ -90,6 +11,8 @@ use nom::{
     multi::{fold, many1},
     sequence::{delimited, preceded, separated_pair},
 };
+
+use crate::expr::{Context, Expr};
 
 use super::{Node, chars::Chars, generator::Generator};
 
@@ -105,15 +28,100 @@ enum CharFragment {
 
 pub type Error = nom::error::Error<String>;
 
-static LOWER: &[(char, char)] = &[('a', 'z')];
-static UPPER: &[(char, char)] = &[('A', 'Z')];
-static ALPHA: &[(char, char)] = &[('A', 'Z'), ('a', 'z')];
-static ALNUM: &[(char, char)] = &[('0', '9'), ('A', 'Z'), ('a', 'z')];
-static DIGIT: &[(char, char)] = &[('0', '9')];
-static XDIGIT: &[(char, char)] = &[('0', '9'), ('a', 'f')];
-static PUNCT: &[(char, char)] = &[('!', '/'), (':', '@'), ('[', '`'), ('{', '~')];
-static PRINT: &[(char, char)] = &[(' ', '~')];
-static WORD: &[(char, char)] = &[('0', '9'), ('A', 'Z'), ('_', '_'), ('a', 'z')];
+impl Expr<'_> {
+    /// Expressions can be parsed from UTF-8 strings.
+    ///
+    /// The following syntax is supported:
+    ///
+    /// ## String literals
+    /// Any literal string that does not otherwise consist of syntax characters stands for itself. A
+    /// schema consisting of a literal string generates itself as the single password. Other characters
+    /// may be escaped with `'\\'`; aside from newline, carriage return, and tab, any non-alphanumeric
+    /// character stands for itself as a literal value when preceded by a backslash.
+    /// ```
+    /// # use {onepass_seed::expr::Node, core::str::FromStr};
+    /// assert_eq!(Node::Literal("test".into()), "test".parse().unwrap());
+    /// assert_eq!(Node::Literal("(escape){}[]".into()), r#"\(escape\)\{\}\[\]"#.parse().unwrap());
+    /// ```
+    ///
+    /// Arbitrary Unicode characters may also be insterted as `\uXXXX`, or hex sequences (so long as
+    /// they encode valid ASCII or UTF-8 byte sequences) as `\xXX`.
+    ///
+    /// ## Character classes
+    /// The special character classes `\w` and `\d` stand for word (alphanumeric plus underscore) and
+    /// digit characters respectively. They may show up anywhere in an expression and stand for a
+    /// single character in their range.
+    ///
+    /// Square bracket character classes are also supported, including the following POSIX character
+    /// classes:
+    /// - `[:lower:]` - lowercase ASCII letters
+    /// - `[:upper:]` - uppercase ASCII letters
+    /// - `[:alpha:]` - upper or lowercase ASCII letters
+    /// - `[:digit:]` - decimal digits
+    /// - `[:xdigit:]` - lowercase hexadecimal digits
+    /// - `[:punct:]` - ASCII punctuation, aka special characters
+    /// - `[:print:]` - printable ASCII characters
+    ///
+    /// Single characters (`[a]`) and unicode character ranges (`[a-z]`) are also supported.
+    ///
+    /// Any of these ranges may be combined within square brackets; `[[:upper:][a-z]\d]` corresponds to
+    /// uppercase ASCII, lowercase ASCII, and decimal digits.
+    ///
+    /// ```
+    /// # use {onepass_seed::expr::Node, core::str::FromStr};
+    /// assert_eq!("[a-z]".parse::<Node>().unwrap(), "[[:lower:]]".parse().unwrap());
+    /// assert_eq!("[A-Za-z0-9_]".parse::<Node>().unwrap(), "\\w".parse().unwrap());
+    /// ```
+    ///
+    /// ## Lists
+    /// A sequence of nodes is represented by its concatenation. A nested list may be created using
+    /// parentheses (`()`). This is of limited utility since the language does not support choices, but
+    /// does allow e.g. setting a count on a sequence, like: `([[:lower:]][[:digit:]][[:lower:]]){3}`.
+    ///
+    /// ```
+    /// # use core::str::FromStr;
+    /// # use crypto_bigint::{NonZero, U256};
+    /// # use num_traits::pow;
+    /// # use onepass_seed::expr::{Eval, Expr};
+    /// assert_eq!(
+    ///     NonZero::new(U256::from_u64((26u64*10*26).pow(3))).unwrap(),
+    ///     Expr::new("([[:lower:]][[:digit:]][[:lower:]]){3}".parse().unwrap()).size()
+    /// );
+    /// ```
+    ///
+    /// ## Counts
+    /// As alluded to, expressions may be repeated for specified counts. The syntax is
+    /// `expr{min,max}`. If `max` is omitted, i.e. `expr{min}`, then `max == min`. If `min` is omitted,
+    /// i.e. `expr{,max}`, `min == 0`.
+    ///
+    /// ## Generators
+    /// Arbitrary library-suppliable generators may be called. The library includes two: `word` to
+    /// produce a single word, and `words` to produce a sequence of words. Generators are surrounded by
+    /// curly braces and must start with a lowercase ASCII letter, e.g. `{word}`.
+    ///
+    /// Generators may take arguments. The first non–lowercase-ASCII character in a generator
+    /// expression is taken as an argument separator, so e.g. `{words:2:U}` calls generator `words`
+    /// with arguments `"2"` and `"U"`.
+    ///
+    /// ## Reserved syntax
+    /// The `|` character may be used inside of generators as an argument separator, like `{word|U}`,
+    /// but may not be used unescaped anywhere else in an expression. This syntax is reserved for
+    /// possible future expansion.
+    ///
+    /// ## Context
+    /// This function returns an expression against the default context.
+    /// [`Self::parse_with_context`] may be used to parse an expression againsta custom context.
+    pub fn parse(input: &str) -> Result<Self, Error> {
+        Ok(Expr::new(input.parse()?))
+    }
+}
+
+impl<'a> Expr<'a> {
+    /// [`parse`][Self::parse] an expression with the given [`Context`].
+    pub fn parse_with_context(input: &str, context: Context<'a>) -> Result<Self, Error> {
+        Ok(Expr::with_context(input.parse()?, context))
+    }
+}
 
 impl Node {
     pub fn parse(input: &str) -> IResult<&str, Node> {
@@ -338,6 +346,16 @@ fn parse_chars_brackets(input: &str) -> IResult<&str, Chars> {
     )
     .parse(input)
 }
+
+static LOWER: &[(char, char)] = &[('a', 'z')];
+static UPPER: &[(char, char)] = &[('A', 'Z')];
+static ALPHA: &[(char, char)] = &[('A', 'Z'), ('a', 'z')];
+static ALNUM: &[(char, char)] = &[('0', '9'), ('A', 'Z'), ('a', 'z')];
+static DIGIT: &[(char, char)] = &[('0', '9')];
+static XDIGIT: &[(char, char)] = &[('0', '9'), ('a', 'f')];
+static PUNCT: &[(char, char)] = &[('!', '/'), (':', '@'), ('[', '`'), ('{', '~')];
+static PRINT: &[(char, char)] = &[(' ', '~')];
+static WORD: &[(char, char)] = &[('0', '9'), ('A', 'Z'), ('_', '_'), ('a', 'z')];
 
 fn parse_chars_posix(input: &str) -> IResult<&str, &'static [(char, char)]> {
     delimited(

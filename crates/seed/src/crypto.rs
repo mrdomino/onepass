@@ -17,14 +17,14 @@ use crate::{expr::Eval, site::Site};
 impl Site<'_> {
     /// Write this site’s password into the passed [`io::Write`] implementation. For security, `W`
     /// should write to a buffer that will be zeroed as soon as possible.
-    pub fn write_password_into<W>(&self, mut w: W, seed_password: &str) -> Result<()>
+    pub fn write_password_into<W>(&self, w: &mut W, seed_password: &str) -> Result<()>
     where
         W: io::Write,
     {
         let size = self.expr.size();
         let secret = self.secret(seed_password);
         let index = secret_uniform(&secret, &size);
-        self.expr.write_to(&mut w, index)?;
+        self.expr.write_to(w, index)?;
         Ok(())
     }
 
@@ -33,7 +33,7 @@ impl Site<'_> {
     pub fn password(&self, seed_password: &str) -> Result<Zeroizing<String>> {
         // Write to a pre-allocated buffer to prevent reallocations leaking sensitive data.
         let mut buf = Zeroizing::new(vec![0u8; 2048]);
-        self.write_password_into(&mut buf[..], seed_password)?;
+        self.write_password_into(&mut &mut buf[..], seed_password)?;
         if let Some(pos) = buf.iter().position(|&b| b == 0) {
             buf.truncate(pos);
         }

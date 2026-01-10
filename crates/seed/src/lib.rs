@@ -39,7 +39,7 @@
 //! ```
 //!
 //! [0]: https://en.wikipedia.org/wiki/Bcrypt
-//! [`Generator`]: expr::generator::Generator
+//! [`Generator`]: expr::Generator
 
 mod crypto;
 pub mod dict;

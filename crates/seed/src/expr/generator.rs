@@ -12,9 +12,6 @@ use super::{
 };
 use crate::dict::EFF_WORDLIST;
 
-#[derive(Clone, Debug)]
-pub struct Generator(Box<str>);
-
 pub trait GeneratorFunc: Send + Sync {
     fn name(&self) -> &'static str;
     fn size(&self, args: &[&str]) -> NonZero<U256>;
@@ -36,6 +33,16 @@ pub trait GeneratorFunc: Send + Sync {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct Generator(Box<str>);
+
+pub struct Context<'a>(HashMap<&'static str, Arc<dyn GeneratorFunc + 'a>>);
+
+// TODO(someday): multiple dict lookup by hash
+pub struct Word<'a, 'b>(&'a dyn Dict<'b>);
+
+pub struct Words<'a, 'b>(&'a dyn Dict<'b>);
+
 fn write_sep_arg<W>(w: &mut W, arg: &str) -> fmt::Result
 where
     W: fmt::Write + ?Sized,
@@ -44,13 +51,6 @@ where
     write_literal(w, arg)?;
     Ok(())
 }
-
-pub struct Context<'a>(HashMap<&'static str, Arc<dyn GeneratorFunc + 'a>>);
-
-// TODO(someday): multiple dict lookup by hash
-pub struct Word<'a, 'b>(&'a dyn Dict<'b>);
-
-pub struct Words<'a, 'b>(&'a dyn Dict<'b>);
 
 impl EvalContext for Generator {
     type Context<'a> = Context<'a>;

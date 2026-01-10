@@ -1,5 +1,5 @@
 use crate::{
-    expr::{Context, Expr, parse::Error as ParseError},
+    expr::{Context, Expr, ParseError},
     url::{Error as UrlError, normalize},
     write_tsv,
 };
