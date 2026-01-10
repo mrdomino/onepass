@@ -6,10 +6,10 @@
 //! [`Display`]: core::fmt::Display
 
 pub mod chars;
-mod fmt;
 pub mod generator;
 pub mod node;
 pub mod parse;
+mod repr;
 mod util;
 
 use std::{

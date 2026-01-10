@@ -1,9 +1,5 @@
 use core::fmt;
-use std::{
-    collections::HashMap,
-    io::{Result, Write},
-    sync::Arc,
-};
+use std::{collections::HashMap, io, sync::Arc};
 
 use crypto_bigint::{NonZero, U256, Word as _Word};
 use onepass_base::dict::Dict;
@@ -11,7 +7,7 @@ use zeroize::Zeroizing;
 
 use super::{
     EvalContext,
-    fmt::fmt_literal,
+    repr::write_literal,
     util::{u256_saturating_pow, u256_to_word},
 };
 use crate::dict::EFF_WORDLIST;
@@ -22,24 +18,30 @@ pub struct Generator(Box<str>);
 pub trait GeneratorFunc: Send + Sync {
     fn name(&self) -> &'static str;
     fn size(&self, args: &[&str]) -> NonZero<U256>;
-    fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>, args: &[&str]) -> Result<()>;
+    fn write_to(
+        &self,
+        w: &mut dyn io::Write,
+        index: Zeroizing<U256>,
+        args: &[&str],
+    ) -> io::Result<()>;
 
     // `GeneratorFunc`s know how to format themselves, which they may use to e.g. inject dictionary
     // hashes for canonical serialization.
-    fn fmt(&self, f: &mut fmt::Formatter<'_>, args: &[&str]) -> fmt::Result {
-        write!(f, "{}", self.name())?;
+    fn write_repr(&self, w: &mut dyn fmt::Write, args: &[&str]) -> fmt::Result {
+        write!(w, "{}", self.name())?;
         for &arg in args {
-            fmt_sep_arg(f, arg)?;
+            write_sep_arg(w, arg)?;
         }
         Ok(())
     }
 }
 
-fn fmt_sep_arg(f: &mut fmt::Formatter<'_>, arg: &str) -> fmt::Result {
-    use fmt::Write;
-
-    f.write_char('|')?;
-    fmt_literal(f, arg)?;
+fn write_sep_arg<W>(w: &mut W, arg: &str) -> fmt::Result
+where
+    W: fmt::Write + ?Sized,
+{
+    w.write_char('|')?;
+    write_literal(w, arg)?;
     Ok(())
 }
 
@@ -57,7 +59,12 @@ impl EvalContext for Generator {
         self.func(context).size(&self.args())
     }
 
-    fn write_to(&self, context: &Context, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()> {
+    fn write_to(
+        &self,
+        context: &Context,
+        w: &mut dyn io::Write,
+        index: Zeroizing<U256>,
+    ) -> io::Result<()> {
         self.func(context).write_to(w, index, &self.args())
     }
 }
@@ -135,7 +142,10 @@ impl<'a> Extend<Arc<dyn GeneratorFunc + 'a>> for Context<'a> {
     }
 }
 
-fn fmt_with_hash(f: &mut fmt::Formatter<'_>, hash: &[u8; 32], args: &[&str]) -> fmt::Result {
+fn fmt_with_hash<W>(w: &mut W, hash: &[u8; 32], args: &[&str]) -> fmt::Result
+where
+    W: fmt::Write + ?Sized,
+{
     if !args.iter().copied().any(|arg| {
         let mut out = vec![0u8; 32];
         let Ok(()) = hex::decode_to_slice(arg, &mut out) else {
@@ -146,10 +156,10 @@ fn fmt_with_hash(f: &mut fmt::Formatter<'_>, hash: &[u8; 32], args: &[&str]) -> 
         let mut out = vec![0u8; 64];
         hex::encode_to_slice(hash, &mut out).unwrap();
         let out = String::from_utf8(out).unwrap();
-        fmt_sep_arg(f, &out)?;
+        write_sep_arg(w, &out)?;
     };
     for &arg in args {
-        fmt_sep_arg(f, arg)?;
+        write_sep_arg(w, arg)?;
     }
     Ok(())
 }
@@ -165,7 +175,12 @@ impl GeneratorFunc for Word<'_, '_> {
         NonZero::new(_Word::try_from(self.0.words().len()).unwrap().into()).unwrap()
     }
 
-    fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>, args: &[&str]) -> Result<()> {
+    fn write_to(
+        &self,
+        w: &mut dyn io::Write,
+        index: Zeroizing<U256>,
+        args: &[&str],
+    ) -> io::Result<()> {
         let upper = args.iter().copied().any(|s| s == "U");
         if !upper {
             write!(w, "{}", self.0.words()[u256_to_word(&index) as usize])?;
@@ -181,9 +196,9 @@ impl GeneratorFunc for Word<'_, '_> {
         Ok(())
     }
 
-    fn fmt(&self, f: &mut fmt::Formatter<'_>, args: &[&str]) -> fmt::Result {
-        write!(f, "{}", self.name())?;
-        fmt_with_hash(f, self.0.hash(), args)
+    fn write_repr(&self, w: &mut dyn fmt::Write, args: &[&str]) -> fmt::Result {
+        write!(w, "{}", self.name())?;
+        fmt_with_hash(w, self.0.hash(), args)
     }
 }
 
@@ -226,7 +241,12 @@ impl GeneratorFunc for Words<'_, '_> {
         NonZero::new(u256_saturating_pow(&base, count.into())).unwrap()
     }
 
-    fn write_to(&self, w: &mut dyn Write, mut index: Zeroizing<U256>, args: &[&str]) -> Result<()> {
+    fn write_to(
+        &self,
+        w: &mut dyn io::Write,
+        mut index: Zeroizing<U256>,
+        args: &[&str],
+    ) -> io::Result<()> {
         let (count, sep, upper) = Self::parse_args(args);
         // TODO(soon): hash checking
         let base = Word(self.0).size(&[]);
@@ -244,9 +264,9 @@ impl GeneratorFunc for Words<'_, '_> {
         Ok(())
     }
 
-    fn fmt(&self, f: &mut fmt::Formatter<'_>, args: &[&str]) -> fmt::Result {
-        write!(f, "{}", self.name())?;
-        fmt_with_hash(f, self.0.hash(), args)
+    fn write_repr(&self, w: &mut dyn fmt::Write, args: &[&str]) -> fmt::Result {
+        write!(w, "{}", self.name())?;
+        fmt_with_hash(w, self.0.hash(), args)
     }
 }
 
