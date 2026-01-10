@@ -54,21 +54,11 @@ impl EvalContext for Generator {
     type Context<'a> = Context<'a>;
 
     fn size(&self, context: &Context) -> NonZero<U256> {
-        let name = self.name();
-        let func = context
-            .get(name)
-            .ok_or_else(|| format!("unknown generator {name}"))
-            .unwrap();
-        func.size(&self.args())
+        self.func(context).size(&self.args())
     }
 
     fn write_to(&self, context: &Context, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()> {
-        let name = self.name();
-        let func = context
-            .get(name)
-            .ok_or_else(|| format!("unknown generator {name}"))
-            .unwrap();
-        func.write_to(w, index, &self.args())
+        self.func(context).write_to(w, index, &self.args())
     }
 }
 
@@ -94,6 +84,14 @@ impl Generator {
             return [].into();
         };
         self.0.split(sep).skip(1).collect()
+    }
+
+    fn func<'a>(&self, context: &'a Context) -> &'a dyn GeneratorFunc {
+        let name = self.name();
+        context
+            .get(name)
+            .ok_or_else(|| format!("unknown generator {name}"))
+            .unwrap()
     }
 }
 
