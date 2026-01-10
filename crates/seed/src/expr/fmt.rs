@@ -53,24 +53,34 @@ impl fmt::Display for Expr<'_> {
     }
 }
 
+pub enum Escape {
+    Hex,
+    Str(&'static str),
+}
+
 pub fn fmt_literal(f: &mut fmt::Formatter<'_>, s: &str) -> Result {
+    use Escape::*;
     let mut pos = 0;
     for (i, b) in s.bytes().enumerate() {
         let escaped = match b {
-            b'\\' => "\\\\",
-            b'(' => "\\(",
-            b')' => "\\)",
-            b'[' => "\\[",
-            b']' => "\\]",
-            b'{' => "{{",
-            b'}' => "}}",
-            b'|' => "\\|",
-            _ => continue,
+            b'\\' => Str("\\\\"),
+            b'(' => Str("\\("),
+            b')' => Str("\\)"),
+            b'[' => Str("\\["),
+            b']' => Str("\\]"),
+            b'{' => Str("{{"),
+            b'}' => Str("}}"),
+            b'|' => Str("\\|"),
+            b'\x20'..=b'\x7e' => continue,
+            _ => Hex,
         };
         if pos != i {
             f.write_str(&s[pos..i])?;
         }
-        f.write_str(escaped)?;
+        match escaped {
+            Str(s) => f.write_str(s),
+            Hex => write!(f, "\\x{b:02x}"),
+        }?;
         pos = i + 1;
     }
     if pos != s.len() {
@@ -99,9 +109,9 @@ impl fmt::Display for Chars {
 
 pub fn fmt_escape(f: &mut fmt::Formatter<'_>, c: char) -> Result {
     match c {
+        '\x00'..'\x20' | '\x7f' => write!(f, "\\x{:02x}", c as u8),
         ']' => f.write_str("\\]"),
-        '\\' => f.write_str("\\\\"),
-        _ => f.write_char(c),
+        _ => write!(f, "{}", c.escape_debug()),
     }
 }
 
@@ -122,12 +132,34 @@ mod tests {
     fn test_chars_hyphens() {
         let tests: [(&str, &[(char, char)]); _] = [
             ("[-a]", &[('-', '-'), ('a', 'a')]),
-            ("[Za--]", &[('Z', 'Z'), ('a', '-')]),
+            ("[Z!--]", &[('Z', 'Z'), ('!', '-')]),
+            ("[\\\\-\\]]", &[('\\', ']')]),
         ];
         for (want, cs) in tests {
             let cs = Chars::from_ranges(cs.iter().copied());
-            eprintln!("{:?}", cs);
+            eprintln!("want=\"{want}\" cs={cs:?}");
             assert_eq!(want, &format!("{cs}"));
+            let expr = Expr::new(want.parse().unwrap());
+            assert_eq!(want, &format!("{expr}"), "{want:?} cs={cs:?}");
+        }
+    }
+
+    #[test]
+    fn test_non_printable() {
+        for (want, root) in [
+            (
+                "[\\x00-\\x7f]",
+                Node::Chars(Chars::from_ranges([('\0', '\x7f')])),
+            ),
+            (
+                "[\u{2014}-\u{2026}]",
+                Node::Chars(Chars::from_ranges([('—', '…')])),
+            ),
+            // XXX we do UTF-8 byte-oriented printing on literals atm
+            (r#"\x00\xe2\x80\x94"#, Node::Literal("\0—".into())),
+        ] {
+            assert_eq!(want, &format!("{}", Expr::new(root.clone())));
+            assert_eq!(root, want.parse().unwrap());
         }
     }
 }
