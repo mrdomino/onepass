@@ -1,6 +1,6 @@
 use core::fmt::Write;
 use std::{
-    io::{Error, Result},
+    io::{self, Error, Result},
     mem,
 };
 
@@ -15,15 +15,25 @@ use zeroize::Zeroizing;
 use crate::{expr::Eval, site::Site};
 
 impl Site<'_> {
-    pub fn password(&self, seed_password: &str) -> Result<Zeroizing<String>> {
+    /// Write this site’s password into the passed [`io::Write`] implementation. For security, `W`
+    /// should write to a buffer that will be zeroed as soon as possible.
+    pub fn write_password_into<W>(&self, mut w: W, seed_password: &str) -> Result<()>
+    where
+        W: io::Write,
+    {
         let size = self.expr.size();
         let secret = self.secret(seed_password);
         let index = secret_uniform(&secret, &size);
+        self.expr.write_to(&mut w, index)?;
+        Ok(())
+    }
+
+    /// Return this site’s unique password for the given `seed_password`.
+    /// If the site password contains non-printable characters, the result is undefined.
+    pub fn password(&self, seed_password: &str) -> Result<Zeroizing<String>> {
         // Write to a pre-allocated buffer to prevent reallocations leaking sensitive data.
         let mut buf = Zeroizing::new(vec![0u8; 2048]);
-        // XXX double borrow to get a `&mut dyn Write`, as
-        // `Write` is implemented on `&mut [u8]`, not `[u8]`.
-        self.expr.write_to(&mut &mut buf[..], index)?;
+        self.write_password_into(&mut buf[..], seed_password)?;
         if let Some(pos) = buf.iter().position(|&b| b == 0) {
             buf.truncate(pos);
         }
@@ -32,12 +42,16 @@ impl Site<'_> {
         Ok(Zeroizing::new(unsafe { String::from_utf8_unchecked(buf) }))
     }
 
+    /// Return the public salt corresponding to this site’s derivation paramters.
+    /// This is just `BLAKE2B256(derivation)`.
     pub fn salt(&self) -> [u8; 32] {
         let mut w = DigestWriter(Blake2b256::new());
         write!(w, "{self}").unwrap();
         w.0.finalize().into()
     }
 
+    /// Return the per-site secret for the given `seed_password`, running [`Argon2`] with the
+    /// crate parameters.
     pub fn secret(&self, seed_password: &str) -> Zeroizing<[u8; 32]> {
         let params = Params::new(256 * 1024, 4, 4, None).unwrap();
         let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
@@ -50,6 +64,8 @@ impl Site<'_> {
     }
 }
 
+/// Randomly sample a [`U256`] from the given 256-bit secret. Uses rejection sampling to prevent
+/// bias in the results.
 pub fn secret_uniform(secret: &[u8; 32], n: &NonZero<U256>) -> Zeroizing<U256> {
     let mut rng = ChaCha20Rng::from_seed(*secret);
     let n_bits = n.bits_vartime();
@@ -58,11 +74,12 @@ pub fn secret_uniform(secret: &[u8; 32], n: &NonZero<U256>) -> Zeroizing<U256> {
     }
 
     // For powers of 2, we do not need rejection-sampling.
-    // We can merely generate `n_bits - 1` random bits.
-    if n.trailing_zeros_vartime() == n_bits - 1 {
-        return Zeroizing::new(RandomBits::random_bits(&mut rng, n_bits - 1));
-    }
-    RandomMod::random_mod_vartime(&mut rng, n).into()
+    // We can simply generate `n_bits - 1` random bits.
+    Zeroizing::new(if n.trailing_zeros_vartime() == n_bits - 1 {
+        RandomBits::random_bits(&mut rng, n_bits - 1)
+    } else {
+        RandomMod::random_mod_vartime(&mut rng, n)
+    })
 }
 
 #[cfg(test)]
