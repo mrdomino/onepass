@@ -45,9 +45,9 @@ fn fmt_sep_arg(f: &mut fmt::Formatter<'_>, arg: &str) -> fmt::Result {
 pub struct Context<'a>(HashMap<&'static str, Arc<dyn GeneratorFunc + 'a>>);
 
 // TODO(someday): multiple dict lookup by hash
-pub struct Word<'a, 'b>(&'a (dyn Dict<'b> + Sync));
+pub struct Word<'a, 'b>(&'a dyn Dict<'b>);
 
-pub struct Words<'a, 'b>(&'a (dyn Dict<'b> + Sync));
+pub struct Words<'a, 'b>(&'a dyn Dict<'b>);
 
 impl EvalContext for Generator {
     type Context<'a> = Context<'a>;
@@ -100,7 +100,7 @@ impl Generator {
 }
 
 impl<'a> Context<'a> {
-    pub fn with_dict<'b>(dict: &'a (dyn Dict<'b> + Sync)) -> Self {
+    pub fn with_dict<'b>(dict: &'a dyn Dict<'b>) -> Self {
         let generators: Vec<Arc<dyn GeneratorFunc + 'a>> =
             vec![Arc::new(Word(dict)), Arc::new(Words(dict))];
         Self::from_iter(generators)

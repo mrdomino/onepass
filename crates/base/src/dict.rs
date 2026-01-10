@@ -1,17 +1,18 @@
 use core::fmt::Write;
+use std::ops::Deref;
 
 use blake2::Blake2b256;
 use digest::Digest;
 
 use crate::fmt::{DigestWriter, Lines, TsvField};
 
-pub trait Dict<'a> {
+pub trait Dict<'a>: Sync {
     fn words(&self) -> &[&'a str];
     fn hash(&self) -> &[u8; 32];
 }
 
 pub struct BoxDict<'a>(Box<[&'a str]>, [u8; 32]);
-pub struct RefDict<'a, 'b: 'a>(&'b [&'a str], &'b [u8; 32]);
+pub struct RefDict<'a, 'b>(&'b [&'a str], &'b [u8; 32]);
 
 impl<'a> BoxDict<'a> {
     pub fn from_lines(s: &'a str) -> Self {
@@ -35,9 +36,23 @@ impl<'a> FromIterator<&'a str> for BoxDict<'a> {
     }
 }
 
-impl<'a, 'b: 'a> RefDict<'a, 'b> {
+impl<'a, 'b> RefDict<'a, 'b> {
     pub const fn new(words: &'b [&'a str], hash: &'b [u8; 32]) -> Self {
         RefDict(words, hash)
+    }
+}
+
+impl<'a> Deref for BoxDict<'a> {
+    type Target = dyn Dict<'a> + 'a;
+    fn deref(&self) -> &Self::Target {
+        self
+    }
+}
+
+impl<'a> Deref for RefDict<'a, 'a> {
+    type Target = dyn Dict<'a> + 'a;
+    fn deref(&self) -> &Self::Target {
+        self
     }
 }
 

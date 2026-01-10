@@ -143,11 +143,11 @@ fn main() -> Result<()> {
 
     let words: Option<_> = read_words_str(&args, &config)?;
     let dict = words.as_deref().map(BoxDict::from_lines);
+    let dict = dict.as_deref();
 
     let mut stdout = stdout();
     for site in &args.sites {
-        let context = dict.as_ref().map(|dict| Context::with_dict(dict));
-        let context = context.unwrap_or_else(Context::default);
+        let context = dict.map_or_else(Context::default, Context::with_dict);
         let res = gen_password_config(&seed, site, &config, &args, context)?;
         stdout.write_all(res.as_bytes())?;
         if stdout.is_terminal() || args.sites.len() > 1 {
