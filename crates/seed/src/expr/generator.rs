@@ -188,24 +188,29 @@ impl GeneratorFunc for Word<'_, '_> {
 }
 
 impl Words<'_, '_> {
-    pub fn parse_args<'a>(args: &'_ [&'a str]) -> (u32, &'a str) {
+    pub fn parse_args<'a>(args: &'_ [&'a str]) -> (u32, &'a str, bool) {
         let mut count = 5;
         let mut sep = " ";
+        let mut upper = false;
         for &arg in args {
             if let Some(c) = arg.chars().next() {
                 if c.is_ascii_digit()
                     && let Ok(n) = arg.parse()
                 {
                     count = n;
-                } else if arg.len() == 1 && c.is_ascii_punctuation() {
-                    sep = arg;
+                } else if arg.len() == 1 {
+                    if c.is_ascii_punctuation() {
+                        sep = arg;
+                    } else if c == 'U' {
+                        upper = true;
+                    }
                 }
             } else {
                 sep = "";
             }
         }
         assert!(count > 0);
-        (count, sep)
+        (count, sep, upper)
     }
 }
 
@@ -215,14 +220,14 @@ impl GeneratorFunc for Words<'_, '_> {
     }
 
     fn size(&self, args: &[&str]) -> NonZero<U256> {
-        let (count, _) = Self::parse_args(args);
-        // TODO(soon): hash checking, case transform
+        let (count, _, _) = Self::parse_args(args);
+        // TODO(soon): hash checking, arbitrary case transforms
         let base = Word(self.0).size(&[]);
         NonZero::new(u256_saturating_pow(&base, count.into())).unwrap()
     }
 
     fn write_to(&self, w: &mut dyn Write, mut index: Zeroizing<U256>, args: &[&str]) -> Result<()> {
-        let (count, sep) = Self::parse_args(args);
+        let (count, sep, upper) = Self::parse_args(args);
         // TODO(soon): hash checking
         let base = Word(self.0).size(&[]);
         for i in 0..count {
@@ -232,8 +237,8 @@ impl GeneratorFunc for Words<'_, '_> {
             let word_index;
             let (a, b) = index.div_rem(&base);
             (index, word_index) = (Zeroizing::new(a), Zeroizing::new(b));
-            // TODO(soon): case transforms
-            Word(self.0).write_to(w, word_index, &[])?;
+            let args: &[&str] = if upper && i == 0 { &["U"] } else { &[] };
+            Word(self.0).write_to(w, word_index, args)?;
         }
         assert!(bool::from(index.is_zero()));
         Ok(())
@@ -290,6 +295,8 @@ mod tests {
         let ctx = Context::default();
         let g = Generator::new("word:U");
         assert_eq!("Abacus", &format_at_ctx(&g, &ctx, U256::ZERO));
+        let g = Generator::new("words:U:3:");
+        assert_eq!("Abacusabacusabacus", &format_at_ctx(&g, &ctx, U256::ZERO));
     }
 
     #[test]
