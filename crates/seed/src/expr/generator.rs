@@ -200,6 +200,8 @@ impl Words<'_, '_> {
                 } else if arg.len() == 1 && c.is_ascii_punctuation() {
                     sep = arg;
                 }
+            } else {
+                sep = "";
             }
         }
         assert!(count > 0);
