@@ -5,7 +5,7 @@ use std::{
     sync::Arc,
 };
 
-use crypto_bigint::{NonZero, U256, Word as _Word, Zero};
+use crypto_bigint::{NonZero, U256, Word as _Word};
 use onepass_base::dict::Dict;
 use zeroize::Zeroizing;
 

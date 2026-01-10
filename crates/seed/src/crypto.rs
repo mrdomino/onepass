@@ -1,6 +1,5 @@
 use core::fmt::Write;
 use std::{
-    cmp::Ordering,
     io::{Error, Result},
     mem,
 };
@@ -8,9 +7,9 @@ use std::{
 use argon2::{Algorithm, Argon2, Params, Version};
 use blake2::{Blake2b256, Digest};
 use chacha20::ChaCha20Rng;
-use crypto_bigint::{Encoding, NonZero, U256};
+use crypto_bigint::{NonZero, RandomBits, RandomMod, U256};
 use onepass_base::fmt::DigestWriter;
-use rand_core::{RngCore, SeedableRng};
+use rand_core::SeedableRng;
 use zeroize::Zeroizing;
 
 use crate::{expr::Eval, site::Site};
@@ -53,7 +52,7 @@ impl Site<'_> {
 
 pub fn secret_uniform(secret: &[u8; 32], n: &NonZero<U256>) -> Zeroizing<U256> {
     let mut rng = ChaCha20Rng::from_seed(*secret);
-    let mut n_bits = n.bits_vartime();
+    let n_bits = n.bits_vartime();
     if n_bits == 1 {
         return U256::ZERO.into();
     }
@@ -61,22 +60,9 @@ pub fn secret_uniform(secret: &[u8; 32], n: &NonZero<U256>) -> Zeroizing<U256> {
     // For powers of 2, we do not need rejection-sampling.
     // We can merely generate `n_bits - 1` random bits.
     if n.trailing_zeros_vartime() == n_bits - 1 {
-        n_bits -= 1;
+        return Zeroizing::new(RandomBits::random_bits(&mut rng, n_bits - 1));
     }
-    let n_bits = n_bits;
-
-    let mut ret = U256::ZERO.to_le_bytes();
-    let n_bytes = n_bits.div_ceil(8) as usize;
-    let hi_mask = !0 >> ((8 - (n_bits % 8)) % 8);
-
-    loop {
-        rng.fill_bytes(&mut ret[..n_bytes]);
-        ret[n_bytes - 1] &= hi_mask;
-        let ret = Zeroizing::new(U256::from_le_bytes(ret));
-        if ret.cmp(n) == Ordering::Less {
-            return ret;
-        }
-    }
+    RandomMod::random_mod_vartime(&mut rng, n).into()
 }
 
 #[cfg(test)]
@@ -133,7 +119,7 @@ mod tests {
     fn secret_uniform_short() {
         let tests = [(1, 0x3c5), (2, 0xf6a), (3, 0x180), (4, 0x390), (5, 0x19d)];
         for (seed, want) in tests {
-            let secret = U256::from_u32(seed).to_le_bytes();
+            let secret = U256::from_u32(seed).to_le_bytes().into();
             let n = NonZero::new(U256::from_u32(0x1000)).unwrap();
             assert_eq!(U256::from_u32(want), *secret_uniform(&secret, &n));
         }
@@ -178,7 +164,7 @@ mod tests {
             assert_eq!(
                 U256::from_be_hex(want),
                 *secret_uniform(
-                    &sec.to_be_bytes(),
+                    &sec.to_be_bytes().into(),
                     &NonZero::new(U256::from_be_hex(siz)).unwrap()
                 ),
             );

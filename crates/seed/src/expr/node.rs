@@ -1,6 +1,6 @@
 use std::io::{Result, Write};
 
-use crypto_bigint::{CheckedSub, NonZero, One, U256, Word, Zero};
+use crypto_bigint::{CheckedSub, NonZero, One, U256, Word};
 use zeroize::Zeroizing;
 
 pub use super::generator::Context;
