@@ -43,10 +43,14 @@ macos-biometry = [
 readpass-libbsd = ["readpassphrase-3/libbsd-static"]
 readpass-vendored = ["readpassphrase-3/linux-vendored"]
 
+[patch.crates-io]
+onepass-base = { path = "crates/base" }
+onepass-seed = { path = "crates/seed" }
+
 [dependencies]
 anyhow = "1.0.100"
 clap = { version = "4.5.53", features = ["derive", "env", "unicode", "wrap_help"] }
-onepass-seed = { path = "crates/seed" }
+onepass-seed = "3.0.0-pre.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
 zeroize = "1.8.2"
