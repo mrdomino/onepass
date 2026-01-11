@@ -407,7 +407,7 @@ fn parse_chars_special(input: &str) -> IResult<&str, &'static [(char, char)]> {
 }
 
 fn parse_generator(input: &str) -> IResult<&str, Generator> {
-    let verify_inner = peek(verify(anychar, |c| c.is_ascii_alphabetic()));
+    let verify_inner = peek(verify(anychar, |c| c.is_ascii_lowercase()));
     let parse_inner = map(
         fold(
             1..,
