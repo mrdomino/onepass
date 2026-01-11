@@ -33,7 +33,7 @@ impl Expr<'_> {
     ///
     /// The following syntax is supported:
     ///
-    /// ## String literals
+    /// # String literals
     /// Any literal string that does not otherwise consist of syntax characters stands for itself. A
     /// schema consisting of a literal string generates itself as the single password. Other characters
     /// may be escaped with `'\\'`; aside from newline, carriage return, and tab, any non-alphanumeric
@@ -47,7 +47,7 @@ impl Expr<'_> {
     /// Arbitrary Unicode characters may also be insterted as `\uXXXX`, or hex sequences (so long as
     /// they encode valid ASCII or UTF-8 byte sequences) as `\xXX`.
     ///
-    /// ## Character classes
+    /// # Character classes
     /// The special character classes `\w` and `\d` stand for word (alphanumeric plus underscore) and
     /// digit characters respectively. They may show up anywhere in an expression and stand for a
     /// single character in their range.
@@ -73,7 +73,7 @@ impl Expr<'_> {
     /// assert_eq!("[A-Za-z0-9_]".parse::<Node>().unwrap(), "\\w".parse().unwrap());
     /// ```
     ///
-    /// ## Lists
+    /// # Lists
     /// A sequence of nodes is represented by its concatenation. A nested list may be created using
     /// parentheses (`()`). This is of limited utility since the language does not support choices, but
     /// does allow e.g. setting a count on a sequence, like: `([[:lower:]][[:digit:]][[:lower:]]){3}`.
@@ -89,12 +89,12 @@ impl Expr<'_> {
     /// );
     /// ```
     ///
-    /// ## Counts
+    /// # Counts
     /// As alluded to, expressions may be repeated for specified counts. The syntax is
     /// `expr{min,max}`. If `max` is omitted, i.e. `expr{min}`, then `max == min`. If `min` is omitted,
     /// i.e. `expr{,max}`, `min == 0`.
     ///
-    /// ## Generators
+    /// # Generators
     /// Arbitrary library-suppliable generators may be called. The library includes two: `word` to
     /// produce a single word, and `words` to produce a sequence of words. Generators are surrounded by
     /// curly braces and must start with a lowercase ASCII letter, e.g. `{word}`.
@@ -103,12 +103,12 @@ impl Expr<'_> {
     /// expression is taken as an argument separator, so e.g. `{words:2:U}` calls generator `words`
     /// with arguments `"2"` and `"U"`.
     ///
-    /// ## Reserved syntax
+    /// # Reserved syntax
     /// The `|` character may be used inside of generators as an argument separator, like `{word|U}`,
     /// but may not be used unescaped anywhere else in an expression. This syntax is reserved for
     /// possible future expansion.
     ///
-    /// ## Context
+    /// # Context
     /// This function returns an expression against the default context.
     /// [`Self::parse_with_context`] may be used to parse an expression againsta custom context.
     pub fn parse(input: &str) -> Result<Self, Error> {
