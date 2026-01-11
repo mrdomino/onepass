@@ -88,7 +88,7 @@ fn next_char(c: char) -> Option<char> {
 impl CharRange {
     // TODO(someday): replace these with `Step` methods once those are stabilized.
 
-    pub fn size(&self) -> u32 {
+    fn size(&self) -> u32 {
         let start = self.start as u32;
         let end = self.end as u32;
         assert!(start <= end, "{:?} > {:?}", self.start, self.end);
@@ -100,7 +100,7 @@ impl CharRange {
         }
     }
 
-    pub fn nth(&self, n: u32) -> char {
+    fn nth(&self, n: u32) -> char {
         let start = self.start as u32;
         let res = start + n;
         let res = if start < 0xD800 && res >= 0xD800 {
