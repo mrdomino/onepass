@@ -99,6 +99,29 @@ impl EvalContext for Node {
     }
 }
 
+impl From<Chars> for Node {
+    fn from(chars: Chars) -> Self {
+        Node::Chars(chars)
+    }
+}
+
+impl From<Generator> for Node {
+    fn from(generator: Generator) -> Self {
+        Node::Generator(generator)
+    }
+}
+
+impl FromIterator<Node> for Node {
+    fn from_iter<T: IntoIterator<Item = Node>>(iter: T) -> Self {
+        let list: Box<[_]> = iter.into_iter().collect();
+        if list.len() == 1 {
+            list.into_iter().next().unwrap()
+        } else {
+            Node::List(list)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{super::util::*, *};
@@ -135,8 +158,8 @@ mod tests {
             ("ba", 27),
             ("zzzzz", 12356629),
         ];
-        let prim = Node::Chars(Chars::from_ranges([('a', 'z')]));
-        let count = Node::Count(prim.into(), 1, 5);
+        let prim = Chars::from_ranges([('a', 'z')]).into();
+        let count = Node::Count(Box::new(prim), 1, 5);
         assert_eq!(U256::from_u32(12356630), *count.size(&context));
         for (want, index) in tests {
             assert_eq!(
@@ -154,8 +177,8 @@ mod tests {
             ("aaa", 676),
             ("zzzzz", 12356603),
         ];
-        let prim = Node::Chars(Chars::from_ranges([('a', 'z')]));
-        let count = Node::Count(prim.into(), 2, 5);
+        let prim = Chars::from_ranges([('a', 'z')]).into();
+        let count = Node::Count(Box::new(prim), 2, 5);
         assert_eq!(U256::from_u32(12356604), *count.size(&context));
         for (want, index) in tests {
             assert_eq!(
@@ -168,7 +191,7 @@ mod tests {
     #[test]
     fn test_lists() {
         let context = Context::empty();
-        let prim = || Node::Chars(Chars::from_ranges([('a', 'z')]));
+        let prim = || Chars::from_ranges([('a', 'z')]).into();
         let tests = [
             ("a", 1, 0),
             ("b", 1, 1),
@@ -181,8 +204,7 @@ mod tests {
             ("aaaaa", 5, 0),
         ];
         for (want, rep, index) in tests {
-            let list = vec![prim(); rep];
-            let node = Node::List(list.into());
+            let node: Node = (0..rep).map(|_| prim()).collect();
             let size = 26.pow(rep as u32);
             assert_eq!(U256::from_u32(size), *node.size(&context));
             assert_eq!(want, &format_at_ctx(&node, &context, U256::from_u32(index)));
@@ -192,7 +214,7 @@ mod tests {
     #[test]
     fn test_generators() {
         let context = Context::default();
-        let node = Node::Generator(Generator::new("word"));
+        let node = Node::from(Generator::new("word"));
         assert_eq!(U256::from_u32(7776), *node.size(&context));
         assert_eq!("abacus", &format_at_ctx(&node, &context, U256::ZERO));
         assert_eq!(

@@ -125,11 +125,7 @@ impl<'a> Expr<'a> {
 
 impl Node {
     pub fn parse(input: &str) -> IResult<&str, Node> {
-        let (input, list) = many1(parse_count).parse(input)?;
-        if list.len() == 1 {
-            return Ok((input, list.into_iter().next().unwrap()));
-        }
-        Ok((input, Node::List(list.into_boxed_slice())))
+        map(many1(parse_count), Node::from_iter).parse(input)
     }
 }
 
