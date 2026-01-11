@@ -4,7 +4,7 @@ version.workspace = true
 categories = ["command-line-utilities"]
 edition.workspace = true
 keywords = ["password", "cryptography", "deterministic"]
-license = "Apache-2.0"
+license.workspace = true
 readme = "README.md"
 repository.workspace = true
 description = "A mostly-stateless deterministic password manager"
@@ -25,6 +25,7 @@ members = ["crates/base"]
 [workspace.package]
 version = "3.0.0-pre.0"
 edition = "2024"
+license = "AGPL"
 repository = "https://github.com/mrdomino/onepass"
 
 [features]
