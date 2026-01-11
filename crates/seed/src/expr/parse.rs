@@ -205,6 +205,11 @@ fn parse_literal_fragment(input: &str) -> IResult<&str, StringFragment<'_>> {
     .parse(input)
 }
 
+fn parse_literal_verbatim(input: &str) -> IResult<&str, &str> {
+    let (input, res) = verify(is_not("\\[](){}|"), |s: &str| !s.is_empty()).parse(input)?;
+    Ok((input, res))
+}
+
 fn parse_literal_escaped(input: &str) -> IResult<&str, char> {
     alt((
         preceded(
@@ -291,11 +296,6 @@ fn parse_hex_byte(input: &str) -> IResult<&str, u8> {
         }),
     )
     .parse(input)
-}
-
-fn parse_literal_verbatim(input: &str) -> IResult<&str, &str> {
-    let (input, res) = verify(is_not("\\[](){}|"), |s: &str| !s.is_empty()).parse(input)?;
-    Ok((input, res))
 }
 
 fn parse_chars(input: &str) -> IResult<&str, Chars> {
