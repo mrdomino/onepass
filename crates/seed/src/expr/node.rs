@@ -1,4 +1,7 @@
-use std::io::{Result, Write};
+use std::{
+    io::{Result, Write},
+    iter::once,
+};
 
 use crypto_bigint::{CheckedSub, NonZero, One, U256, Word};
 use zeroize::Zeroizing;
@@ -113,12 +116,14 @@ impl From<Generator> for Node {
 
 impl FromIterator<Node> for Node {
     fn from_iter<T: IntoIterator<Item = Node>>(iter: T) -> Self {
-        let list: Box<[_]> = iter.into_iter().collect();
-        if list.len() == 1 {
-            list.into_iter().next().unwrap()
-        } else {
-            Node::List(list)
+        let mut iter = iter.into_iter().peekable();
+        let Some(node) = iter.next() else {
+            return Node::List(Box::default());
+        };
+        if iter.peek().is_none() {
+            return node;
         }
+        Node::List(once(node).chain(iter).collect())
     }
 }
 
