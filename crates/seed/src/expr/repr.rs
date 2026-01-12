@@ -61,6 +61,7 @@ impl ReprState<'_, '_> {
                 Ok(())
             }
             Node::Count(ref node, min, max) => {
+                self.0 = true;
                 self.write(w, node)?;
                 w.write_char('{')?;
                 write!(w, "{min}")?;
@@ -199,6 +200,18 @@ mod tests {
         assert_eq!(
             r#"\{\}"#,
             &format!("{}", Expr::new(Node::Literal("{}".into())))
+        );
+    }
+
+    #[test]
+    fn test_nested() {
+        assert_eq!(
+            "([a-z][0-9]){3,6}",
+            &format!("{}", Expr::parse("([a-z][0-9]){3,6}").unwrap())
+        );
+        assert_eq!(
+            "[a-z]{0,3}",
+            &format!("{}", Expr::parse("[a-z]{,3}").unwrap())
         );
     }
 }
