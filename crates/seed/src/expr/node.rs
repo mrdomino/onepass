@@ -13,6 +13,7 @@ use super::{
     util::u256_saturating_pow,
 };
 
+/// AST representation for [`Expr`][super::Expr] nodes.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Node {
     Literal(Box<str>),
