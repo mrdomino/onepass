@@ -9,7 +9,7 @@ use crate::fmt::{DigestWriter, Lines, TsvField};
 /// This trait implements a hashed word list suitable for use in deterministic password generation.
 /// The hash may be used as part of a derivation path to make generated passwords depend upon the
 /// exact word list used.
-pub trait Dict: Sync {
+pub trait Dict: Send + Sync {
     /// Return the full word list.
     fn words(&self) -> &[&str];
 
