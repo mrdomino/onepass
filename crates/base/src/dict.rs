@@ -9,9 +9,9 @@ use crate::fmt::{DigestWriter, Lines, TsvField};
 /// This trait implements a hashed word list suitable for use in deterministic password generation.
 /// The hash may be used as part of a derivation path to make generated passwords depend upon the
 /// exact word list used.
-pub trait Dict<'a>: Sync {
+pub trait Dict: Sync {
     /// Return the full word list.
-    fn words(&self) -> &[&'a str];
+    fn words(&self) -> &[&str];
 
     /// Return the unique BLAKE2b256 hash of this word list.
     fn hash(&self) -> &[u8; 32];
@@ -24,7 +24,7 @@ pub struct BoxDict<'a>(Box<[&'a str]>, [u8; 32]);
 /// This type provides a [`Dict`] over non-owned data. It may be used in tests, or to implement a
 /// static compile-time dictionary, giving the compiler maximum freedom as to how to lay out the
 /// string slices.
-pub struct RefDict<'a, 'b>(&'b [&'a str], &'b [u8; 32]);
+pub struct RefDict<'a>(&'a [&'a str], &'a [u8; 32]);
 
 impl<'a> BoxDict<'a> {
     /// Construct a dictionary from a single string slice, taking each non-empty line, with leading
@@ -52,32 +52,32 @@ impl<'a> FromIterator<&'a str> for BoxDict<'a> {
     }
 }
 
-impl<'a, 'b> RefDict<'a, 'b> {
+impl<'a> RefDict<'a> {
     /// Construct a dictionary from the given word slice and hash reference.
     /// # Safety
     /// This function is only safe if `hash` is the `BLAKE2b256` hash of the word list as if
     /// constructed via `BoxDict::from_iter(words.into_iter())`.
-    pub const unsafe fn new(words: &'b [&'a str], hash: &'b [u8; 32]) -> Self {
+    pub const unsafe fn new(words: &'a [&'a str], hash: &'a [u8; 32]) -> Self {
         RefDict(words, hash)
     }
 }
 
 impl<'a> Deref for BoxDict<'a> {
-    type Target = dyn Dict<'a> + 'a;
+    type Target = dyn Dict + 'a;
     fn deref(&self) -> &Self::Target {
         self
     }
 }
 
-impl<'a> Deref for RefDict<'a, 'a> {
-    type Target = dyn Dict<'a> + 'a;
+impl<'a> Deref for RefDict<'a> {
+    type Target = dyn Dict + 'a;
     fn deref(&self) -> &Self::Target {
         self
     }
 }
 
-impl<'a> Dict<'a> for BoxDict<'a> {
-    fn words(&self) -> &[&'a str] {
+impl Dict for BoxDict<'_> {
+    fn words(&self) -> &[&str] {
         &self.0
     }
     fn hash(&self) -> &[u8; 32] {
@@ -85,8 +85,8 @@ impl<'a> Dict<'a> for BoxDict<'a> {
     }
 }
 
-impl<'a> Dict<'a> for RefDict<'a, '_> {
-    fn words(&self) -> &[&'a str] {
+impl Dict for RefDict<'_> {
+    fn words(&self) -> &[&str] {
         self.0
     }
     fn hash(&self) -> &[u8; 32] {

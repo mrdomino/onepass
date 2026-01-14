@@ -39,9 +39,9 @@ pub struct Generator(Box<str>);
 pub struct Context<'a>(HashMap<&'static str, Arc<dyn GeneratorFunc + 'a>>);
 
 // TODO(someday): multiple dict lookup by hash
-pub struct Word<'a, 'b>(&'a dyn Dict<'b>);
+pub struct Word<'a>(&'a dyn Dict);
 
-pub struct Words<'a, 'b>(&'a dyn Dict<'b>);
+pub struct Words<'a>(&'a dyn Dict);
 
 fn write_sep_arg<W>(w: &mut W, arg: &str) -> fmt::Result
 where
@@ -103,7 +103,7 @@ impl Generator {
 }
 
 impl<'a> Context<'a> {
-    pub fn with_dict<'b>(dict: &'a dyn Dict<'b>) -> Self {
+    pub fn with_dict(dict: &'a dyn Dict) -> Self {
         let generators: Vec<Arc<dyn GeneratorFunc + 'a>> =
             vec![Arc::new(Word(dict)), Arc::new(Words(dict))];
         Self::from_iter(generators)
@@ -164,7 +164,7 @@ where
     Ok(())
 }
 
-impl GeneratorFunc for Word<'_, '_> {
+impl GeneratorFunc for Word<'_> {
     fn name(&self) -> &'static str {
         "word"
     }
@@ -202,7 +202,7 @@ impl GeneratorFunc for Word<'_, '_> {
     }
 }
 
-impl Words<'_, '_> {
+impl Words<'_> {
     pub fn parse_args<'a>(args: &'_ [&'a str]) -> (u32, &'a str, bool) {
         let mut count = 5;
         let mut sep = " ";
@@ -229,7 +229,7 @@ impl Words<'_, '_> {
     }
 }
 
-impl GeneratorFunc for Words<'_, '_> {
+impl GeneratorFunc for Words<'_> {
     fn name(&self) -> &'static str {
         "words"
     }
