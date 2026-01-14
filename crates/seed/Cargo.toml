@@ -15,6 +15,7 @@ hex = { version = "0.4.3", default-features = false }
 nom = "8.0.0"
 onepass-base = "3.0.0-pre.0"
 rand_core = "0.10.0-rc-3"
+serde = { version = "1.0.228", default-features = false, features = ["derive"] }
 url = { version = "2.5.8", default-features = false }
 zeroize = { version = "1.8.2", default-features = false, features = ["alloc"] }
 
