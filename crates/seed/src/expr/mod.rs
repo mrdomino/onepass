@@ -25,6 +25,7 @@ pub use parse::Error as ParseError;
 /// A fully parsed and bound schema expression.
 ///
 /// It may be evaluated with [`Eval`] to generate passwords from its domain.
+#[derive(Debug)]
 pub struct Expr<'a> {
     pub root: Node,
     pub context: Option<&'a Context<'a>>,

@@ -36,6 +36,7 @@ pub trait GeneratorFunc: Send + Sync {
 #[derive(Clone, Debug)]
 pub struct Generator(Box<str>);
 
+#[derive(Debug)]
 pub struct Context<'a>(HashMap<&'static str, Arc<dyn GeneratorFunc + 'a>>);
 
 // TODO(someday): multiple dict lookup by hash
@@ -273,6 +274,14 @@ impl GeneratorFunc for Words<'_> {
 impl PartialEq for Generator {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
+    }
+}
+
+impl<'a> fmt::Debug for dyn GeneratorFunc + 'a {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "GeneratorFunc(")?;
+        self.write_repr(f, &[])?;
+        write!(f, ")")
     }
 }
 
