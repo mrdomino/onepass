@@ -118,7 +118,7 @@ impl Expr<'_> {
 
 impl<'a> Expr<'a> {
     /// [`parse`][Self::parse] an expression with the given [`Context`].
-    pub fn parse_with_context(input: &str, context: Context<'a>) -> Result<Self, Error> {
+    pub fn parse_with_context(input: &str, context: &'a Context<'a>) -> Result<Self, Error> {
         Ok(Expr::with_context(input.parse()?, context))
     }
 }

@@ -27,7 +27,7 @@ pub use parse::Error as ParseError;
 /// It may be evaluated with [`Eval`] to generate passwords from its domain.
 pub struct Expr<'a> {
     pub root: Node,
-    pub context: Option<Context<'a>>,
+    pub context: Option<&'a Context<'a>>,
 }
 
 /// The core expression sampling trait for this module.
@@ -85,7 +85,7 @@ impl Expr<'_> {
 }
 
 impl<'a> Expr<'a> {
-    pub fn with_context(root: Node, context: Context<'a>) -> Self {
+    pub fn with_context(root: Node, context: &'a Context<'a>) -> Self {
         Expr {
             root,
             context: Some(context),
@@ -93,7 +93,7 @@ impl<'a> Expr<'a> {
     }
 
     pub fn get_context(&self) -> &Context<'a> {
-        self.context.as_ref().unwrap_or(&DEFAULT_CONTEXT)
+        self.context.unwrap_or(&DEFAULT_CONTEXT)
     }
 }
 

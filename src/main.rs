@@ -205,7 +205,7 @@ fn gen_password_config(
     let increment = args
         .increment
         .unwrap_or_else(|| site.as_ref().map_or(0, |(_, site)| site.increment));
-    let site = Site::with_context(context, url, username, schema, increment)?;
+    let site = Site::with_context(&context, url, username, schema, increment)?;
     let size = site.expr.size();
     let salt = format!("{site}");
 
