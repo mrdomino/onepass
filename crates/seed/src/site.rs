@@ -1,4 +1,4 @@
-use core::num::NonZero;
+use core::{error, fmt, num::NonZero};
 
 use serde::{Deserialize, Serialize};
 
@@ -133,8 +133,8 @@ where
     }
 }
 
-impl core::fmt::Display for Site<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Site<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write_tsv!(
             f,
             "v3",
@@ -146,8 +146,8 @@ impl core::fmt::Display for Site<'_> {
     }
 }
 
-impl core::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl error::Error for Error {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         use Error::*;
 
         Some(match self {
@@ -157,11 +157,11 @@ impl core::error::Error for Error {
     }
 }
 
-impl core::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use core::error::Error;
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use error::Error;
 
-        core::fmt::Display::fmt(self.source().unwrap(), f)
+        fmt::Display::fmt(self.source().unwrap(), f)
     }
 }
 
