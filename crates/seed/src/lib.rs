@@ -44,6 +44,6 @@
 mod crypto;
 pub mod dict;
 pub mod expr;
-mod fmt;
+mod macros;
 pub mod site;
 pub mod url;
