@@ -1,13 +1,13 @@
-use core::fmt::{Display, Formatter, Write};
+use core::fmt::{self, Display, Formatter, Write};
 
 use digest::Update;
 
 /// Adapter type that allows a hasher to be treated like a [`impl Write`][Write], assuming
-/// [`core::fmt::Write`] is imported.
+/// [`fmt::Write`] is imported.
 pub struct DigestWriter<T: Update>(pub T);
 
 impl<T: Update> Write for DigestWriter<T> {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
         self.0.update(s.as_bytes());
         Ok(())
     }
@@ -23,7 +23,7 @@ where
     I: Iterator + Clone,
     I::Item: Display,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.0
             .clone()
             .try_fold((), |(), line| writeln!(f, "{line}"))
@@ -34,7 +34,7 @@ where
 pub struct TsvField<T>(pub T);
 
 impl<T: Display> Display for TsvField<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(TsvEscaper(f), "{}", self.0)
     }
 }
@@ -58,7 +58,7 @@ impl TsvEscaper<'_, '_> {
 }
 
 impl Write for TsvEscaper<'_, '_> {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
         let mut pos = 0;
         for (i, b) in s.bytes().enumerate() {
             let Some(escaped) = Self::escape(b) else {
@@ -76,7 +76,7 @@ impl Write for TsvEscaper<'_, '_> {
         Ok(())
     }
 
-    fn write_char(&mut self, c: char) -> std::fmt::Result {
+    fn write_char(&mut self, c: char) -> fmt::Result {
         match u8::try_from(c).ok().and_then(Self::escape) {
             None => self.0.write_char(c),
             Some(s) => self.0.write_str(s),

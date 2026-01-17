@@ -1,5 +1,4 @@
-use core::fmt;
-use std::fmt::{Result, Write};
+use core::fmt::{self, Result, Write};
 
 use crate::expr::{
     Context, Expr, Node,
@@ -84,13 +83,13 @@ impl ReprState<'_, '_> {
 }
 
 impl fmt::Display for Expr<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result {
         self.write_repr(f)
     }
 }
 
 impl fmt::Display for Chars {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result {
         self.write_repr(f)
     }
 }

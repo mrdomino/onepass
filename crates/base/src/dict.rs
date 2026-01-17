@@ -1,5 +1,4 @@
-use core::fmt::Write;
-use std::ops::Deref;
+use core::{fmt::Write, ops::Deref};
 
 use blake2::Blake2b256;
 use digest::Digest;

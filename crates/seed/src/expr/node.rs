@@ -1,7 +1,5 @@
-use std::{
-    io::{Result, Write},
-    iter::once,
-};
+use core::iter::once;
+use std::io::{Result, Write};
 
 use crypto_bigint::{CheckedSub, NonZero, One, U256, Word};
 use zeroize::Zeroizing;

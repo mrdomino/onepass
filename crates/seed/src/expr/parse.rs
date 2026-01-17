@@ -1,5 +1,4 @@
-use core::str;
-use std::str::Utf8Error;
+use core::str::{self, Utf8Error};
 
 use nom::{
     Finish, IResult, Parser,

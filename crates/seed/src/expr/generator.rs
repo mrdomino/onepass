@@ -278,7 +278,7 @@ impl PartialEq for Generator {
 }
 
 impl<'a> fmt::Debug for dyn GeneratorFunc + 'a {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "GeneratorFunc(")?;
         self.write_repr(f, &[])?;
         write!(f, ")")

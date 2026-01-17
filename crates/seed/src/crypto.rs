@@ -1,8 +1,5 @@
-use core::fmt::Write;
-use std::{
-    io::{self, Error, Result},
-    mem,
-};
+use core::{fmt::Write, mem};
+use std::io::{self, Error, Result};
 
 use argon2::{Algorithm, Argon2, Params, Version};
 use blake2::{Blake2b256, Digest};

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{
+use core::{
     fmt::Display,
     ptr::{self, NonNull},
     slice,
@@ -101,7 +101,7 @@ impl Entry {
         let reason = NSString::from_str("load your seed password");
         let context = unsafe { LAContext::new() };
         unsafe { context.setLocalizedReason(&reason) };
-        let context = unsafe { std::mem::transmute::<&AnyObject, &CFType>(&context) };
+        let context = unsafe { core::mem::transmute::<&AnyObject, &CFType>(&context) };
         let query = unsafe {
             CFDictionary::from_slices(
                 &[
@@ -172,7 +172,7 @@ pub(crate) enum Error {
 }
 
 impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Error::NoEntry => write!(f, "entry not found"),
             Error::Other(err) => err.fmt(f),
@@ -181,7 +181,7 @@ impl Display for Error {
 }
 
 impl core::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             Error::Other(err) => Some(err.as_ref()),
             _ => None,

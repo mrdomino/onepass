@@ -1,7 +1,5 @@
-use std::{
-    cmp::max,
-    io::{Result, Write},
-};
+use core::cmp::max;
+use std::io::{Result, Write};
 
 use crypto_bigint::{NonZero, U256};
 use zeroize::Zeroizing;
