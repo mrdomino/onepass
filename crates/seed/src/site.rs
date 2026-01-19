@@ -26,9 +26,13 @@ pub struct Site<'a> {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct RawSite<S> {
     pub url: S,
+
+    // TODO(soon): figure out how to represent sites with defaulted schemas.
     pub schema: S,
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub username: Option<S>,
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub increment: Option<NonZero<u32>>,
 }
