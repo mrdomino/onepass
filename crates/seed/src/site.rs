@@ -8,11 +8,13 @@ use crate::{
     write_tsv,
 };
 
-/// Represents an error deserializing a [`Site`].
-#[derive(Clone, Debug)]
-pub enum Error {
-    Parse(ParseError),
-    Url(UrlError),
+/// A fully parsed [`Site`].
+#[derive(Debug)]
+pub struct Site<'a> {
+    pub url: String,
+    pub username: Option<String>,
+    pub expr: Expr<'a>,
+    pub increment: u32,
 }
 
 /// Serialized representation of a [`Site`].
@@ -31,13 +33,11 @@ pub struct RawSite<S> {
     pub increment: Option<NonZero<u32>>,
 }
 
-/// A fully parsed [`Site`].
-#[derive(Debug)]
-pub struct Site<'a> {
-    pub url: String,
-    pub username: Option<String>,
-    pub expr: Expr<'a>,
-    pub increment: u32,
+/// Represents an error deserializing a [`Site`].
+#[derive(Clone, Debug)]
+pub enum Error {
+    Parse(ParseError),
+    Url(UrlError),
 }
 
 impl Site<'_> {
