@@ -88,48 +88,62 @@ impl<'a> Site<'a> {
     }
 }
 
-impl<S> TryFrom<RawSite<S>> for Site<'_>
+impl<S> RawSite<S>
 where
     S: AsRef<str>,
 {
-    type Error = Error;
-    fn try_from(site: RawSite<S>) -> Result<Self, Self::Error> {
-        Ok(Site {
-            url: normalize(site.url.as_ref())?,
-            username: site.username.map(|s| s.as_ref().to_string()),
-            expr: Expr::new(site.schema.as_ref().parse()?),
-            increment: site.increment.map_or(0, Into::into),
-        })
-    }
-}
-
-impl<'a, S> TryFrom<(RawSite<S>, &'a Context<'a>)> for Site<'a>
-where
-    S: AsRef<str>,
-{
-    type Error = Error;
-    fn try_from(value: (RawSite<S>, &'a Context<'a>)) -> Result<Self, Self::Error> {
-        let (site, context) = (value.0, value.1);
-        Ok(Site {
-            url: normalize(site.url.as_ref())?,
-            username: site.username.map(|s| s.as_ref().to_string()),
-            expr: Expr::with_context(site.schema.as_ref().parse()?, context),
-            increment: site.increment.map_or(0, Into::into),
-        })
+    pub fn new(url: S, username: Option<S>, schema: S, increment: u32) -> Self {
+        RawSite {
+            url,
+            username,
+            schema,
+            increment: NonZero::try_from(increment).ok(),
+        }
     }
 }
 
 impl<S> From<Site<'_>> for RawSite<S>
 where
-    S: From<String>,
+    S: From<String> + AsRef<str>,
 {
     fn from(site: Site<'_>) -> Self {
-        RawSite {
-            url: site.url.into(),
-            username: site.username.map(Into::into),
-            schema: format!("{}", site.expr).into(),
-            increment: NonZero::try_from(site.increment).ok(),
-        }
+        let url = S::from(site.url);
+        let username = site.username.map(S::from);
+        let schema = S::from(format!("{}", site.expr));
+        let increment = site.increment;
+        RawSite::new(url, username, schema, increment)
+    }
+}
+
+impl<S> TryFrom<&RawSite<S>> for Site<'_>
+where
+    S: AsRef<str>,
+{
+    type Error = Error;
+    fn try_from(site: &RawSite<S>) -> Result<Self, Self::Error> {
+        Site::new(
+            site.url.as_ref(),
+            site.username.as_ref().map(S::as_ref),
+            site.schema.as_ref(),
+            site.increment.map_or(0, u32::from),
+        )
+    }
+}
+
+impl<'a, S> TryFrom<(&RawSite<S>, &'a Context<'a>)> for Site<'a>
+where
+    S: AsRef<str>,
+{
+    type Error = Error;
+    fn try_from(value: (&RawSite<S>, &'a Context<'a>)) -> Result<Self, Self::Error> {
+        let (site, context) = value;
+        Site::with_context(
+            context,
+            site.url.as_ref(),
+            site.username.as_ref().map(S::as_ref),
+            site.schema.as_ref(),
+            site.increment.map_or(0, u32::from),
+        )
     }
 }
 
