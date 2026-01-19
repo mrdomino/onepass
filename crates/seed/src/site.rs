@@ -100,6 +100,15 @@ where
             increment: NonZero::try_from(increment).ok(),
         }
     }
+
+    pub fn as_deref(&self) -> RawSite<&str> {
+        RawSite {
+            url: self.url.as_ref(),
+            username: self.username.as_ref().map(S::as_ref),
+            schema: self.schema.as_ref(),
+            increment: self.increment,
+        }
+    }
 }
 
 impl<S> From<Site<'_>> for RawSite<S>
