@@ -142,6 +142,8 @@ mod tests {
             ("a", 1, 5, 0, Some(5)),
             ("aa", 1, 5, 1, None),
             ("aaaaa", 1, 5, 4, None),
+            ("", 0, 1, 0, Some(2)),
+            ("a", 0, 1, 1, None),
         ];
         for (want, min, max, index, want_size) in tests {
             let prim = Node::Literal("a".into());
@@ -189,6 +191,26 @@ mod tests {
                 want,
                 &format_at_ctx(&count, &context, U256::from_u32(index))
             );
+        }
+    }
+
+    #[test]
+    fn test_count_single() {
+        let context = Context::empty();
+        let literal = Node::Literal("a".into());
+        for (want, min, max, index) in [
+            ("", 0, 5, 0),
+            ("a", 0, 5, 1),
+            ("aaaaa", 0, 5, 5),
+            ("a", 1, 5, 0),
+            ("aaaa", 1, 5, 3),
+            ("aaaaa", 1, 5, 4),
+            ("aaaa", 4, 10, 0),
+            ("aaaaa", 4, 10, 1),
+        ] {
+            let count = Node::Count(Box::new(literal.clone()), min, max);
+            let index = U256::from_u32(index);
+            assert_eq!(want, &format_at_ctx(&count, &context, index));
         }
     }
 
