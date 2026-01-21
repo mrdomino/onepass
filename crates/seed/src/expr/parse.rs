@@ -133,7 +133,12 @@ impl str::FromStr for Node {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match Node::parse(s).finish() {
-            Ok((_remaining, node)) => Ok(node),
+            Ok((remaining, node)) => {
+                if !remaining.is_empty() {
+                    return Err(Error::new(s.to_string(), ErrorKind::Complete));
+                }
+                Ok(node)
+            }
             Err(error::Error { input, code }) => Err(Error {
                 input: input.to_string(),
                 code,
@@ -445,7 +450,7 @@ mod tests {
     fn test_literal() {
         let node = "cats".parse().unwrap();
         assert_eq!(Node::Literal("cats".into()), node);
-        let node = r#"\\cats\tand\[dogs\]\{woof\}}"#.parse().unwrap();
+        let node = r#"\\cats\tand\[dogs\]\{woof\}"#.parse().unwrap();
         assert_eq!(Node::Literal("\\cats\tand[dogs]{woof}".into()), node);
     }
 
@@ -549,6 +554,14 @@ mod tests {
                 code: ErrorKind::Char
             }),
             "\\ud800".parse::<Node>(),
+        );
+    }
+
+    #[test]
+    fn test_remaining() {
+        assert_eq!(
+            Err(Error::new("a\\".into(), ErrorKind::Complete)),
+            "a\\".parse::<Node>()
         );
     }
 }
