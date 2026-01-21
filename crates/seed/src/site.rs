@@ -186,9 +186,11 @@ impl error::Error for Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use error::Error;
-
-        fmt::Display::fmt(self.source().unwrap(), f)
+        let (t, e): (&str, &dyn error::Error) = match self {
+            Error::Parse(e) => ("parse", e),
+            Error::Url(e) => ("url", e),
+        };
+        write!(f, "{t}: {e}")
     }
 }
 
