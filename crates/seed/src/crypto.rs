@@ -90,7 +90,7 @@ mod tests {
     #[test]
     fn derivation_works() {
         assert_eq!(
-            "v3\thttps://google.com/\t\t{words|323606b363ebdedff9f562cb84c50df1a21cbd4b597ff4566df92bb9f2cefdfd}\t0",
+            "v3/priv\thttps://google.com/\t\t{words|323606b363ebdedff9f562cb84c50df1a21cbd4b597ff4566df92bb9f2cefdfd}\t0",
             &format!("{}", &test_site())
         );
     }
@@ -98,13 +98,13 @@ mod tests {
     #[test]
     fn salt_works() {
         assert_eq!(
-            "54fdc7b0a714e494b08563043429c9343e32680cbc7a9d4b23287db322c583ba",
+            "1cef595ae1bd08b50d1fd457eab716961891b8e6244f377bea6f18cc171f749d",
             hex::encode(test_site().salt())
         );
         let mut site2 = test_site();
         site2.username = Some("me@example.com".into());
         assert_eq!(
-            "8c6ffa25db380192f6aa494eb01d281aae89d39d1f8e6ea343f60b97e6d26a9a",
+            "05801ea917cb4da2045b9db3bff6b7421dc93f1d3708bfd34a73100f16460bb3",
             hex::encode(site2.salt())
         );
     }
@@ -113,18 +113,18 @@ mod tests {
     #[ignore] // too slow in debug
     fn secret() {
         assert_eq!(
-            "a89b5d180f4bda7a2ab4b090c18668f8d673d5743f7d9b58d737fede04bd7e12",
+            "b9d8aeffbcf60b4054d399be576648e1a058d3b61f194a5fab73126362b3a301",
             hex::encode(test_site().secret("testpass"))
         );
         assert_eq!(
-            "008db9755077550ceeb16500552f726f7bb7d8736e50ee5ebd47a1941d2cbb38",
+            "92ea6c4c44a3cb223e601ade213bbcfdf55c2758997c8657631e7dd33ffe0ed2",
             hex::encode(test_site().secret("testpass2"))
         );
         let mut site2 = test_site();
         site2.increment = 1;
         site2.username = Some("you@example.com".into());
         assert_eq!(
-            "4a7d78a751f1c72ea279b31951a7a3dc8004bb1ada0685f2e919218f582a54d4",
+            "d76fbab456c845b005aa8527781197a8691a763984d05e75450d266bc6f1cd27",
             hex::encode(site2.secret("testpass"))
         );
     }
@@ -189,7 +189,7 @@ mod tests {
     #[ignore]
     fn password_e2e() {
         assert_eq!(
-            "gab sporting subduing defrost sixties",
+            "parasitic prompter dimmer overdrive designer",
             &*test_site().password("testpass").unwrap()
         );
     }

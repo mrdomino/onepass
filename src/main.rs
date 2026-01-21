@@ -236,13 +236,13 @@ mod tests {
     fn test_passwords() -> Result<()> {
         let tests = [
             (
-                "deprive-cargo-richly-sibling",
+                "impeach-duckling-outage-spur",
                 "arst",
                 "google.com",
                 "{words:4:-}",
                 0,
             ),
-            ("!((-%(')*'\"/", "password", "apple.com", "[!-/]{12}", 1),
+            ("(%\")&#+(&!/$", "password", "apple.com", "[!-/]{12}", 1),
         ];
         for (want, seed, url, schema, increment) in tests {
             let site = Site::new(url, None, schema, increment)?;

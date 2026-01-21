@@ -164,7 +164,7 @@ impl fmt::Display for Site<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write_tsv!(
             f,
-            "v3",
+            "v3/priv",
             &self.url,
             &self.username.as_deref().unwrap_or(""),
             &self.expr,
