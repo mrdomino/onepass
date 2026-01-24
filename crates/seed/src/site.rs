@@ -1,6 +1,4 @@
-use core::{error, fmt, num::NonZero};
-
-use serde::{Deserialize, Serialize};
+use core::{error, fmt};
 
 use crate::{
     expr::{Context, Expr, ParseError},
@@ -15,26 +13,6 @@ pub struct Site<'a> {
     pub username: Option<String>,
     pub expr: Expr<'a>,
     pub increment: u32,
-}
-
-/// Serialized representation of a [`Site`].
-///
-/// This type is suitable for storing in e.g config files, and may be serialized or deserialized
-/// via [`serde`]. It converts to a [`Site`] via [`TryFrom`], or with a custom [`Context`] via
-/// `TryFrom<(RawSite, Context)>`. The generic `S` parameter may be any type that implements
-/// [`AsRef<str>`].
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub struct RawSite<S> {
-    pub url: S,
-
-    // TODO(soon): figure out how to represent sites with defaulted schemas.
-    pub schema: S,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub username: Option<S>,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub increment: Option<NonZero<u32>>,
 }
 
 /// Represents an error deserializing a [`Site`].
@@ -89,74 +67,6 @@ impl<'a> Site<'a> {
     ) -> Result<Self, Error> {
         let expr = Expr::with_context(schema.parse()?, ctx);
         Self::with_expr(url, username, expr, increment)
-    }
-}
-
-impl<S> RawSite<S>
-where
-    S: AsRef<str>,
-{
-    pub fn new(url: S, username: Option<S>, schema: S, increment: u32) -> Self {
-        RawSite {
-            url,
-            username,
-            schema,
-            increment: NonZero::try_from(increment).ok(),
-        }
-    }
-
-    pub fn as_deref(&self) -> RawSite<&str> {
-        RawSite {
-            url: self.url.as_ref(),
-            username: self.username.as_ref().map(S::as_ref),
-            schema: self.schema.as_ref(),
-            increment: self.increment,
-        }
-    }
-}
-
-impl<S> From<Site<'_>> for RawSite<S>
-where
-    S: From<String> + AsRef<str>,
-{
-    fn from(site: Site<'_>) -> Self {
-        let url = S::from(site.url);
-        let username = site.username.map(S::from);
-        let schema = S::from(format!("{}", site.expr));
-        let increment = site.increment;
-        RawSite::new(url, username, schema, increment)
-    }
-}
-
-impl<S> TryFrom<&RawSite<S>> for Site<'_>
-where
-    S: AsRef<str>,
-{
-    type Error = Error;
-    fn try_from(site: &RawSite<S>) -> Result<Self, Self::Error> {
-        Site::new(
-            site.url.as_ref(),
-            site.username.as_ref().map(S::as_ref),
-            site.schema.as_ref(),
-            site.increment.map_or(0, u32::from),
-        )
-    }
-}
-
-impl<'a, S> TryFrom<(&RawSite<S>, &'a Context<'a>)> for Site<'a>
-where
-    S: AsRef<str>,
-{
-    type Error = Error;
-    fn try_from(value: (&RawSite<S>, &'a Context<'a>)) -> Result<Self, Self::Error> {
-        let (site, context) = value;
-        Site::with_context(
-            context,
-            site.url.as_ref(),
-            site.username.as_ref().map(S::as_ref),
-            site.schema.as_ref(),
-            site.increment.map_or(0, u32::from),
-        )
     }
 }
 
