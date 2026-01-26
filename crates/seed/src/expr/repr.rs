@@ -1,4 +1,7 @@
-use core::fmt::{self, Result, Write};
+use core::{
+    fmt::{self, Result, Write},
+    mem,
+};
 
 use crate::expr::{
     Context, Expr, Node,
@@ -48,8 +51,7 @@ impl ReprState<'_, '_> {
             Node::Literal(ref s) => write_literal(w, s),
             Node::Chars(ref chars) => write!(w, "{chars}"),
             Node::List(ref list) => {
-                let nested;
-                (nested, self.0) = (self.0, true);
+                let nested = mem::replace(&mut self.0, true);
                 if nested {
                     write!(w, "(")?;
                 }
