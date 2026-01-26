@@ -9,8 +9,8 @@ use crate::{
 /// A fully parsed [`Site`].
 #[derive(Debug)]
 pub struct Site<'a> {
-    pub url: String,
-    pub username: Option<String>,
+    pub url: Box<str>,
+    pub username: Option<Box<str>>,
     pub expr: Expr<'a>,
     pub increment: u32,
 }
@@ -29,8 +29,8 @@ impl Site<'_> {
         schema: &str,
         increment: u32,
     ) -> Result<Self, Error> {
-        let url = normalize(url)?;
-        let username = username.map(str::to_string);
+        let url = normalize(url)?.into_boxed_str();
+        let username = username.map(Box::from);
         let expr = Expr::new(schema.parse()?);
         Ok(Site {
             url,
@@ -48,8 +48,8 @@ impl<'a> Site<'a> {
         expr: Expr<'a>,
         increment: u32,
     ) -> Result<Self, Error> {
-        let url = normalize(url)?;
-        let username = username.map(str::to_string);
+        let url = normalize(url)?.into_boxed_str();
+        let username = username.map(Box::from);
         Ok(Site {
             url,
             username,
