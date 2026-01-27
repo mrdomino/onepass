@@ -1159,6 +1159,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "onepass-conf"
+version = "3.0.0-pre.0"
+
+[[package]]
 name = "onepass-seed"
 version = "3.0.0-pre.0"
 dependencies = [
