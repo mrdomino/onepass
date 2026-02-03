@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod config;
 #[cfg(all(target_os = "macos", feature = "macos-biometry"))]
 mod macos_keychain;
 mod seed_password;
 
 use std::{
     io::{IsTerminal, Write, stdout},
+    num::NonZero,
     path::Path,
 };
 
 use anyhow::{Context as _Context, Result};
 use clap::{CommandFactory, Parser, error::ErrorKind};
-use config::Config;
+use onepass_conf::Config;
 use onepass_seed::{
     dict::BoxDict,
     expr::{Context, Eval},
@@ -122,8 +122,9 @@ fn main() -> Result<()> {
     if args.no_keyring {
         args.keyring = Some(false);
     }
-    let config = Config::from_file(args.config_path.as_deref()).context("failed to read config")?;
-    let use_keyring = args.keyring.or(config.use_keyring).unwrap_or(false);
+    let config_path = args.config_path.as_deref();
+    let config = Config::from_or_init(config_path).context("failed to read config")?;
+    let use_keyring = args.keyring.or(config.global.use_keyring).unwrap_or(false);
 
     if args.reset_keyring {
         seed_password::delete()?;
@@ -175,7 +176,10 @@ fn main() -> Result<()> {
 fn read_words_str(args: &Args, config: &Config) -> Result<Option<Box<str>>> {
     use std::fs::read_to_string;
 
-    let path = args.words_path.as_deref().or(config.words_path.as_deref());
+    let path = args
+        .words_path
+        .as_deref()
+        .or(config.global.words_path.as_deref());
     path.map(|p| read_to_string(p).map(|s| s.into_boxed_str()))
         .transpose()
         .context("failed reading words file")
@@ -192,19 +196,20 @@ fn gen_password_config(
     let username = args
         .username
         .as_deref()
-        .or_else(|| site.as_ref().and_then(|(_, site)| site.username.as_deref()));
+        .or_else(|| site.as_ref().and_then(|(_, site)| site.username));
     let url = site.as_ref().map_or(req, |(url, _)| url);
     let schema = args.schema.as_ref().map_or_else(
         || {
-            site.as_ref().map_or(config.default_schema(), |(_, site)| {
-                config.site_schema(site)
-            })
+            site.as_ref()
+                .and_then(|(_, site)| site.schema)
+                .unwrap_or(config.default_schema())
         },
-        |schema| config.aliases.get(schema).unwrap_or(schema),
+        |schema| config.global.aliases.get(schema).unwrap_or(schema),
     );
-    let increment = args
-        .increment
-        .unwrap_or_else(|| site.as_ref().map_or(0, |(_, site)| site.increment));
+    let increment = args.increment.unwrap_or_else(|| {
+        site.as_ref()
+            .map_or(0, |(_, site)| site.increment.map_or(0, NonZero::get))
+    });
     let site = Site::with_context(&context, url, username, schema, increment)?;
     let size = site.expr.size();
     let salt = format!("{site}");
@@ -263,8 +268,8 @@ mod tests {
         let words_path = dir_path.into_boxed_path();
 
         let mut config_file = File::create(&config_path)?;
-        writeln!(config_file, "words_path: words")?;
-        writeln!(config_file, "sites:")?;
+        writeln!(config_file, "[global]")?;
+        writeln!(config_file, "words_path = {words_path:?}")?;
         drop(config_file);
 
         let mut words_file = File::create(&words_path)?;
@@ -274,7 +279,7 @@ mod tests {
         writeln!(words_file, "a")?;
         drop(words_file);
 
-        let config = Config::from_file(Some(&config_path))?;
+        let config = Config::from_file(&config_path)?;
         let args: [&str; 0] = [];
         let words = read_words_str(&Args::parse_from(args.iter()), &config)?
             .context("failed reading words file")?;
