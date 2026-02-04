@@ -147,9 +147,9 @@ fn main() -> Result<()> {
     let dict = dict.as_deref();
 
     let mut stdout = stdout();
+    let context = dict.map_or_else(Context::default, Context::with_dict);
     for site in &args.sites {
-        let context = dict.map_or_else(Context::default, Context::with_dict);
-        let res = gen_password_config(&seed, site, &config, &args, context)?;
+        let res = gen_password_config(&seed, site, &config, &args, &context)?;
         stdout.write_all(res.as_bytes())?;
         if stdout.is_terminal() || args.sites.len() > 1 {
             writeln!(stdout)?;
@@ -190,7 +190,7 @@ fn gen_password_config(
     req: &str,
     config: &Config,
     args: &Args,
-    context: Context<'_>,
+    context: &Context<'_>,
 ) -> Result<Zeroizing<String>> {
     let site = config.find_site(req)?;
     let username = args
@@ -202,7 +202,7 @@ fn gen_password_config(
         || {
             site.as_ref()
                 .and_then(|(_, site)| site.schema)
-                .unwrap_or(config.default_schema())
+                .unwrap_or_else(|| config.default_schema())
         },
         |schema| config.global.aliases.get(schema).unwrap_or(schema),
     );
@@ -210,7 +210,7 @@ fn gen_password_config(
         site.as_ref()
             .map_or(0, |(_, site)| site.increment.map_or(0, NonZero::get))
     });
-    let site = Site::with_context(&context, url, username, schema, increment)?;
+    let site = Site::with_context(context, url, username, schema, increment)?;
     let size = site.expr.size();
     let salt = format!("{site}");
 
