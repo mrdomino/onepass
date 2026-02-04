@@ -16,12 +16,21 @@ use serde::{Deserialize, Serialize};
 
 use crate::dirs::{config_dir, expand_home};
 
+/// Finalized user configuration for `onepass`.
+///
+/// Consists of [global settings][Global] and a map of URL to Site.
 #[derive(Clone, Debug, Default)]
 pub struct Config {
     pub global: Global,
+
+    // TODO(soon): This actually should be (url, username) => site, not url => site.
     pub site: BTreeMap<String, RawSite<String>>,
 }
 
+/// On-disk representation of a single `onepass` configuration file.
+///
+/// Compared with [`Config`], this specifies optional include paths and allows any number of sites
+/// without any constraints on mapping.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Hash)]
 pub struct DiskConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -34,21 +43,42 @@ pub struct DiskConfig {
     pub site: Vec<RawSite<String>>,
 }
 
+/// Global settings for `onepass`.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Global {
+    /// The default schema for any sites that don’t have one of their own. If not specified,
+    /// defaults to `{words}`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_schema: Option<String>,
 
+    /// The word list to use for any sites that generate from dictionaries, instead of the built-in
+    /// [`EFF wordlist`][onepass_seed::dict::EFF_WORDLIST].
+    // TODO(soon): Make the word list configurable per site. Warning: lifetime pain.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub words_path: Option<PathBuf>,
 
+    /// Whether to store the seed password in the OS keyring.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_keyring: Option<bool>,
 
+    /// A lookup of shorthand names to schema definitions. If a site has a schema that matches one
+    /// of the keys of this map, then that key’s value will be substituted when that site is
+    /// processed.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub aliases: BTreeMap<String, String>,
 }
 
+/// A pseudo-[`Site`] that is easier to represent on disk.
+///
+/// Compared with [`Site`], this allows using any [`AsRef<str>`] type, and does not enforce correct
+/// URLs or schemas. Incorrect or missing data will result in errors converting from `RawSite` to
+/// `Site`.
+///
+/// Morally speaking, there is a `impl From<Site> for RawSite`, but only
+/// `impl TryFrom<RawSite> for Site`. But neither of these quite exist, because there needs to be
+/// an optional dictionary passed along as well, and since the current
+/// [`Dict`][onepass_seed::dict::Dict] takes a lifetime parameter, the dictionary cannot be easily
+/// subbed in here without some changes at a higher level.
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RawSite<S> {
     pub url: S,
@@ -65,12 +95,17 @@ pub struct RawSite<S> {
 
 impl Config {
     #[cfg(test)]
+    /// Create a `Config` directly from a string, for tests. Panics if `include` is nonempty.
     pub fn from_str(s: &str) -> Result<Self, io::Error> {
         let ret: DiskConfig = toml::from_str(s).map_err(io::Error::other)?;
         assert!(ret.include.is_empty());
         Config::from_global_site(ret.global, ret.site).map_err(io::Error::other)
     }
 
+    /// Create a `Config` from its constituent parts.
+    ///
+    /// This normalizes all URLs in the [`RawSite`]s and does the conversion from `S` to
+    /// [`String`].
     pub fn from_global_site<S>(
         global: Global,
         site: impl IntoIterator<Item = RawSite<S>>,
@@ -154,6 +189,10 @@ impl Config {
         res
     }
 
+    /// Reads and returns the config pointed to by the base path.
+    ///
+    /// This traverses includes, producing a single [`Config`] that is the result of merging all
+    /// includes together.
     pub fn from_file(base_path: &Path) -> Result<Self, io::Error> {
         let base_path = expand_home(base_path).canonicalize()?;
         let base_config = DiskConfig::from_file(&base_path)?;
@@ -189,6 +228,12 @@ impl Config {
         Config::from_global_site(global, site).map_err(io::Error::other)
     }
 
+    /// Look up a site.
+    ///
+    /// This does [URL normalization][normalize] on the input URL, so e.g. "google.com" will look
+    /// up "https://google.com/" (and vice versa, since URLs are normalized in the site data too.)
+    /// It also does alias substitution on the result, producing a [`RawSite`] that is safe to
+    /// convert to a [`Site`].
     pub fn find_site<'a>(&'a self, url: &str) -> Result<Option<(String, RawSite<&'a str>)>, Error> {
         let url = normalize(url)?;
         let Some(site) = self.site.get(&url) else {
@@ -201,6 +246,7 @@ impl Config {
         Ok(Some((url, site)))
     }
 
+    /// Returns the configured default schema, or `"{words}"` if none is specified.
     pub fn default_schema(&self) -> &str {
         self.global.default_schema.as_deref().unwrap_or("{words}")
     }
@@ -223,6 +269,10 @@ impl Config {
 }
 
 impl DiskConfig {
+    /// Read a config from a file, returning it.
+    ///
+    /// This just does simple deserialization without any traversal of includes; see
+    /// [`Config::from_file`].
     pub fn from_file(path: &Path) -> Result<Self, io::Error> {
         let config = fs::read_to_string(path)?;
         toml::from_str(&config).map_err(io::Error::other)
@@ -230,6 +280,8 @@ impl DiskConfig {
 }
 
 impl Global {
+    /// Returns the word list from disk as a single string suitable for passing to
+    /// [`BoxDict::from_lines`][onepass_seed::dict::BoxDict::from_lines].
     pub fn get_words_string(&self) -> Result<Option<Box<str>>, io::Error> {
         let Some(ref path) = self.words_path else {
             return Ok(None);
@@ -258,6 +310,7 @@ impl Global {
         self.aliases.extend(other.aliases);
     }
 
+    /// Returns true if these settings are all unspecified / [`None`].
     pub fn is_empty(&self) -> bool {
         self.default_schema.is_none()
             && self.words_path.is_none()
@@ -279,6 +332,7 @@ where
         }
     }
 
+    /// Dereference this site, returning a `RawSite<&str>`.
     pub fn as_deref(&self) -> RawSite<&str> {
         RawSite {
             url: self.url.as_ref(),
@@ -288,6 +342,9 @@ where
         }
     }
 
+    /// Convert this site to a [`Site`].
+    ///
+    /// See [`Site::new`].
     pub fn to_site(&self, default_schema: &str) -> Result<Site<'_>, Error> {
         Site::new(
             self.url.as_ref(),
@@ -297,6 +354,9 @@ where
         )
     }
 
+    /// Convert this site to a [`Site`] with a specific context.
+    ///
+    /// See [`Site::with_context`].
     pub fn to_site_with_context<'a>(
         &self,
         default_schema: &str,
@@ -311,6 +371,10 @@ where
         )
     }
 
+    /// Return the increment for this site as a u32.
+    ///
+    /// This trivial helper method exists because we use `Option<NonZero<u32>>` to skip serializing
+    /// zero values.
     fn get_increment(&self) -> u32 {
         self.increment.map_or(0, NonZero::get)
     }
