@@ -26,7 +26,7 @@ impl EvalContext for Node {
 
     fn size(&self, context: &Context) -> NonZero<U256> {
         match *self {
-            Node::Literal(_) => NonZero::new(U256::ONE).unwrap(),
+            Node::Literal(_) => NonZero::ONE,
             Node::Chars(ref chars) => chars.size(),
             Node::List(ref nodes) => {
                 NonZero::new(nodes.into_iter().fold(U256::ONE, |acc, node| {
