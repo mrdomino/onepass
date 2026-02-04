@@ -22,8 +22,10 @@ pub trait GeneratorFunc: Send + Sync {
         args: &[&str],
     ) -> io::Result<()>;
 
-    // `GeneratorFunc`s know how to format themselves, which they may use to e.g. inject dictionary
-    // hashes for canonical serialization.
+    /// `GeneratorFunc`s know how to format themselves, which they may use to e.g. inject
+    /// dictionary hashes for canonical serialization.
+    // TODO(someday): standardize `write_sep_arg`, and instead have an optional trait method that
+    // yields each argument.
     fn write_repr(&self, w: &mut dyn fmt::Write, args: &[&str]) -> fmt::Result {
         write!(w, "{}", self.name())?;
         for &arg in args {
