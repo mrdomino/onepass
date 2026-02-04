@@ -23,6 +23,7 @@ resolver = "3"
 members = ["crates/base", "crates/conf", "crates/seed"]
 
 [workspace.package]
+# TODO(soon): figure out per-crate releases, versioning, etc.
 version = "3.0.0-pre.0"
 edition = "2024"
 license = "AGPL"
