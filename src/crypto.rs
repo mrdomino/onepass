@@ -14,7 +14,7 @@
 
 use anyhow::Result;
 use argon2::{Algorithm, Argon2, Params, Version};
-use chacha20::ChaCha20Rng;
+use rand_chacha::ChaCha20Rng;
 use rand_core::{RngCore, SeedableRng};
 use zeroize::{ZeroizeOnDrop, Zeroizing, zeroize_flat_type};
 
@@ -43,6 +43,9 @@ impl RngCore for Rng {
     }
     fn fill_bytes(&mut self, dst: &mut [u8]) {
         self.0.fill_bytes(dst);
+    }
+    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> std::result::Result<(), rand_core::Error> {
+        self.0.try_fill_bytes(dst)
     }
 }
 
