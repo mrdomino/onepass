@@ -245,16 +245,17 @@ impl Config {
             return Ok(None);
         };
         let mut site = site.as_deref();
-        let schema = site.schema.unwrap_or_else(|| self.default_schema());
-        if let Some(pattern) = self.global.aliases.get(schema) {
-            site.schema = Some(pattern.as_ref());
-        }
+        let schema = site
+            .schema
+            .map(|name| self.resolve_schema(name))
+            .unwrap_or_else(|| self.default_schema());
+        site.schema = Some(schema);
         Ok(Some((url, site)))
     }
 
     /// Returns the configured default schema, or `"{words}"` if none is specified.
     pub fn default_schema(&self) -> &str {
-        self.global.default_schema.as_deref().unwrap_or("{words}")
+        self.resolve_schema(self.global.default_schema.as_deref().unwrap_or("{words}"))
     }
 
     fn resolve_path(base_path: &Path, path: PathBuf) -> PathBuf {
@@ -271,6 +272,10 @@ impl Config {
         path.push("onepass");
         path.push("config.toml");
         Ok(path)
+    }
+
+    fn resolve_schema<'a>(&'a self, name: &'a str) -> &'a str {
+        self.global.aliases.get(name).map_or(name, AsRef::as_ref)
     }
 }
 
@@ -430,6 +435,7 @@ mod tests {
         .unwrap();
         let (_, site) = config.find_site("google.com").unwrap().unwrap();
         assert_eq!(Some("b"), site.schema);
+        assert_eq!("b", config.default_schema());
     }
 
     // TODO(soon): more tests
