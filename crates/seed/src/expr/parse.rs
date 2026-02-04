@@ -174,7 +174,7 @@ impl str::FromStr for Node {
 
 fn parse_count(input: &str) -> IResult<&str, Node> {
     let (input, node) = parse_single(input)?;
-    let (input, count) = opt(delimited(
+    let (remaining, count) = opt(delimited(
         char('{'),
         alt((
             separated_pair(complete::u32, char(','), complete::u32),
@@ -184,13 +184,14 @@ fn parse_count(input: &str) -> IResult<&str, Node> {
         char('}'),
     ))
     .parse(input)?;
-    Ok((
-        input,
-        match count {
-            None => node,
-            Some((a, b)) => Node::Count(Box::new(node), a, b),
-        },
-    ))
+    match count {
+        None => Ok((remaining, node)),
+        Some((min, max)) if max >= min => Ok((remaining, Node::Count(Box::new(node), min, max))),
+        _ => Err(nom::Err::Failure(error::Error::new(
+            input,
+            ErrorKind::Verify,
+        ))),
+    }
 }
 
 fn parse_single(input: &str) -> IResult<&str, Node> {
@@ -401,7 +402,7 @@ fn parse_chars_posix(input: &str) -> IResult<&str, &'static [(char, char)]> {
 }
 
 fn parse_chars_range(input: &str) -> IResult<&str, (char, char)> {
-    if let (input2, Some((a, b))) = opt(separated_pair(
+    if let (remaining, Some((a, b))) = opt(separated_pair(
         parse_chars_single,
         char('-'),
         parse_chars_single,
@@ -409,7 +410,7 @@ fn parse_chars_range(input: &str) -> IResult<&str, (char, char)> {
     .parse(input)?
     {
         if a <= b {
-            return Ok((input2, (a, b)));
+            return Ok((remaining, (a, b)));
         }
         return Err(nom::Err::Failure(error::Error::new(
             input,
