@@ -91,7 +91,7 @@ impl Expr<'_> {
     /// # Counts
     /// As alluded to, expressions may be repeated for specified counts. The syntax is
     /// `expr{min,max}`. If `max` is omitted, i.e. `expr{min}`, then `max == min`. If `min` is omitted,
-    /// i.e. `expr{,max}`, `min == 0`.
+    /// i.e. `expr{,max}`, then `min == 0`.
     ///
     /// # Generators
     /// Arbitrary library-suppliable generators may be called. The library includes two: `word` to
@@ -107,9 +107,34 @@ impl Expr<'_> {
     /// but may not be used unescaped anywhere else in an expression. This syntax is reserved for
     /// possible future expansion.
     ///
+    /// # Errors
+    /// It is an error to write a character class with the higher character before the lower
+    /// character, e.g. `[b-a]`.
+    /// ```
+    /// # use core::str::FromStr;
+    /// # use onepass_seed::expr::Node;
+    /// assert!("[b-a]".parse::<Node>().is_err());
+    /// ```
+    ///
+    /// Partial remainders, e.g. in the case of unbalanced delimiters, yield an error. (These can,
+    /// and should, simply be backslash-escaped.)
+    /// ```
+    /// # use core::str::FromStr;
+    /// # use onepass_seed::expr::Node;
+    /// assert!("abcd}".parse::<Node>().is_err());
+    /// assert!("abcd\\}".parse::<Node>().is_ok());
+    /// ```
+    ///
+    /// At present, hex sequences that do not encode valid UTF-8 encoded text are an error.
+    ///
+    /// The syntax `[:word:]` (and `[:Word:]`) used to be the way to generate a word from a
+    /// dictionary in `onepass` v2. In the current syntax, these would both parse to degenerate
+    /// character classes, e.g. `[:dorw]`. Since this is virtually never intended, those specific
+    /// strings are presently a parse error.
+    ///
     /// # Context
     /// This function returns an expression against the default context.
-    /// [`Self::parse_with_context`] may be used to parse an expression againsta custom context.
+    /// [`Self::parse_with_context`] may be used to parse an expression against a custom context.
     pub fn parse(input: &str) -> Result<Self, Error> {
         Ok(Expr::new(input.parse()?))
     }
