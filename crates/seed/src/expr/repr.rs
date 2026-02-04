@@ -65,7 +65,10 @@ impl ReprState<'_, '_> {
                 self.0 = true;
                 self.write(w, node)?;
                 w.write_char('{')?;
-                write!(w, "{min}")?;
+                // NB. it is legal to have max == 0.
+                if min != 0 || max == 0 {
+                    write!(w, "{min}")?;
+                }
                 if max != min {
                     write!(w, ",{max}")?;
                 }
@@ -211,8 +214,8 @@ mod tests {
             &format!("{}", Expr::parse("([a-z][0-9]){3,6}").unwrap())
         );
         assert_eq!(
-            "[a-z]{0,3}",
-            &format!("{}", Expr::parse("[a-z]{,3}").unwrap())
+            "[a-z]{,3}",
+            &format!("{}", Expr::parse("[a-z]{0,3}").unwrap())
         );
     }
 }
