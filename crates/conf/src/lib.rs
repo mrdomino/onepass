@@ -58,6 +58,9 @@ pub struct Global {
     pub words_path: Option<PathBuf>,
 
     /// Whether to store the seed password in the OS keyring.
+    // TODO(soon): this is poorly named. We probably want a feature to _populate_ generated site
+    // passwords _into_ the OS keyring, as well as this one, which reads the _seed_ password _from_
+    // the OS keyring.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_keyring: Option<bool>,
 
