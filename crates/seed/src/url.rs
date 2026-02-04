@@ -16,6 +16,14 @@ use url::Url;
 
 pub type Error = url::ParseError;
 
+/// Apply some light normalization to an input URL.
+///
+/// This function does whatever [`url::Url::parse`] does, e.g. punycode conversion, case folding,
+/// and path normalization. It also, if given a URL that does not parse successfully, tries
+/// prepending `"https://"` and re-parsing, thus normalizing between schemeless and schemed URLs.
+// TODO(someday): revisit the https:// prepending. It seems kinda sketchy, maybe we should only do
+// it if the URL does not contain a : or does not start with "http://" or "https://". Maybe we
+// should just normalize everything to HTTPS or HTTP, or drop the scheme.
 pub fn normalize(input: &str) -> Result<String, Error> {
     Url::parse(input)
         .or_else(|_| Url::parse(format!("https://{input}").as_ref()))
