@@ -53,7 +53,9 @@ pub struct Global {
 
     /// The word list to use for any sites that generate from dictionaries, instead of the built-in
     /// [`EFF wordlist`][onepass_seed::dict::EFF_WORDLIST].
-    // TODO(soon): Make the word list configurable per site. Warning: lifetime pain.
+    // TODO(soon): Make the dictionary configurable per site. Probably we want this to be a list of
+    // word files, maybe with optional labels and/or parsing instructions, and then we can refer to
+    // dicts by hash or by label in per-site schemas.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub words_path: Option<PathBuf>,
 
