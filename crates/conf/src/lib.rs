@@ -245,7 +245,8 @@ impl Config {
             return Ok(None);
         };
         let mut site = site.as_deref();
-        if let Some(pattern) = site.schema.and_then(|name| self.global.aliases.get(name)) {
+        let schema = site.schema.unwrap_or_else(|| self.default_schema());
+        if let Some(pattern) = self.global.aliases.get(schema) {
             site.schema = Some(pattern.as_ref());
         }
         Ok(Some((url, site)))
@@ -403,7 +404,7 @@ mod tests {
             r#"
             [[site]]
             url="google.com"
-        "#,
+            "#,
         )
         .unwrap();
         eprintln!("{config:?}");
@@ -413,6 +414,22 @@ mod tests {
         assert_eq!(None, site.schema);
         assert_eq!(None, site.increment);
         assert!(!config.site.contains_key("yahoo.com"));
+    }
+
+    #[test]
+    fn test_default_schema_alias() {
+        let config = Config::from_str(
+            r#"
+            [global]
+            aliases={a="b"}
+            default_schema="a"
+            [[site]]
+            url="google.com"
+            "#,
+        )
+        .unwrap();
+        let (_, site) = config.find_site("google.com").unwrap().unwrap();
+        assert_eq!(Some("b"), site.schema);
     }
 
     // TODO(soon): more tests
