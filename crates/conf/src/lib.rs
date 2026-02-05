@@ -233,6 +233,7 @@ impl Config {
         Config::from_global_site(global, site).map_err(io::Error::other)
     }
 
+    #[allow(rustdoc::bare_urls)]
     /// Look up a site.
     ///
     /// This does [URL normalization][normalize] on the input URL, so e.g. "google.com" will look
