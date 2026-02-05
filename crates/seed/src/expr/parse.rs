@@ -147,17 +147,19 @@ impl<'a> Expr<'a> {
     }
 }
 
-impl Node {
-    pub fn parse(input: &str) -> IResult<&str, Node> {
-        map(many1(parse_count), Node::from_iter).parse(input)
-    }
+/// Parse a [`Node`], returning an [`IResult`].
+///
+/// This function is used to implement the [`FromStr`][str::FromStr] instance on which
+/// [`Expr::parse`] is based.
+pub fn parse_node(input: &str) -> IResult<&str, Node> {
+    map(many1(parse_count), Node::from_iter).parse(input)
 }
 
 impl str::FromStr for Node {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match Node::parse(s).finish() {
+        match parse_node(s).finish() {
             Ok((remaining, node)) => {
                 if !remaining.is_empty() {
                     return Err(Error::new(s.to_string(), ErrorKind::Complete));
@@ -465,7 +467,7 @@ fn parse_generator_verbatim(input: &str) -> IResult<&str, &str> {
 }
 
 fn parse_list(input: &str) -> IResult<&str, Node> {
-    delimited(char('('), Node::parse, char(')')).parse(input)
+    delimited(char('('), parse_node, char(')')).parse(input)
 }
 
 #[cfg(test)]
@@ -488,10 +490,9 @@ mod tests {
             }),
             "[A-Za-z0123-9]".parse::<Node>().unwrap(),
         );
-        let res = Node::parse("[z-a]");
+        let res = "[z-a]".parse::<Node>();
         assert!(res.is_err(), "{res:?}");
-        let e = format!("{}", res.unwrap_err());
-        assert!(e.contains(r#"input: "z-a]""#));
+        assert_eq!("error Verify at: z-a]", &format!("{}", res.unwrap_err()));
     }
 
     #[test]
