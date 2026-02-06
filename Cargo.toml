@@ -34,7 +34,7 @@ readpass-libbsd = ["readpassphrase-3/libbsd-static"]
 readpass-vendored = ["readpassphrase-3/linux-vendored"]
 
 [dependencies]
-anyhow = "1.0.100"
+anyhow = "1.0.101"
 argon2 = { version = "0.5.3", features = ["zeroize"] }
 char-iter = "0.1.0"
 clap = { version = "4.5.60", features = ["derive", "env", "unicode", "wrap_help"] }
