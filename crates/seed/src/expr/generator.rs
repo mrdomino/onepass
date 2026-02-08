@@ -35,7 +35,7 @@ pub trait GeneratorFunc: Send + Sync {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Generator(Box<str>);
 
 #[derive(Debug)]
@@ -270,12 +270,6 @@ impl GeneratorFunc for Words<'_> {
     fn write_repr(&self, w: &mut dyn fmt::Write, args: &[&str]) -> fmt::Result {
         write!(w, "{}", self.name())?;
         fmt_with_hash(w, self.0.hash(), args)
-    }
-}
-
-impl PartialEq for Generator {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
     }
 }
 
