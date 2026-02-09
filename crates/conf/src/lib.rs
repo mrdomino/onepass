@@ -70,7 +70,7 @@ pub struct Global {
     /// of the keys of this map, then that key’s value will be substituted when that site is
     /// processed.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub aliases: BTreeMap<String, String>,
+    pub alias: BTreeMap<String, String>,
 }
 
 /// A pseudo-[`Site`] that is easier to represent on disk.
@@ -174,7 +174,7 @@ impl Config {
                     "# use_keyring = true\n",
                     "\n",
                     "# Schemas may have named aliases.\n",
-                    "aliases = {\n",
+                    "alias = {\n",
                     "    apple = \"{word:U}-{words:3:-}\\\\d\",\n",
                     "    login = \"\\\\w{12}\",\n",
                     "}\n",
@@ -276,7 +276,7 @@ impl Config {
     }
 
     fn resolve_schema<'a>(&'a self, name: &'a str) -> &'a str {
-        self.global.aliases.get(name).map_or(name, AsRef::as_ref)
+        self.global.alias.get(name).map_or(name, AsRef::as_ref)
     }
 }
 
@@ -319,7 +319,7 @@ impl Global {
             .use_keyring
             .into_iter()
             .for_each(|v| self.use_keyring = Some(v));
-        self.aliases.extend(other.aliases);
+        self.alias.extend(other.alias);
     }
 
     /// Returns true if these settings are all unspecified / [`None`].
@@ -327,7 +327,7 @@ impl Global {
         self.default_schema.is_none()
             && self.words_path.is_none()
             && self.use_keyring.is_none()
-            && self.aliases.is_empty()
+            && self.alias.is_empty()
     }
 }
 
@@ -427,7 +427,7 @@ mod tests {
         let config = Config::from_str(
             r#"
             [global]
-            aliases={a="b"}
+            alias={a="b"}
             default_schema="a"
             [[site]]
             url="google.com"

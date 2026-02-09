@@ -204,7 +204,7 @@ fn gen_password_config(
                 .and_then(|(_, site)| site.schema)
                 .unwrap_or_else(|| config.default_schema())
         },
-        |schema| config.global.aliases.get(schema).unwrap_or(schema),
+        |schema| config.global.alias.get(schema).unwrap_or(schema),
     );
     let increment = args.increment.unwrap_or_else(|| {
         site.as_ref()
