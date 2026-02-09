@@ -1,4 +1,4 @@
-use core::{fmt::Write, mem};
+use core::{fmt::Write, mem, pin::Pin};
 use std::io::{self, Error, Result};
 
 use argon2::{Algorithm, Argon2, Params, Version};
@@ -49,11 +49,11 @@ impl Site<'_> {
 
     /// Return the per-site secret for the given `seed_password`, running [`Argon2`] with the
     /// crate parameters.
-    pub fn secret(&self, seed_password: &str) -> Zeroizing<[u8; 32]> {
+    pub fn secret(&self, seed_password: &str) -> Pin<Zeroizing<[u8; 32]>> {
         let params = Params::new(256 * 1024, 4, 4, None).unwrap();
         let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
         let salt = self.salt();
-        let mut out = Zeroizing::new([0u8; 32]);
+        let mut out = Pin::new(Zeroizing::new([0u8; 32]));
         argon2
             .hash_password_into(seed_password.as_bytes(), &salt, &mut *out)
             .unwrap();
@@ -114,18 +114,18 @@ mod tests {
     fn secret() {
         assert_eq!(
             "b9d8aeffbcf60b4054d399be576648e1a058d3b61f194a5fab73126362b3a301",
-            hex::encode(test_site().secret("testpass"))
+            hex::encode(*test_site().secret("testpass"))
         );
         assert_eq!(
             "92ea6c4c44a3cb223e601ade213bbcfdf55c2758997c8657631e7dd33ffe0ed2",
-            hex::encode(test_site().secret("testpass2"))
+            hex::encode(*test_site().secret("testpass2"))
         );
         let mut site2 = test_site();
         site2.increment = 1;
         site2.username = Some("you@example.com".into());
         assert_eq!(
             "d76fbab456c845b005aa8527781197a8691a763984d05e75450d266bc6f1cd27",
-            hex::encode(site2.secret("testpass"))
+            hex::encode(*site2.secret("testpass"))
         );
     }
 
