@@ -1,0 +1,26 @@
+# Other files may be included.
+# include = ["local.toml"]
+
+# These settings affect all sites.
+[global]
+# The default schema can be overridden.
+# default_schema = "{words:5:-}"
+
+# A custom word list may be specified.
+# words_path = "/usr/share/dict/words"
+
+# The OS keyring may be used to store the seed password.
+# use_keyring = true
+
+# Schemas may have named aliases.
+alias = {
+    apple = "{word:U}-{words:3:-}\\d",
+    login = "\\w{12}",
+}
+
+# Sites can be configured by URL, username, schema, and increment.
+# [[site]]
+# url = "google.com"
+# username = "gmail@example"
+# schema = "apple"
+# increment = 1
