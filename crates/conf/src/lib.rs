@@ -1,3 +1,18 @@
+//! On-disk toml configuration format for [onepass].
+//!
+//! This crate defines a mapping between toml files and onepass password definitions, allowing
+//! users to store and manage their password configurations, including e.g. storing URLs and
+//! usernames, changing schemas, and rotating passwords.
+//!
+//! A crucial piece of the design of this crate is that no secret information should need to be
+//! persisted, save the seed password to a secure credential store, in order to use onepass. All
+//! other configuration may be shared without compromising site passwords; aside from user privacy
+//! concerns about sharing URLs or site activity, there shouldn’t be any issue with posting a
+//! onepass configuration file on the public internet. Short of that, copying it from one machine
+//! to another via an ordinary backup and restore process should be fine.
+//!
+//! [onepass]: https://github.com/mrdomino/onepass
+
 pub mod dirs;
 
 use std::{
@@ -33,6 +48,10 @@ pub struct Config {
 /// without any constraints on mapping.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Hash)]
 pub struct DiskConfig {
+    /// List of files to be included by this file.
+    ///
+    /// Files are merged, with paths interpreted relative to the file in which they are contained,
+    /// to build up a final [`Config`].
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub include: Vec<PathBuf>,
 

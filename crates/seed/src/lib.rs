@@ -28,9 +28,9 @@
 //!
 //! This scheme is designed to be user-extensible; crate users may add their own custom secret
 //! generators to extend this library into other domains. This is done via
-//! [`Generator`]s. A [`Generator`] may extend a password schema with specific extra configuration,
-//! e.g. a hash of a word list, to ensure that derivations that are different produce uncorrelated
-//! passwords.
+//! <code>[Generator]</code>s. A `Generator` may extend a password schema with specific extra
+//! configuration, e.g. a hash of a word list, to ensure that derivations that are different
+//! produce uncorrelated passwords.
 //!
 //! The derivation parameters saved per-site are the (mandatory) URL, an optional username, the
 //! password schema, and a nonce (called the “increment” in this crate.) The purpose of the nonce
@@ -44,8 +44,11 @@
 //! assert_eq!("jaywalker-diffused-verse-abdominal", &*site.password("seedpass").unwrap());
 //! ```
 //!
+//! For more information on the schema language see <code>[Expr]</code>.
+//!
 //! [0]: https://en.wikipedia.org/wiki/Bcrypt
-//! [`Generator`]: expr::Generator
+//! [Generator]: expr::Generator
+//! [Expr]: expr::Expr
 
 mod crypto;
 pub mod dict;
