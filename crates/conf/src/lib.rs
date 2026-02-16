@@ -310,7 +310,7 @@ impl Global {
             .default_schema
             .into_iter()
             .for_each(|s| self.default_schema = Some(s));
-        // TODO(soon): words_path should be relative to other, not self.
+        // TODO(soon): words_path should be relative to other, not self. The method needs a path.
         other
             .words_path
             .into_iter()
