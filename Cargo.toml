@@ -1,10 +1,10 @@
 [package]
 name = "onepass"
-version.workspace = true
+version = "3.0.0-pre.0"
 categories = ["command-line-utilities"]
 edition.workspace = true
 keywords = ["password", "cryptography", "deterministic"]
-license.workspace = true
+license = "AGPL"
 readme = "README.md"
 repository.workspace = true
 description = "A mostly-stateless deterministic password manager"
@@ -23,10 +23,7 @@ resolver = "3"
 members = ["crates/base", "crates/conf", "crates/seed"]
 
 [workspace.package]
-# TODO(soon): figure out per-crate releases, versioning, etc.
-version = "3.0.0-pre.0"
 edition = "2024"
-license = "AGPL"
 repository = "https://github.com/mrdomino/onepass"
 
 [features]
@@ -52,8 +49,8 @@ onepass-seed = { path = "crates/seed" }
 [dependencies]
 anyhow = "1.0.100"
 clap = { version = "4.5.53", features = ["derive", "env", "unicode", "wrap_help"] }
-onepass-conf = "3.0.0-pre.0"
-onepass-seed = "3.0.0-pre.0"
+onepass-conf = "0.1.0"
+onepass-seed = "0.1.0"
 serde = { version = "1.0.228", features = ["derive"] }
 zeroize = "1.8.2"
 
