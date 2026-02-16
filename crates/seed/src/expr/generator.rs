@@ -1,10 +1,11 @@
 use core::fmt;
-use std::{collections::HashMap, io, sync::Arc};
+use std::{io, sync::Arc};
 
 use crypto_bigint::{NonZero, U256, Word as _Word};
 use onepass_base::dict::Dict;
 use zeroize::Zeroizing;
 
+pub use super::context::Context;
 use super::{
     EvalContext,
     repr::write_literal,
@@ -14,7 +15,10 @@ use crate::dict::EFF_WORDLIST;
 
 pub trait GeneratorFunc: Send + Sync {
     fn name(&self) -> &'static str;
+
+    // TODO(soon): return Result from size so we can report dict lookup failure
     fn size(&self, context: &Context<'_>, args: &[&str]) -> NonZero<U256>;
+
     fn write_to(
         &self,
         context: &Context<'_>,
@@ -39,13 +43,9 @@ pub trait GeneratorFunc: Send + Sync {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Generator(Box<str>);
 
-#[derive(Debug)]
-pub struct Context<'a>(HashMap<&'static str, Arc<dyn GeneratorFunc + 'a>>);
+pub struct Word;
 
-// TODO(someday): multiple dict lookup by hash
-pub struct Word<'a>(&'a dyn Dict);
-
-pub struct Words<'a>(&'a dyn Dict);
+pub struct Words;
 
 fn write_sep_arg<W>(w: &mut W, arg: &str) -> fmt::Result
 where
@@ -60,7 +60,10 @@ impl EvalContext for Generator {
     type Context<'a> = Context<'a>;
 
     fn size(&self, context: &Context) -> NonZero<U256> {
-        self.func(context).size(context, &self.args())
+        context
+            .get_generator(self.name())
+            .unwrap()
+            .size(context, &self.args())
     }
 
     fn write_to(
@@ -69,7 +72,10 @@ impl EvalContext for Generator {
         w: &mut dyn io::Write,
         index: Zeroizing<U256>,
     ) -> io::Result<()> {
-        self.func(context).write_to(context, w, index, &self.args())
+        context
+            .get_generator(self.name())
+            .unwrap()
+            .write_to(context, w, index, &self.args())
     }
 }
 
@@ -96,53 +102,19 @@ impl Generator {
         };
         self.0.split(sep).skip(1).collect()
     }
-
-    fn func<'a>(&self, context: &'a Context) -> &'a dyn GeneratorFunc {
-        let name = self.name();
-        context
-            .get(name)
-            .ok_or_else(|| format!("unknown generator {name}"))
-            .unwrap()
-    }
 }
 
 impl<'a> Context<'a> {
-    pub fn with_dict(dict: &'a dyn Dict) -> Self {
-        let generators: Vec<Arc<dyn GeneratorFunc + 'a>> =
-            vec![Arc::new(Word(dict)), Arc::new(Words(dict))];
-        Self::from_iter(generators)
-    }
-}
-
-impl Context<'_> {
-    pub fn empty() -> Self {
-        Context(HashMap::new())
-    }
-
-    pub fn get<'a>(&'a self, name: &str) -> Option<&'a dyn GeneratorFunc> {
-        self.0.get(name).map(Arc::as_ref)
+    // TODO(soon): remove
+    pub fn with_dict(dict: Arc<dyn Dict + 'a>) -> Self {
+        Context::default().with_default_dict(dict)
     }
 }
 
 impl Default for Context<'_> {
     fn default() -> Self {
-        let generators: Vec<Arc<dyn GeneratorFunc>> = vec![
-            Arc::new(Word(&EFF_WORDLIST)),
-            Arc::new(Words(&EFF_WORDLIST)),
-        ];
-        Self::from_iter(generators)
-    }
-}
-
-impl<'a> FromIterator<Arc<dyn GeneratorFunc + 'a>> for Context<'a> {
-    fn from_iter<T: IntoIterator<Item = Arc<dyn GeneratorFunc + 'a>>>(iter: T) -> Self {
-        Context(iter.into_iter().map(|g| (g.name(), g)).collect())
-    }
-}
-
-impl<'a> Extend<Arc<dyn GeneratorFunc + 'a>> for Context<'a> {
-    fn extend<T: IntoIterator<Item = Arc<dyn GeneratorFunc + 'a>>>(&mut self, iter: T) {
-        self.0.extend(iter.into_iter().map(|g| (g.name(), g)));
+        let generators: Vec<Arc<dyn GeneratorFunc>> = vec![Arc::new(Word), Arc::new(Words)];
+        Context::new(generators, [], Arc::new(EFF_WORDLIST))
     }
 }
 
@@ -168,30 +140,30 @@ where
     Ok(())
 }
 
-impl GeneratorFunc for Word<'_> {
+impl GeneratorFunc for Word {
     fn name(&self) -> &'static str {
         "word"
     }
 
-    fn size(&self, _: &Context<'_>, args: &[&str]) -> NonZero<U256> {
-        // TODO(soon): dict hash checking
-        let _ = args;
-        NonZero::new(_Word::try_from(self.0.words().len()).unwrap().into()).unwrap()
+    fn size(&self, context: &Context<'_>, args: &[&str]) -> NonZero<U256> {
+        let dict = context.get_dict(&Context::dict_hash(args)).unwrap();
+        NonZero::new(_Word::try_from(dict.words().len()).unwrap().into()).unwrap()
     }
 
     fn write_to(
         &self,
-        _: &Context<'_>,
+        context: &Context<'_>,
         w: &mut dyn io::Write,
         index: Zeroizing<U256>,
         args: &[&str],
     ) -> io::Result<()> {
+        let dict = context.get_dict(&Context::dict_hash(args)).unwrap();
         let upper = args.iter().copied().any(|s| s == "U");
+        let word = dict.words()[u256_to_word(&index) as usize];
         if !upper {
-            write!(w, "{}", self.0.words()[u256_to_word(&index) as usize])?;
+            write!(w, "{word}")?;
             return Ok(());
         }
-        let word = self.0.words()[u256_to_word(&index) as usize];
         let mut iter = word.chars();
         let first = iter.next().unwrap();
         write!(w, "{}", first.to_uppercase())?;
@@ -201,13 +173,20 @@ impl GeneratorFunc for Word<'_> {
         Ok(())
     }
 
-    fn write_repr(&self, _: &Context<'_>, w: &mut dyn fmt::Write, args: &[&str]) -> fmt::Result {
+    fn write_repr(
+        &self,
+        context: &Context<'_>,
+        w: &mut dyn fmt::Write,
+        args: &[&str],
+    ) -> fmt::Result {
+        // TODO(soon): clean up
+        let hash = Context::dict_hash(args).unwrap_or_else(|| *context.default_dict.hash());
         write!(w, "{}", self.name())?;
-        fmt_with_hash(w, self.0.hash(), args)
+        fmt_with_hash(w, &hash, args)
     }
 }
 
-impl Words<'_> {
+impl Words {
     pub fn parse_args<'a>(args: &'_ [&'a str]) -> (u32, &'a str, bool) {
         let mut count = 5;
         let mut sep = " ";
@@ -234,15 +213,15 @@ impl Words<'_> {
     }
 }
 
-impl GeneratorFunc for Words<'_> {
+impl GeneratorFunc for Words {
     fn name(&self) -> &'static str {
         "words"
     }
 
     fn size(&self, context: &Context<'_>, args: &[&str]) -> NonZero<U256> {
         let (count, _, _) = Self::parse_args(args);
-        // TODO(soon): hash checking, arbitrary case transforms
-        let base = Word(self.0).size(context, &[]);
+        // TODO(soon): arbitrary case transforms
+        let base = Word.size(context, args);
         NonZero::new(u256_saturating_pow(&base, count.into())).unwrap()
     }
 
@@ -255,7 +234,7 @@ impl GeneratorFunc for Words<'_> {
     ) -> io::Result<()> {
         let (count, sep, upper) = Self::parse_args(args);
         // TODO(soon): hash checking
-        let base = Word(self.0).size(context, &[]);
+        let base = Word.size(context, &[]);
         for i in 0..count {
             if i != 0 {
                 write!(w, "{sep}")?;
@@ -264,15 +243,21 @@ impl GeneratorFunc for Words<'_> {
             let (a, b) = index.div_rem(&base);
             (index, word_index) = (Zeroizing::new(a), Zeroizing::new(b));
             let args: &[&str] = if upper && i == 0 { &["U"] } else { &[] };
-            Word(self.0).write_to(context, w, word_index, args)?;
+            Word.write_to(context, w, word_index, args)?;
         }
         assert!(bool::from(index.is_zero()));
         Ok(())
     }
 
-    fn write_repr(&self, _: &Context<'_>, w: &mut dyn fmt::Write, args: &[&str]) -> fmt::Result {
+    fn write_repr(
+        &self,
+        context: &Context<'_>,
+        w: &mut dyn fmt::Write,
+        args: &[&str],
+    ) -> fmt::Result {
+        let hash = Context::dict_hash(args).unwrap_or_else(|| *context.default_dict.hash());
         write!(w, "{}", self.name())?;
-        fmt_with_hash(w, self.0.hash(), args)
+        fmt_with_hash(w, &hash, args)
     }
 }
 
@@ -330,8 +315,8 @@ mod tests {
     #[test]
     fn test_lifetimes() {
         let s = "bob\ndole".to_string();
-        let dict = BoxDict::from_lines(&s);
-        let ctx = Context::with_dict(&dict);
+        let dict = Arc::new(BoxDict::from_lines(&s));
+        let ctx = Context::with_dict(dict);
         let g = Generator::new("word");
         assert_eq!(U256::from_u32(2), *g.size(&ctx));
         assert_eq!("bob", &format_at_ctx(&g, &ctx, U256::from_u32(0)));

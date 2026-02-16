@@ -76,10 +76,11 @@ impl ReprState<'_, '_> {
             }
             Node::Generator(ref generator) => {
                 w.write_char('{')?;
-                self.1
-                    .get(generator.name())
-                    .unwrap()
-                    .write_repr(self.1, w, &generator.args())?;
+                self.1.get_generator(generator.name()).unwrap().write_repr(
+                    self.1,
+                    w,
+                    &generator.args(),
+                )?;
                 w.write_char('}')?;
                 Ok(())
             }

@@ -20,13 +20,14 @@ use std::{
     io::{IsTerminal, Write, stdout},
     num::NonZero,
     path::Path,
+    sync::Arc,
 };
 
 use anyhow::{Context as _Context, Result};
 use clap::{CommandFactory, Parser, error::ErrorKind};
 use onepass_conf::Config;
 use onepass_seed::{
-    dict::BoxDict,
+    dict::{BoxDict, Dict},
     expr::{Context, Eval},
     site::Site,
 };
@@ -143,8 +144,10 @@ fn main() -> Result<()> {
     let seed = seed_password::read(use_keyring, args.confirm)?;
 
     let words: Option<_> = read_words_str(&args, &config)?;
-    let dict = words.as_deref().map(BoxDict::from_lines);
-    let dict = dict.as_deref();
+    let dict = words
+        .as_deref()
+        .map(BoxDict::from_lines)
+        .map(|d| -> Arc<dyn Dict + '_> { Arc::new(d) });
 
     let mut stdout = stdout();
     let context = dict.map_or_else(Context::default, Context::with_dict);

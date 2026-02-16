@@ -1,4 +1,7 @@
-use core::{fmt::Write, ops::Deref};
+use core::{
+    fmt::{self, Write},
+    ops::Deref,
+};
 
 use blake2::Blake2b256;
 use digest::Digest;
@@ -90,6 +93,15 @@ impl Dict for RefDict<'_> {
     }
     fn hash(&self) -> &[u8; 32] {
         self.1
+    }
+}
+
+impl<'a> fmt::Debug for dyn Dict + 'a {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut out = [0u8; 64];
+        hex::encode_to_slice(self.hash(), &mut out).unwrap();
+        let hash = str::from_utf8(&out).unwrap();
+        write!(f, "Dict({hash})")
     }
 }
 

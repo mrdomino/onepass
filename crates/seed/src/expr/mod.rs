@@ -3,6 +3,7 @@
 //! the [`Eval`] and [`EvalContext`] instances for the generation scheme.
 
 mod chars;
+pub mod context;
 mod generator;
 mod node;
 mod parse;
@@ -73,7 +74,7 @@ pub trait EvalContext {
     ) -> Result<()>;
 }
 
-static DEFAULT_CONTEXT: LazyLock<Context> = LazyLock::new(Context::default);
+static DEFAULT_CONTEXT: LazyLock<Context<'static>> = LazyLock::new(Context::default);
 
 impl Expr<'_> {
     /// Construct a new expression with the default generator context.
