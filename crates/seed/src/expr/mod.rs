@@ -47,6 +47,8 @@ pub trait Eval {
     /// at index 0 will be the lowest or lexicographically first password, and the string at
     /// `self.size() - 1` will be the highest or lexicographically last password, but this is not
     /// required.
+    // TODO(soon): do not take `index` this way, it entails copies that may result in their sources
+    // not being zeroed.
     fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()>;
 }
 
