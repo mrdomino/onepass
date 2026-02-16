@@ -61,6 +61,7 @@ impl ReprState<'_, '_> {
                 }
                 Ok(())
             }
+
             Node::Count(ref node, min, max) => {
                 self.0 = true;
                 self.write(w, node)?;
@@ -74,6 +75,7 @@ impl ReprState<'_, '_> {
                 }
                 w.write_char('}')
             }
+
             Node::Generator(ref generator) => {
                 w.write_char('{')?;
                 self.1.get_generator(generator.name()).unwrap().write_repr(
