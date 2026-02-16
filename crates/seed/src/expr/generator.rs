@@ -219,10 +219,13 @@ impl GeneratorFunc for Words {
     }
 
     fn size(&self, context: &Context<'_>, args: &[&str]) -> NonZero<U256> {
-        let (count, _, _) = Self::parse_args(args);
-        // TODO(soon): arbitrary case transforms
+        let (count, _, upper) = Self::parse_args(args);
         let base = Word.size(context, args);
-        NonZero::new(u256_saturating_pow(&base, count.into())).unwrap()
+        let mut n = u256_saturating_pow(&base, count.into());
+        if upper {
+            n = n.saturating_mul(&U256::from_u32(count));
+        }
+        NonZero::new(n).unwrap()
     }
 
     fn write_to(
@@ -233,8 +236,16 @@ impl GeneratorFunc for Words {
         args: &[&str],
     ) -> io::Result<()> {
         let (count, sep, upper) = Self::parse_args(args);
-        // TODO(soon): hash checking
-        let base = Word.size(context, &[]);
+        // TODO(soon): better Words -> Word arg mapping
+        let base = Word.size(context, args);
+        let j;
+        if upper {
+            let j_uint;
+            (*index, j_uint) = index.div_rem(&NonZero::new(U256::from_u32(count)).unwrap());
+            j = u32::try_from(u256_to_word(&j_uint)).unwrap();
+        } else {
+            j = 0;
+        }
         for i in 0..count {
             if i != 0 {
                 write!(w, "{sep}")?;
@@ -242,7 +253,7 @@ impl GeneratorFunc for Words {
             let word_index;
             let (a, b) = index.div_rem(&base);
             (index, word_index) = (Zeroizing::new(a), Zeroizing::new(b));
-            let args: &[&str] = if upper && i == 0 { &["U"] } else { &[] };
+            let args: &[&str] = if upper && i == j { &["U"] } else { &[] };
             Word.write_to(context, w, word_index, args)?;
         }
         assert!(bool::from(index.is_zero()));
@@ -293,6 +304,18 @@ mod tests {
                     ("zoom-zoom-zoom-zoom", 0xCFD41B90FFFFF),
                 ],
             ),
+            (
+                "words:2:U",
+                0x7354800,
+                &[
+                    ("Abacus abacus", 0),
+                    ("abacus Abacus", 1),
+                    ("Abdomen abacus", 2),
+                    ("abdomen Abacus", 3),
+                    ("Zoom zoom", 0x73547fe),
+                    ("zoom Zoom", 0x73547ff),
+                ],
+            ),
         ];
         for (g, sz, tt) in tests {
             let g = Generator::new(g);
@@ -301,6 +324,21 @@ mod tests {
                 assert_eq!(s, &format_at_ctx(&g, &ctx, U256::from_u64(*i)));
             }
         }
+    }
+
+    #[test]
+    fn test_hashes() {
+        let mut ctx = Context::default();
+        let dict_a = Arc::new(BoxDict::from_lines("a\nb"));
+        let dict_b = Arc::new(BoxDict::from_lines("c\nd"));
+        ctx.extend([dict_a as Arc<dyn Dict>, dict_b]);
+        let ctx = ctx;
+        let a =
+            Generator::new("word|e622f861cfb90d7fc2773ebf739fd5331515e652d2d3bad8d5a24ec90bf505fd");
+        let b =
+            Generator::new("word|ca492d04b5ed9cb47f4405591bb0ca14f5cdf0e45ea86a1d38466e8965e9abb2");
+        assert_eq!("a", &format_at_ctx(&a, &ctx, U256::ZERO));
+        assert_eq!("c", &format_at_ctx(&b, &ctx, U256::ZERO));
     }
 
     #[test]
