@@ -5,9 +5,7 @@ use crypto_bigint::{CheckedSub, NonZero, One, U256, Word};
 use zeroize::Zeroizing;
 
 use super::{
-    Eval, EvalContext,
-    chars::Chars,
-    generator::{Context, Generator},
+    Eval, EvalContext, chars::Chars, context::Context, generator::Generator,
     util::u256_saturating_pow,
 };
 

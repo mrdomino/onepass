@@ -5,9 +5,9 @@ use crypto_bigint::{NonZero, U256, Word as _Word};
 use onepass_base::dict::Dict;
 use zeroize::Zeroizing;
 
-pub use super::context::Context;
 use super::{
     EvalContext,
+    context::Context,
     repr::write_literal,
     util::{u256_saturating_pow, u256_to_word},
 };

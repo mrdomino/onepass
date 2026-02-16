@@ -11,9 +11,7 @@ use nom::{
     sequence::{delimited, preceded, separated_pair},
 };
 
-use crate::expr::{Context, Expr};
-
-use super::{Node, chars::Chars, generator::Generator};
+use super::{Context, Expr, Node, chars::Chars, generator::Generator};
 
 enum StringFragment<'a> {
     Verbatim(&'a str),

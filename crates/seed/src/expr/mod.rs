@@ -3,7 +3,7 @@
 //! the [`Eval`] and [`EvalContext`] instances for the generation scheme.
 
 mod chars;
-pub mod context;
+mod context;
 mod generator;
 mod node;
 mod parse;
@@ -19,7 +19,8 @@ use crypto_bigint::{NonZero, U256};
 use zeroize::Zeroizing;
 
 pub use chars::{CharRange, Chars};
-pub use generator::{Context, Generator, GeneratorFunc, Word, Words};
+pub use context::Context;
+pub use generator::{Generator, GeneratorFunc, Word, Words};
 pub use node::Node;
 pub use parse::Error as ParseError;
 
