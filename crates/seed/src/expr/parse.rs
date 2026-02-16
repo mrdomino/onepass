@@ -33,26 +33,27 @@ impl Expr<'_> {
     /// The following syntax is supported:
     ///
     /// # String literals
-    /// Any literal string that does not otherwise consist of syntax characters stands for itself. A
-    /// schema consisting of a literal string generates itself as the single password. Other characters
-    /// may be escaped with `'\\'`; aside from newline, carriage return, and tab, any non-alphanumeric
-    /// character stands for itself as a literal value when preceded by a backslash.
+    /// Any literal string that does not otherwise consist of syntax characters stands for itself.
+    /// A schema consisting of a literal string generates itself as the single password. Other
+    /// characters may be escaped with `'\\'`; aside from newline, carriage return, and tab, any
+    /// non-alphanumeric character stands for itself as a literal value when preceded by a
+    /// backslash.
     /// ```
     /// # use {onepass_seed::expr::Node, core::str::FromStr};
     /// assert_eq!(Node::Literal("test".into()), "test".parse().unwrap());
     /// assert_eq!(Node::Literal("(escape){}[]".into()), r#"\(escape\)\{\}\[\]"#.parse().unwrap());
     /// ```
     ///
-    /// Arbitrary Unicode characters may also be insterted as `\uXXXX`, or hex sequences (so long as
-    /// they encode valid ASCII or UTF-8 byte sequences) as `\xXX`.
+    /// Arbitrary Unicode characters may also be insterted as `\uXXXX`, or hex sequences (so long
+    /// as they encode valid ASCII or UTF-8 byte sequences) as `\xXX`.
     ///
     /// # Character classes
-    /// The special character classes `\w` and `\d` stand for word (alphanumeric plus underscore) and
-    /// digit characters respectively. They may show up anywhere in an expression and stand for a
-    /// single character in their range.
+    /// The special character classes `\w` and `\d` stand for word (alphanumeric plus underscore)
+    /// and digit characters respectively. They may show up anywhere in an expression and stand for
+    /// a single character in their range.
     ///
-    /// Square bracket character classes are also supported, including the following POSIX character
-    /// classes:
+    /// Square bracket character classes are also supported, including the following POSIX
+    /// character classes:
     /// - `[:lower:]` - lowercase ASCII letters
     /// - `[:upper:]` - uppercase ASCII letters
     /// - `[:alpha:]` - upper or lowercase ASCII letters
@@ -63,8 +64,8 @@ impl Expr<'_> {
     ///
     /// Single characters (`[a]`) and unicode character ranges (`[a-z]`) are also supported.
     ///
-    /// Any of these ranges may be combined within square brackets; `[[:upper:][a-z]\d]` corresponds to
-    /// uppercase ASCII, lowercase ASCII, and decimal digits.
+    /// Any of these ranges may be combined within square brackets; `[[:upper:][a-z]\d]`
+    /// corresponds to uppercase ASCII, lowercase ASCII, and decimal digits.
     ///
     /// ```
     /// # use {onepass_seed::expr::Node, core::str::FromStr};
@@ -74,8 +75,9 @@ impl Expr<'_> {
     ///
     /// # Lists
     /// A sequence of nodes is represented by its concatenation. A nested list may be created using
-    /// parentheses (`()`). This is of limited utility since the language does not support choices, but
-    /// does allow e.g. setting a count on a sequence, like: `([[:lower:]][[:digit:]][[:lower:]]){3}`.
+    /// parentheses (`()`). This is of limited utility since the language does not support choices,
+    /// but does allow e.g. setting a count on a sequence, like:
+    /// `([[:lower:]][[:digit:]][[:lower:]]){3}`.
     ///
     /// ```
     /// # use core::str::FromStr;
@@ -90,22 +92,22 @@ impl Expr<'_> {
     ///
     /// # Counts
     /// As alluded to, expressions may be repeated for specified counts. The syntax is
-    /// `expr{min,max}`. If `max` is omitted, i.e. `expr{min}`, then `max == min`. If `min` is omitted,
-    /// i.e. `expr{,max}`, then `min == 0`.
+    /// `expr{min,max}`. If `max` is omitted, i.e. `expr{min}`, then `max == min`. If `min` is
+    /// omitted, i.e. `expr{,max}`, then `min == 0`.
     ///
     /// # Generators
     /// Arbitrary library-suppliable generators may be called. The library includes two: `word` to
-    /// produce a single word, and `words` to produce a sequence of words. Generators are surrounded by
-    /// curly braces and must start with a lowercase ASCII letter, e.g. `{word}`.
+    /// produce a single word, and `words` to produce a sequence of words. Generators are
+    /// surrounded by curly braces and must start with a lowercase ASCII letter, e.g. `{word}`.
     ///
     /// Generators may take arguments. The first non–lowercase-ASCII character in a generator
     /// expression is taken as an argument separator, so e.g. `{words:2:U}` calls generator `words`
     /// with arguments `"2"` and `"U"`.
     ///
     /// # Reserved syntax
-    /// The `|` character may be used inside of generators as an argument separator, like `{word|U}`,
-    /// but may not be used unescaped anywhere else in an expression. This syntax is reserved for
-    /// possible future expansion.
+    /// The `|` character may be used inside of generators as an argument separator, like
+    /// `{word|U}`, but may not be used unescaped anywhere else in an expression. This syntax is
+    /// reserved for possible future expansion.
     ///
     /// # Errors
     /// It is an error to write a character class with the higher character before the lower
