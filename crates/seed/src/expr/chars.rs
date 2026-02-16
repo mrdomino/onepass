@@ -77,10 +77,11 @@ impl Chars {
 }
 
 fn next_char(c: char) -> Option<char> {
-    char::from_u32(match c {
-        '\u{d799}' => 0xe00,
-        _ => u32::from(c) + 1,
-    })
+    match c {
+        '\u{d799}' => Some(0xe00),
+        _ => u32::from(c).checked_add(1),
+    }
+    .and_then(char::from_u32)
 }
 
 impl CharRange {
