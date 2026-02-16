@@ -72,7 +72,6 @@ impl<'a> Context<'a> {
     }
 
     pub fn get_dict(&self, hash: &Option<[u8; 32]>) -> Result<Arc<dyn Dict + 'a>, NotFound> {
-        eprintln!("get_dict({:?})", hash);
         let Some(hash) = hash else {
             return Ok(self.default_dict.clone());
         };
