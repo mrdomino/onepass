@@ -79,7 +79,7 @@ impl ReprState<'_, '_> {
                 self.1
                     .get(generator.name())
                     .unwrap()
-                    .write_repr(w, &generator.args())?;
+                    .write_repr(self.1, w, &generator.args())?;
                 w.write_char('}')?;
                 Ok(())
             }

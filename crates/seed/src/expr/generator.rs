@@ -14,9 +14,10 @@ use crate::dict::EFF_WORDLIST;
 
 pub trait GeneratorFunc: Send + Sync {
     fn name(&self) -> &'static str;
-    fn size(&self, args: &[&str]) -> NonZero<U256>;
+    fn size(&self, context: &Context<'_>, args: &[&str]) -> NonZero<U256>;
     fn write_to(
         &self,
+        context: &Context<'_>,
         w: &mut dyn io::Write,
         index: Zeroizing<U256>,
         args: &[&str],
@@ -26,7 +27,7 @@ pub trait GeneratorFunc: Send + Sync {
     /// dictionary hashes for canonical serialization.
     // TODO(someday): standardize `write_sep_arg`, and instead have an optional trait method that
     // yields each argument.
-    fn write_repr(&self, w: &mut dyn fmt::Write, args: &[&str]) -> fmt::Result {
+    fn write_repr(&self, _: &Context<'_>, w: &mut dyn fmt::Write, args: &[&str]) -> fmt::Result {
         write!(w, "{}", self.name())?;
         for &arg in args {
             write_sep_arg(w, arg)?;
@@ -59,7 +60,7 @@ impl EvalContext for Generator {
     type Context<'a> = Context<'a>;
 
     fn size(&self, context: &Context) -> NonZero<U256> {
-        self.func(context).size(&self.args())
+        self.func(context).size(context, &self.args())
     }
 
     fn write_to(
@@ -68,7 +69,7 @@ impl EvalContext for Generator {
         w: &mut dyn io::Write,
         index: Zeroizing<U256>,
     ) -> io::Result<()> {
-        self.func(context).write_to(w, index, &self.args())
+        self.func(context).write_to(context, w, index, &self.args())
     }
 }
 
@@ -172,7 +173,7 @@ impl GeneratorFunc for Word<'_> {
         "word"
     }
 
-    fn size(&self, args: &[&str]) -> NonZero<U256> {
+    fn size(&self, _: &Context<'_>, args: &[&str]) -> NonZero<U256> {
         // TODO(soon): dict hash checking
         let _ = args;
         NonZero::new(_Word::try_from(self.0.words().len()).unwrap().into()).unwrap()
@@ -180,6 +181,7 @@ impl GeneratorFunc for Word<'_> {
 
     fn write_to(
         &self,
+        _: &Context<'_>,
         w: &mut dyn io::Write,
         index: Zeroizing<U256>,
         args: &[&str],
@@ -199,7 +201,7 @@ impl GeneratorFunc for Word<'_> {
         Ok(())
     }
 
-    fn write_repr(&self, w: &mut dyn fmt::Write, args: &[&str]) -> fmt::Result {
+    fn write_repr(&self, _: &Context<'_>, w: &mut dyn fmt::Write, args: &[&str]) -> fmt::Result {
         write!(w, "{}", self.name())?;
         fmt_with_hash(w, self.0.hash(), args)
     }
@@ -237,22 +239,23 @@ impl GeneratorFunc for Words<'_> {
         "words"
     }
 
-    fn size(&self, args: &[&str]) -> NonZero<U256> {
+    fn size(&self, context: &Context<'_>, args: &[&str]) -> NonZero<U256> {
         let (count, _, _) = Self::parse_args(args);
         // TODO(soon): hash checking, arbitrary case transforms
-        let base = Word(self.0).size(&[]);
+        let base = Word(self.0).size(context, &[]);
         NonZero::new(u256_saturating_pow(&base, count.into())).unwrap()
     }
 
     fn write_to(
         &self,
+        context: &Context<'_>,
         w: &mut dyn io::Write,
         mut index: Zeroizing<U256>,
         args: &[&str],
     ) -> io::Result<()> {
         let (count, sep, upper) = Self::parse_args(args);
         // TODO(soon): hash checking
-        let base = Word(self.0).size(&[]);
+        let base = Word(self.0).size(context, &[]);
         for i in 0..count {
             if i != 0 {
                 write!(w, "{sep}")?;
@@ -261,13 +264,13 @@ impl GeneratorFunc for Words<'_> {
             let (a, b) = index.div_rem(&base);
             (index, word_index) = (Zeroizing::new(a), Zeroizing::new(b));
             let args: &[&str] = if upper && i == 0 { &["U"] } else { &[] };
-            Word(self.0).write_to(w, word_index, args)?;
+            Word(self.0).write_to(context, w, word_index, args)?;
         }
         assert!(bool::from(index.is_zero()));
         Ok(())
     }
 
-    fn write_repr(&self, w: &mut dyn fmt::Write, args: &[&str]) -> fmt::Result {
+    fn write_repr(&self, _: &Context<'_>, w: &mut dyn fmt::Write, args: &[&str]) -> fmt::Result {
         write!(w, "{}", self.name())?;
         fmt_with_hash(w, self.0.hash(), args)
     }
@@ -275,9 +278,9 @@ impl GeneratorFunc for Words<'_> {
 
 impl<'a> fmt::Debug for dyn GeneratorFunc + 'a {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "GeneratorFunc(")?;
-        self.write_repr(f, &[])?;
-        write!(f, ")")
+        // TODO(soon): represent args, context
+        write!(f, "GeneratorFunc({:?})", self.name())?;
+        Ok(())
     }
 }
 
