@@ -81,7 +81,7 @@ Generally, no. Onepass is a tool for power users; if you are in the minority of 
 2. There is no automatic mechanism to synchronize your configuration between different devices. (It can be stored in [dotfiles](https://github.com/mrdomino/dotconfig/blob/main/onepass/config.toml) — if you are the sort of person who is comfortable versioning dotfiles.
 3. There is no way to migrate from a different password manager to onepass, aside from changing all of your passwords on all of your sites all at once.
 4. There is no automated export from onepass to any other format or any other password manager. (This can be scripted — if you are the sort of person who is comfortable writing scripts.)
-5. For its security, onepass depends absolutely and crucially on the seed password being a strong, securely generated, high-entropy password, and does nothing whatsoever to ensure this.
+5. For its security, onepass depends absolutely and crucially on the seed password being a strong, securely generated password, and does nothing whatsoever to ensure this.
 
 If you understand the above and it is not off-putting to you, then yes, you might should use onepass. If not, consider [supporting me](#support) in building a more user-friendly interface.
 
