@@ -9,11 +9,10 @@ use std::{
 
 use anyhow::{Context as _Context, Result};
 use clap::{CommandFactory, Parser, error::ErrorKind};
-use onepass_conf::{Config, Error, FindError};
+use onepass_conf::{Config, Error, FindError, RawSite};
 use onepass_seed::{
     dict::{BoxDict, Dict},
     expr::{Context, Eval},
-    site::Site,
 };
 use zeroize::Zeroizing;
 
@@ -174,45 +173,35 @@ fn read_words_str(args: &Args, config: &Config) -> Result<Option<Box<str>>> {
 
 fn gen_password_config(
     seed: &str,
-    req: &str,
+    url: &str,
     config: &Config,
     args: &Args,
     context: &Context<'_>,
 ) -> Result<Zeroizing<String>> {
-    // TODO(soon): this function is probably doing extra work and can be simplified.
-
     let username = args.username.as_deref();
-    let site = match config.find_site(req, username) {
-        Ok(site) => Some(site),
-        Err(Error::Find(FindError::UrlNotFound)) => None,
+    let mut site = match config.find_site(url, username) {
+        Ok(site) => site,
+        Err(Error::Find(FindError::UrlNotFound)) => RawSite::new(url, username, None, 0),
         Err(err) => return Err(err).context("failed finding site"),
     };
-    let username = username.or_else(|| site.as_ref().and_then(|site| site.username));
-    let url = site.as_ref().map_or(req, |site| site.url);
-    let schema = args.schema.as_ref().map_or_else(
-        || {
-            // TODO(soon): this schema does not need to be resolved
-            site.as_ref()
-                .and_then(|site| site.schema)
-                .unwrap_or_else(|| config.default_schema())
-        },
-        |schema| config.global.alias.get(schema).unwrap_or(schema),
-    );
-    let increment = args.increment.unwrap_or_else(|| {
-        site.as_ref()
-            .and_then(|site| site.increment)
-            .map_or(0, NonZero::get)
-    });
-    let site = Site::with_context(context, url, username, schema, increment)?;
+    if args.schema.is_some() {
+        site.schema = args.schema.as_deref();
+    }
+    if let Some(increment) = args.increment {
+        site.increment = NonZero::new(increment);
+    }
+    // TODO(soon): do something about redundant default_schema call here
+    let site = site.to_site_with_context(config.default_schema(), context)?;
     let size = site.expr.size();
     let salt = format!("{site}");
 
+    // TODO(soon): mode that only describes passwords and shows entropy.
     if args.verbose {
         eprintln!(
             "schema for {2} has about {0} bits of entropy (0x{1} possible passwords)",
             &size.bits(),
             &size.to_string().trim_start_matches('0'),
-            req,
+            url,
         );
         eprintln!("salt: {salt:?}");
     }
@@ -224,7 +213,10 @@ fn gen_password_config(
 mod tests {
     use std::{fs::File, path::PathBuf};
 
-    use onepass_seed::dict::{BoxDict, Dict};
+    use onepass_seed::{
+        dict::{BoxDict, Dict},
+        site::Site,
+    };
     use tempfile::TempDir;
 
     use super::*;
