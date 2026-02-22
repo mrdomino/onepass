@@ -1,5 +1,3 @@
-#[cfg(all(target_os = "macos", feature = "macos-biometry"))]
-mod macos_keychain;
 mod seed_password;
 
 use std::{
