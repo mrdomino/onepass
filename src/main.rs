@@ -202,7 +202,8 @@ fn gen_password_config(
     );
     let increment = args.increment.unwrap_or_else(|| {
         site.as_ref()
-            .map_or(0, |site| site.increment.map_or(0, NonZero::get))
+            .and_then(|site| site.increment)
+            .map_or(0, NonZero::get)
     });
     let site = Site::with_context(context, url, username, schema, increment)?;
     let size = site.expr.size();
