@@ -1154,7 +1154,6 @@ dependencies = [
  "onepass-conf",
  "onepass-seed",
  "readpassphrase-3",
- "serde",
  "tempfile",
  "zeroize",
 ]
