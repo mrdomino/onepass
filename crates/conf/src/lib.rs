@@ -15,16 +15,18 @@
 
 pub mod dirs;
 
+use core::{error, fmt};
 use std::{
     collections::{BTreeMap, HashSet, VecDeque},
     fs, io,
     num::NonZero,
+    ops::Bound,
     path::{Path, PathBuf},
 };
 
 use onepass_seed::{
     expr::Context,
-    site::{Error, Site},
+    site::{Error as SiteError, Site},
     url::normalize,
 };
 use serde::{Deserialize, Serialize};
@@ -38,8 +40,9 @@ use crate::dirs::{config_dir, expand_home};
 pub struct Config {
     pub global: Global,
 
-    // TODO(soon): This actually should be (url, username) => site, not url => site.
-    pub site: BTreeMap<String, RawSite<String>>,
+    site: Vec<RawSite<String>>,
+    site_by_url: BTreeMap<String, usize>,
+    site_by_key: BTreeMap<(String, Option<String>), usize>,
 }
 
 /// On-disk representation of a single `onepass` configuration file.
@@ -117,6 +120,19 @@ pub struct RawSite<S> {
     pub increment: Option<NonZero<u32>>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FindError {
+    UrlNotFound,
+    UsernameNotFound,
+    MultipleChoices(String, Vec<String>),
+}
+
+#[derive(Clone, Debug)]
+pub enum Error {
+    Site(SiteError),
+    Find(FindError),
+}
+
 impl Config {
     #[cfg(test)]
     /// Create a `Config` directly from a string, for tests. Panics if `include` is nonempty.
@@ -133,13 +149,20 @@ impl Config {
     pub fn from_global_site<S>(
         global: Global,
         site: impl IntoIterator<Item = RawSite<S>>,
-    ) -> Result<Self, Error>
+    ) -> Result<Self, SiteError>
     where
         S: Into<String>,
     {
-        let site = site
+        // We cannot just `sort_by_key` &c because the keys are references that would need to
+        // outlive the input tuple reference.
+        fn key(entry: &(String, RawSite<String>)) -> (&'_ str, Option<&'_ str>) {
+            let (normal, site) = entry;
+            (normal.as_ref(), site.username.as_deref())
+        }
+
+        let mut site = site
             .into_iter()
-            .map(|site| -> Result<(String, RawSite<String>), Error> {
+            .map(|site| -> Result<(String, RawSite<String>), SiteError> {
                 let url = site.url.into();
                 let normal = normalize(&url)?;
                 Ok((
@@ -152,8 +175,36 @@ impl Config {
                     },
                 ))
             })
-            .collect::<Result<BTreeMap<_, _>, _>>()?;
-        Ok(Config { global, site })
+            .collect::<Result<Vec<_>, _>>()?;
+        site.sort_by(|a, b| key(a).cmp(&key(b)));
+        // TODO(soon): better handling for duplicate keys - warning or error
+        site.dedup_by(|a, b| key(a).eq(&key(b)));
+
+        let mut site_by_url = site
+            .iter()
+            .enumerate()
+            .map(|(i, (normal, _))| (normal.as_str(), i))
+            .collect::<Vec<_>>();
+        site_by_url.dedup_by_key(|&mut (normal, _)| normal);
+        let site_by_url = site_by_url
+            .into_iter()
+            .map(|(normal, i)| (normal.to_string(), i))
+            .collect();
+
+        let site_by_key = site
+            .iter()
+            .enumerate()
+            .map(|(i, (normal, site))| ((normal.clone(), site.username.clone()), i))
+            .collect();
+
+        let site = site.into_iter().map(|entry| entry.1).collect();
+
+        Ok(Config {
+            global,
+            site,
+            site_by_url,
+            site_by_key,
+        })
     }
 
     /// Return the config from disk, creating a default one in some cases.
@@ -257,20 +308,85 @@ impl Config {
     ///
     /// This does [URL normalization][normalize] on the input URL, so e.g. "google.com" will look
     /// up "https://google.com/" (and vice versa, since URLs are normalized in the site data too.)
-    /// It also does alias substitution on the result, producing a [`RawSite`] that is safe to
-    /// convert to a [`Site`].
-    pub fn find_site<'a>(&'a self, url: &str) -> Result<Option<(String, RawSite<&'a str>)>, Error> {
-        let url = normalize(url)?;
-        let Some(site) = self.site.get(&url) else {
-            return Ok(None);
-        };
-        let mut site = site.as_deref();
+    ///
+    /// Schema aliases are resolved, so the returned site is directly usable without further
+    /// modification.
+    ///
+    /// Username resolution works as follows:
+    /// 1. If there is an exact `(url, username)` match, that value is returned.
+    /// 2. If there is an entry for `(url, None)`, that entry’s value is returned.
+    /// 3. If the passed username was `None` and only one entry exists for that URL, that entry is
+    ///    returned.
+    ///
+    /// In other cases, a descriptive error is returned. In case no username was specified and
+    /// there were multiple sites at the URL with different usernames, all possible usernames are
+    /// returned.
+    pub fn find_site<'a>(
+        &'a self,
+        url: &str,
+        username: Option<&'a str>,
+    ) -> Result<RawSite<&'a str>, Error> {
+        let url = normalize(url).map_err(SiteError::from)?;
+        let mut site = self.find_site_raw(url.clone(), username)?;
         let schema = site
             .schema
             .map(|name| self.resolve_schema(name))
             .unwrap_or_else(|| self.default_schema());
         site.schema = Some(schema);
-        Ok(Some((url, site)))
+        Ok(site)
+    }
+
+    // Finds a site by normalized URL, without doing schema resolution.
+    fn find_site_raw<'a>(
+        &'a self,
+        url: String,
+        username: Option<&'a str>,
+    ) -> Result<RawSite<&'a str>, FindError> {
+        // XXX lots of extra allocations because there is no Borrow<(&str, &str)>.
+        let username_string = username.map(String::from);
+        if let Some(&i) = self
+            .site_by_key
+            .get(&(url.clone(), username_string.clone()))
+        {
+            return Ok(self.site[i].as_deref());
+        }
+        if username.is_some() {
+            if let Some(&i) = self.site_by_key.get(&(url, None)) {
+                let mut site = self.site[i].as_deref();
+                site.username = username;
+                return Ok(site);
+            }
+            return Err(FindError::UsernameNotFound);
+        }
+
+        let Some(&i) = self.site_by_url.get(&url) else {
+            return Err(FindError::UrlNotFound);
+        };
+        let next = self
+            .site_by_url
+            .range::<String, _>((Bound::Excluded(&url), Bound::Unbounded))
+            .next()
+            .map(|(_, &v)| v);
+        let range = i..next.unwrap_or(self.site.len());
+
+        if range.len() == 1 {
+            return Ok(self.site[range.start].as_deref());
+        }
+
+        let slice = &self.site[range];
+        let mut usernames = slice
+            .iter()
+            .map(|site| match site.username.as_ref() {
+                Some(username) => username.clone(),
+                None => unreachable!(),
+            })
+            .collect::<VecDeque<_>>();
+        let first = usernames.pop_front().unwrap();
+
+        Err(FindError::MultipleChoices(
+            first,
+            usernames.into_iter().collect(),
+        ))
     }
 
     /// Returns the configured default schema, or `"{words}"` if none is specified.
@@ -376,7 +492,7 @@ where
     /// Convert this site to a [`Site`].
     ///
     /// See [`Site::new`].
-    pub fn to_site(&self, default_schema: &str) -> Result<Site<'_>, Error> {
+    pub fn to_site(&self, default_schema: &str) -> Result<Site<'_>, SiteError> {
         Site::new(
             self.url.as_ref(),
             self.get_username(),
@@ -392,7 +508,7 @@ where
         &self,
         default_schema: &str,
         context: &'a Context<'a>,
-    ) -> Result<Site<'a>, Error> {
+    ) -> Result<Site<'a>, SiteError> {
         Site::with_context(
             context,
             self.url.as_ref(),
@@ -419,6 +535,51 @@ where
     }
 }
 
+impl From<SiteError> for Error {
+    fn from(value: SiteError) -> Self {
+        Self::Site(value)
+    }
+}
+impl From<FindError> for Error {
+    fn from(value: FindError) -> Self {
+        Self::Find(value)
+    }
+}
+
+impl fmt::Display for FindError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UrlNotFound => f.write_str("url not found"),
+            Self::UsernameNotFound => f.write_str("username not found"),
+            Self::MultipleChoices(first, rest) => {
+                write!(f, "multiple choices: {first}")?;
+                for s in rest {
+                    write!(f, ", {s}")?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+impl error::Error for FindError {}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Site(err) => write!(f, "site: {err}"),
+            Self::Find(err) => write!(f, "find: {err}"),
+        }
+    }
+}
+impl error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Site(err) => Some(err),
+            Self::Find(err) => Some(err),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -433,12 +594,11 @@ mod tests {
         )
         .unwrap();
         eprintln!("{config:?}");
-        let site = &config.site["https://google.com/"];
+        let site = &config.site[0];
         assert_eq!("google.com", site.url);
         assert_eq!(None, site.username);
         assert_eq!(None, site.schema);
         assert_eq!(None, site.increment);
-        assert!(!config.site.contains_key("yahoo.com"));
     }
 
     #[test]
@@ -453,9 +613,66 @@ mod tests {
             "#,
         )
         .unwrap();
-        let (_, site) = config.find_site("google.com").unwrap().unwrap();
+        let site = config.find_site("google.com", None).unwrap();
         assert_eq!(Some("b"), site.schema);
         assert_eq!("b", config.default_schema());
+    }
+
+    #[test]
+    fn test_multiple_usernames() {
+        let config = Config::from_str(
+            r#"
+            [[site]]
+            url="google.com"
+            username="mrdomino"
+            [[site]]
+            url="google.com"
+            username="bobdole"
+            "#,
+        )
+        .unwrap();
+        let site = config.find_site("google.com", Some("mrdomino")).unwrap();
+        assert_eq!(Some("{words}"), site.schema);
+        assert_eq!(Some("mrdomino"), site.username);
+        let site = config.find_site("google.com", Some("bobdole")).unwrap();
+        assert_eq!(Some("bobdole"), site.username);
+        let Error::Find(err) = config.find_site("google.com", Some("nobody")).unwrap_err() else {
+            panic!();
+        };
+        assert_eq!(FindError::UsernameNotFound, err);
+        let Error::Find(err) = config.find_site("google.com", None).unwrap_err() else {
+            panic!();
+        };
+        assert_eq!(
+            FindError::MultipleChoices("bobdole".into(), vec!["mrdomino".into()]),
+            err
+        );
+        let Error::Find(FindError::UrlNotFound) = config.find_site("yahoo.com", None).unwrap_err()
+        else {
+            panic!();
+        };
+
+        let config = Config::from_str(
+            r#"
+            [[site]]
+            url="google.com"
+            schema="a"
+            [[site]]
+            url="google.com"
+            username="bobdole"
+            schema="b"
+            "#,
+        )
+        .unwrap();
+        let site = config.find_site("google.com", Some("mrdomino")).unwrap();
+        assert_eq!(Some("a"), site.schema);
+        assert_eq!(Some("mrdomino"), site.username);
+        let site = config.find_site("google.com", Some("bobdole")).unwrap();
+        assert_eq!(Some("b"), site.schema);
+        assert_eq!(Some("bobdole"), site.username);
+        let site = config.find_site("google.com", None).unwrap();
+        assert_eq!(Some("a"), site.schema);
+        assert_eq!(None, site.username);
     }
 
     // TODO(soon): more tests

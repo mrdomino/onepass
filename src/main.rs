@@ -11,7 +11,7 @@ use std::{
 
 use anyhow::{Context as _Context, Result};
 use clap::{CommandFactory, Parser, error::ErrorKind};
-use onepass_conf::Config;
+use onepass_conf::{Config, Error, FindError};
 use onepass_seed::{
     dict::{BoxDict, Dict},
     expr::{Context, Eval},
@@ -181,23 +181,28 @@ fn gen_password_config(
     args: &Args,
     context: &Context<'_>,
 ) -> Result<Zeroizing<String>> {
-    let site = config.find_site(req)?;
-    let username = args
-        .username
-        .as_deref()
-        .or_else(|| site.as_ref().and_then(|(_, site)| site.username));
-    let url = site.as_ref().map_or(req, |(url, _)| url);
+    // TODO(soon): this function is probably doing extra work and can be simplified.
+
+    let username = args.username.as_deref();
+    let site = match config.find_site(req, username) {
+        Ok(site) => Some(site),
+        Err(Error::Find(FindError::UrlNotFound)) => None,
+        Err(err) => return Err(err).context("failed finding site"),
+    };
+    let username = username.or_else(|| site.as_ref().and_then(|site| site.username));
+    let url = site.as_ref().map_or(req, |site| site.url);
     let schema = args.schema.as_ref().map_or_else(
         || {
+            // TODO(soon): this schema does not need to be resolved
             site.as_ref()
-                .and_then(|(_, site)| site.schema)
+                .and_then(|site| site.schema)
                 .unwrap_or_else(|| config.default_schema())
         },
         |schema| config.global.alias.get(schema).unwrap_or(schema),
     );
     let increment = args.increment.unwrap_or_else(|| {
         site.as_ref()
-            .map_or(0, |(_, site)| site.increment.map_or(0, NonZero::get))
+            .map_or(0, |site| site.increment.map_or(0, NonZero::get))
     });
     let site = Site::with_context(context, url, username, schema, increment)?;
     let size = site.expr.size();
