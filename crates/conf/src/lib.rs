@@ -40,6 +40,7 @@ use crate::dirs::{config_dir, expand_home};
 pub struct Config {
     pub global: Global,
 
+    // Sites sorted by (normalize(url), username).
     site: Vec<RawSite<String>>,
     site_by_url: BTreeMap<String, usize>,
     site_by_key: BTreeMap<(String, Option<String>), usize>,
@@ -277,13 +278,14 @@ impl Config {
             .into_iter()
             .map(|p| Config::resolve_path(&base_path, p))
             .collect();
-        let mut visited = HashSet::new();
 
         let mut global = base_config.global;
         let mut site = base_config.site;
 
-        while let Some(include_path) = includes.pop_front() {
-            let path = Config::resolve_path(&base_path, include_path);
+        let mut visited = HashSet::new();
+        visited.insert(base_path);
+        while let Some(path) = includes.pop_front() {
+            let path = path.canonicalize()?;
             if visited.contains(&path) {
                 continue;
             }
@@ -362,6 +364,7 @@ impl Config {
         let Some(&i) = self.site_by_url.get(&url) else {
             return Err(FindError::UrlNotFound);
         };
+        // Since sites is sorted by normalized url, next is the end of the range for this url.
         let next = self
             .site_by_url
             .range::<String, _>((Bound::Excluded(&url), Bound::Unbounded))
@@ -378,7 +381,7 @@ impl Config {
             .iter()
             .map(|site| match site.username.as_ref() {
                 Some(username) => username.clone(),
-                None => unreachable!(),
+                None => unreachable!("a None username would have matched earlier"),
             })
             .collect::<VecDeque<_>>();
         let first = usernames.pop_front().unwrap();
@@ -441,19 +444,17 @@ impl Global {
 
     /// Merge `other` into `self`, preferring `other` (i.e. `other` overrides base.)
     pub fn merge(&mut self, other: Global) {
-        other
-            .default_schema
-            .into_iter()
-            .for_each(|s| self.default_schema = Some(s));
+        if let Some(s) = other.default_schema {
+            self.default_schema = Some(s);
+        }
         // TODO(soon): words_path should be relative to other, not self. The method needs a path.
-        other
-            .words_path
-            .into_iter()
-            .for_each(|p| self.words_path = Some(p));
-        other
-            .use_keyring
-            .into_iter()
-            .for_each(|v| self.use_keyring = Some(v));
+        if let Some(p) = other.words_path {
+            self.words_path = Some(p);
+        }
+        if let Some(k) = other.use_keyring {
+            self.use_keyring = Some(k);
+        }
+        // NB. this silently clobbers aliases in self.
         self.alias.extend(other.alias);
     }
 
