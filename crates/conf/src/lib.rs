@@ -296,10 +296,11 @@ impl Config {
                     .into_iter()
                     .map(|p| Config::resolve_path(&path, p)),
             );
-            visited.insert(path);
 
-            global.merge(config.global);
+            global.merge(config.global, &path);
             site.extend(config.site);
+
+            visited.insert(path);
         }
 
         Config::from_global_site(global, site).map_err(io::Error::other)
@@ -443,13 +444,12 @@ impl Global {
     }
 
     /// Merge `other` into `self`, preferring `other` (i.e. `other` overrides base.)
-    pub fn merge(&mut self, other: Global) {
+    pub fn merge(&mut self, other: Global, other_path: &Path) {
         if let Some(s) = other.default_schema {
             self.default_schema = Some(s);
         }
-        // TODO(soon): words_path should be relative to other, not self. The method needs a path.
         if let Some(p) = other.words_path {
-            self.words_path = Some(p);
+            self.words_path = Some(Config::resolve_path(other_path, p));
         }
         if let Some(k) = other.use_keyring {
             self.use_keyring = Some(k);
@@ -583,6 +583,10 @@ impl error::Error for Error {
 
 #[cfg(test)]
 mod tests {
+    use std::{fs::File, io::Write};
+
+    use tempfile::TempDir;
+
     use super::*;
 
     #[test]
@@ -674,6 +678,29 @@ mod tests {
         let site = config.find_site("google.com", None).unwrap();
         assert_eq!(Some("a"), site.schema);
         assert_eq!(None, site.username);
+    }
+
+    #[test]
+    fn test_words_path_resolve() {
+        let a = TempDir::new().unwrap();
+        let b = TempDir::new().unwrap();
+
+        let a_path = a.path().join("config.toml");
+        let b_path = b.path().join("config.toml");
+        let b_words_path = b.path().join("words");
+
+        let mut a_file = File::create(&a_path).unwrap();
+        let mut b_file = File::create(&b_path).unwrap();
+        let mut b_words = File::create(&b_words_path).unwrap();
+        write!(a_file, "include=[{:?}]", &b_path).unwrap();
+        write!(b_file, "[global]\nwords_path=\"words\"").unwrap();
+        write!(b_words, "bob").unwrap();
+
+        let config = Config::from_file(&a_path).unwrap();
+        assert_eq!(
+            "bob",
+            fs::read_to_string(config.global.words_path.unwrap()).unwrap()
+        );
     }
 
     // TODO(soon): more tests
