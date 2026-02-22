@@ -61,13 +61,13 @@ pub fn current_home() -> Result<PathBuf, HomeNotSet> {
 }
 
 impl core::error::Error for HomeNotSet {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         None
     }
 }
 
 impl core::fmt::Display for HomeNotSet {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("failed reading $HOME")
     }
 }
