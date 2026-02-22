@@ -93,10 +93,19 @@ impl Expr<'_> {
     /// `expr{min,max}`. If `max` is omitted, i.e. `expr{min}`, then `max == min`. If `min` is
     /// omitted, i.e. `expr{,max}`, then `min == 0`.
     ///
+    /// **NB.** In the current revision of the schema language, a count after a literal applies to
+    /// the whole string, not just the last character; so `ab{2}` is equivalent to `(ab){2}`, not
+    /// `a(b){2}`:
+    /// ```
+    /// # use {onepass_seed::expr::Node, core::str::FromStr};
+    /// assert_eq!("(ab){2}".parse::<Node>().unwrap(), "ab{2}".parse().unwrap());
+    /// ```
+    ///
     /// # Generators
     /// Arbitrary library-suppliable generators may be called. The library includes two: `word` to
     /// produce a single word, and `words` to produce a sequence of words. Generators are
     /// surrounded by curly braces and must start with a lowercase ASCII letter, e.g. `{word}`.
+    /// (This rule is what differentiates them from counts, which must start with an ASCII digit.)
     ///
     /// Generators may take arguments. The first non–lowercase-ASCII character in a generator
     /// expression is taken as an argument separator, so e.g. `{words:2:U}` calls generator `words`
