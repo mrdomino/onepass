@@ -1,6 +1,7 @@
 mod seed_password;
 
 use std::{
+    fs,
     io::{IsTerminal, Write, stdout},
     num::NonZero,
     path::Path,
@@ -160,13 +161,11 @@ fn main() -> Result<()> {
 }
 
 fn read_words_str(args: &Args, config: &Config) -> Result<Option<Box<str>>> {
-    use std::fs::read_to_string;
-
     let path = args
         .words_path
         .as_deref()
         .or(config.global.words_path.as_deref());
-    path.map(|p| read_to_string(p).map(|s| s.into_boxed_str()))
+    path.map(|p| fs::read_to_string(p).map(|s| s.into_boxed_str()))
         .transpose()
         .context("failed reading words file")
 }
