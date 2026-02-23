@@ -2,7 +2,7 @@ mod seed_password;
 
 use std::{
     fs,
-    io::{IsTerminal, Write, stdout},
+    io::{BufWriter, IsTerminal, Write, stdout},
     num::NonZero,
     path::Path,
     sync::Arc,
@@ -14,6 +14,7 @@ use onepass_conf::{Config, Error, RawSite};
 use onepass_seed::{
     dict::{BoxDict, Dict},
     expr::{Context, Eval},
+    site::Site,
 };
 use zeroize::Zeroizing;
 
@@ -61,6 +62,10 @@ struct Args {
     #[arg(short, long, help_heading = "Keyring Integration")]
     reset_keyring: bool,
 
+    /// Describe the site password instead of computing it
+    #[arg(short, long, help_heading = "Password Entry")]
+    describe: bool,
+
     /// Confirm seed password
     #[arg(short, long, help_heading = "Password Entry")]
     confirm: bool,
@@ -107,6 +112,8 @@ fn main() -> Result<()> {
     if args.no_keyring {
         args.keyring = Some(false);
     }
+    let args = args;
+
     let config_path = args.config_path.as_deref();
     let config = Config::from_or_init(config_path).context("failed to read config")?;
     let use_keyring = args.keyring.or(config.global.use_keyring).unwrap_or(false);
@@ -125,16 +132,34 @@ fn main() -> Result<()> {
             .error(ErrorKind::TooFewValues, "specify at least one site")
             .exit();
     }
-    let seed = seed_password::read(use_keyring, args.confirm)?;
 
     let words: Option<_> = read_words_str(&args, &config)?;
     let dict = words
         .as_deref()
         .map(BoxDict::from_lines)
         .map(|d| -> Arc<dyn Dict + '_> { Arc::new(d) });
+    let context = dict.map_or_else(Context::default, Context::with_dict);
+
+    if args.describe {
+        for url in &args.sites {
+            let site = lookup_site(url, &config, &args, &context)?;
+            let size = site.expr.size();
+
+            println!("{url}:");
+            println!("{}", site.expr);
+
+            let mut buf = BufWriter::new(Vec::new());
+            site.expr.write_to(&mut buf, Zeroizing::default())?;
+            let example = String::from_utf8(buf.into_inner()?)?;
+            println!("Looks like: {example}");
+
+            println!("about {} bits of entropy", size.bits_vartime());
+        }
+        return Ok(());
+    }
 
     let mut stdout = stdout();
-    let context = dict.map_or_else(Context::default, Context::with_dict);
+    let seed = seed_password::read(use_keyring, args.confirm)?;
     for site in &args.sites {
         let res = gen_password_config(&seed, site, &config, &args, &context)?;
         stdout.write_all(res.as_bytes())?;
@@ -177,6 +202,29 @@ fn gen_password_config(
     args: &Args,
     context: &Context<'_>,
 ) -> Result<Zeroizing<String>> {
+    let site = lookup_site(url, config, args, context)?;
+    let size = site.expr.size();
+    let salt = format!("{site}");
+
+    if args.verbose {
+        eprintln!(
+            "schema for {2} has about {0} bits of entropy (0x{1} possible passwords)",
+            &size.bits(),
+            &size.to_string().trim_start_matches('0'),
+            url,
+        );
+        eprintln!("salt: {salt:?}");
+    }
+
+    site.password(seed).context("failed generating password")
+}
+
+fn lookup_site<'a>(
+    url: &str,
+    config: &Config,
+    args: &Args,
+    context: &'a Context<'a>,
+) -> Result<Site<'a>> {
     let username = args.username.as_deref();
     let mut site = match config.find_site(url, username) {
         Ok(site) => site,
@@ -190,22 +238,8 @@ fn gen_password_config(
         site.increment = NonZero::new(increment);
     }
     // TODO(soon): do something about redundant default_schema call here
-    let site = site.to_site_with_context(config.default_schema(), context)?;
-    let size = site.expr.size();
-    let salt = format!("{site}");
-
-    // TODO(soon): mode that only describes passwords and shows entropy.
-    if args.verbose {
-        eprintln!(
-            "schema for {2} has about {0} bits of entropy (0x{1} possible passwords)",
-            &size.bits(),
-            &size.to_string().trim_start_matches('0'),
-            url,
-        );
-        eprintln!("salt: {salt:?}");
-    }
-
-    site.password(seed).context("failed generating password")
+    site.to_site_with_context(config.default_schema(), context)
+        .context("failed generating site")
 }
 
 #[cfg(test)]
