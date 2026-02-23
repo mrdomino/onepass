@@ -1,5 +1,8 @@
+# TODO(soon): add changelogs
+
 [package]
 name = "onepass"
+# TODO(soon): release workflow (tag-based or manual)
 version = "3.0.0-pre.0"
 categories = ["command-line-utilities"]
 edition.workspace = true
