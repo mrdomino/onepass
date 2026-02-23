@@ -602,7 +602,7 @@ impl error::Error for Error {
 mod tests {
     use std::{fs::File, io::Write};
 
-    use tempfile::TempDir;
+    use tempfile::{NamedTempFile, TempDir};
 
     use super::*;
 
@@ -718,6 +718,43 @@ mod tests {
             "bob",
             fs::read_to_string(config.global.words_path.unwrap()).unwrap()
         );
+    }
+
+    #[test]
+    fn test_site_merge() {
+        let a = NamedTempFile::new().unwrap();
+        let b = NamedTempFile::new().unwrap();
+        fs::write(
+            a.path(),
+            format!(
+                concat!(
+                    "include=[{:?}]\n",
+                    "[[site]]\n",
+                    r#"url="google.com""#,
+                    "\nincrement=2\n",
+                    r#"schema="a""#,
+                    "\n",
+                ),
+                b.path(),
+            ),
+        )
+        .unwrap();
+        fs::write(
+            b.path(),
+            concat!(
+                "[[site]]\n",
+                r#"url="google.com""#,
+                "\nincrement=1\n",
+                r#"schema="b""#,
+                "\n",
+            ),
+        )
+        .unwrap();
+
+        let config = Config::from_file(a.path()).unwrap();
+        let site = config.find_site("google.com", None).unwrap();
+        assert_eq!(Some("b"), site.schema.as_deref());
+        assert_eq!(2, site.increment.unwrap().get());
     }
 
     // TODO(soon): more tests
