@@ -231,8 +231,8 @@ fn lookup_site<'a>(
         Err(Error::UrlNotFound) => RawSite::new(url, username, None, 0),
         Err(err) => return Err(err).context("failed finding site"),
     };
-    if args.schema.is_some() {
-        site.schema = args.schema.as_deref();
+    if let Some(ref schema) = args.schema {
+        site.schema = Some(config.resolve_schema(schema));
     }
     if let Some(increment) = args.increment {
         site.increment = NonZero::new(increment);
