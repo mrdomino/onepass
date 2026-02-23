@@ -17,7 +17,8 @@ pub mod dirs;
 
 use core::{error, fmt};
 use std::{
-    collections::{BTreeMap, HashSet, VecDeque},
+    cmp,
+    collections::{BTreeMap, HashSet, VecDeque, btree_map::Entry},
     fs, io,
     num::NonZero,
     ops::Bound,
@@ -147,6 +148,11 @@ impl Config {
     ///
     /// This normalizes all URLs in the [`RawSite`]s and does the conversion from `S` to
     /// [`String`].
+    ///
+    /// Duplicate sites are merged by (url, username). The merge logic is that the highest
+    /// increment wins, and the last seen schema wins. Because sites from included files come after
+    /// sites from the files that included them, this means that local includes can override the
+    /// schema from a base config.
     pub fn from_global_site<S>(
         global: Global,
         site: impl IntoIterator<Item = RawSite<S>>,
@@ -154,32 +160,42 @@ impl Config {
     where
         S: Into<String>,
     {
-        // We cannot just `sort_by_key` &c because the keys are references that would need to
-        // outlive the input tuple reference.
-        fn key(entry: &(String, RawSite<String>)) -> (&'_ str, Option<&'_ str>) {
-            let (normal, site) = entry;
-            (normal.as_ref(), site.username.as_deref())
-        }
+        // Collect records, merging duplicates.
+        let mut map = BTreeMap::new();
+        for site in site {
+            let url = site.url.into();
+            let normal = normalize(&url)?;
+            let username = site.username.map(S::into);
+            let schema = site.schema.map(S::into);
+            let increment = site.increment;
 
-        let mut site = site
+            let k = (normal, username);
+            match map.entry(k) {
+                Entry::Vacant(v) => {
+                    v.insert((url, schema, increment));
+                }
+                Entry::Occupied(mut o) => {
+                    let old = o.get_mut();
+                    old.0 = url;
+                    old.1 = schema;
+                    old.2 = cmp::max(old.2, increment);
+                }
+            }
+        }
+        let site = map
             .into_iter()
-            .map(|site| -> Result<(String, RawSite<String>), SiteError> {
-                let url = site.url.into();
-                let normal = normalize(&url)?;
-                Ok((
+            .map(|((normal, username), (url, schema, increment))| {
+                (
                     normal,
                     RawSite {
                         url,
-                        username: site.username.map(Into::into),
-                        schema: site.schema.map(Into::into),
-                        increment: site.increment,
+                        username,
+                        schema,
+                        increment,
                     },
-                ))
+                )
             })
-            .collect::<Result<Vec<_>, _>>()?;
-        site.sort_by(|a, b| key(a).cmp(&key(b)));
-        // TODO(soon): better handling for duplicate keys - warning or error
-        site.dedup_by(|a, b| key(a).eq(&key(b)));
+            .collect::<Vec<_>>();
 
         let mut site_by_url = site
             .iter()
@@ -269,6 +285,10 @@ impl Config {
     ///
     /// This traverses includes, producing a single [`Config`] that is the result of merging all
     /// includes together.
+    ///
+    /// Conflicts in global config are resolved in favor of the last included file. Conflicts in
+    /// site entries are resolved by merge using `(url, username)` as the key, taking the highest
+    /// increment and last schema defined for any given entry.
     pub fn from_file(base_path: &Path) -> Result<Self, io::Error> {
         let base_path = expand_home(base_path).canonicalize()?;
         let base_config = DiskConfig::from_file(&base_path)?;
@@ -330,7 +350,7 @@ impl Config {
         username: Option<&'a str>,
     ) -> Result<RawSite<&'a str>, Error> {
         let url = normalize(url).map_err(SiteError::from)?;
-        let mut site = self.find_site_raw(url.clone(), username)?;
+        let mut site = self.find_site_raw(url, username)?;
         let schema = site
             .schema
             .map(|name| self.resolve_schema(name))
@@ -345,14 +365,11 @@ impl Config {
         url: String,
         username: Option<&'a str>,
     ) -> Result<RawSite<&'a str>, FindError> {
-        // XXX lots of extra allocations because there is no Borrow<(&str, &str)>.
-        let username_string = username.map(String::from);
-        if let Some(&i) = self
-            .site_by_key
-            .get(&(url.clone(), username_string.clone()))
-        {
+        let key = (url, username.map(String::from));
+        if let Some(&i) = self.site_by_key.get(&key) {
             return Ok(self.site[i].as_deref());
         }
+        let (url, _) = key;
         if username.is_some() {
             if let Some(&i) = self.site_by_key.get(&(url, None)) {
                 let mut site = self.site[i].as_deref();
