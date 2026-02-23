@@ -151,7 +151,7 @@ fn main() -> Result<()> {
             let mut buf = BufWriter::new(Vec::new());
             site.expr.write_to(&mut buf, Zeroizing::default())?;
             let example = String::from_utf8(buf.into_inner()?)?;
-            println!("Looks like: {example}");
+            println!("Looks like: {example:?}");
 
             println!("about {} bits of entropy", size.bits_vartime());
         }
