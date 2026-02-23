@@ -15,7 +15,7 @@ pub struct HomeNotSet;
 /// user’s home dir (read via [`current_home`].) In all other cases, including when the home cannot
 /// be computed, the literal input path is returned unchanged.
 pub fn expand_home(path: &Path) -> Cow<'_, Path> {
-    let mut iter = path.components().peekable();
+    let mut iter = path.components();
     if let Some(Component::Normal(s)) = iter.next()
         && s == OsStr::new("~")
         && let Ok(mut path) = current_home()
