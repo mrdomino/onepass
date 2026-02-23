@@ -122,17 +122,18 @@ pub struct RawSite<S> {
     pub increment: Option<NonZero<u32>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum FindError {
-    UrlNotFound,
-    UsernameNotFound,
-    MultipleChoices(String, Vec<String>),
-}
-
 #[derive(Clone, Debug)]
 pub enum Error {
     Site(SiteError),
-    Find(FindError),
+    UrlNotFound,
+    UsernameNotFound,
+    MultipleChoices(MultipleChoices),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MultipleChoices {
+    first: String,
+    rest: Vec<String>,
 }
 
 impl Config {
@@ -364,7 +365,7 @@ impl Config {
         &'a self,
         url: String,
         username: Option<&'a str>,
-    ) -> Result<RawSite<&'a str>, FindError> {
+    ) -> Result<RawSite<&'a str>, Error> {
         let key = (url, username.map(String::from));
         if let Some(&i) = self.site_by_key.get(&key) {
             return Ok(self.site[i].as_deref());
@@ -376,11 +377,11 @@ impl Config {
                 site.username = username;
                 return Ok(site);
             }
-            return Err(FindError::UsernameNotFound);
+            return Err(Error::UsernameNotFound);
         }
 
         let Some(&i) = self.site_by_url.get(&url) else {
-            return Err(FindError::UrlNotFound);
+            return Err(Error::UrlNotFound);
         };
         // Since sites is sorted by normalized url, next is the end of the range for this url.
         let next = self
@@ -404,10 +405,10 @@ impl Config {
             .collect::<VecDeque<_>>();
         let first = usernames.pop_front().unwrap();
 
-        Err(FindError::MultipleChoices(
+        Err(Error::MultipleChoices(MultipleChoices {
             first,
-            usernames.into_iter().collect(),
-        ))
+            rest: usernames.into_iter().collect(),
+        }))
     }
 
     /// Returns the configured default schema, or `"{words}"` if none is specified.
@@ -558,18 +559,14 @@ impl From<SiteError> for Error {
         Self::Site(value)
     }
 }
-impl From<FindError> for Error {
-    fn from(value: FindError) -> Self {
-        Self::Find(value)
-    }
-}
 
-impl fmt::Display for FindError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Site(err) => write!(f, "site error: {err}"),
             Self::UrlNotFound => f.write_str("url not found"),
             Self::UsernameNotFound => f.write_str("username not found"),
-            Self::MultipleChoices(first, rest) => {
+            Self::MultipleChoices(MultipleChoices { first, rest }) => {
                 write!(f, "multiple choices: {first}")?;
                 for s in rest {
                     write!(f, ", {s}")?;
@@ -579,21 +576,11 @@ impl fmt::Display for FindError {
         }
     }
 }
-impl error::Error for FindError {}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Site(err) => write!(f, "site: {err}"),
-            Self::Find(err) => write!(f, "find: {err}"),
-        }
-    }
-}
 impl error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Site(err) => Some(err),
-            Self::Find(err) => Some(err),
+            _ => None,
         }
     }
 }
@@ -658,19 +645,22 @@ mod tests {
         assert_eq!(Some("mrdomino"), site.username);
         let site = config.find_site("google.com", Some("bobdole")).unwrap();
         assert_eq!(Some("bobdole"), site.username);
-        let Error::Find(err) = config.find_site("google.com", Some("nobody")).unwrap_err() else {
+        let Error::UsernameNotFound = config.find_site("google.com", Some("nobody")).unwrap_err()
+        else {
             panic!();
         };
-        assert_eq!(FindError::UsernameNotFound, err);
-        let Error::Find(err) = config.find_site("google.com", None).unwrap_err() else {
+        let Error::MultipleChoices(choices) = config.find_site("google.com", None).unwrap_err()
+        else {
             panic!();
         };
         assert_eq!(
-            FindError::MultipleChoices("bobdole".into(), vec!["mrdomino".into()]),
-            err
+            MultipleChoices {
+                first: "bobdole".into(),
+                rest: vec!["mrdomino".into()]
+            },
+            choices
         );
-        let Error::Find(FindError::UrlNotFound) = config.find_site("yahoo.com", None).unwrap_err()
-        else {
+        let Error::UrlNotFound = config.find_site("yahoo.com", None).unwrap_err() else {
             panic!();
         };
 

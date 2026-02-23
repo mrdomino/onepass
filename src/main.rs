@@ -10,7 +10,7 @@ use std::{
 
 use anyhow::{Context as _Context, Result};
 use clap::{CommandFactory, Parser, error::ErrorKind};
-use onepass_conf::{Config, Error, FindError, RawSite};
+use onepass_conf::{Config, Error, RawSite};
 use onepass_seed::{
     dict::{BoxDict, Dict},
     expr::{Context, Eval},
@@ -180,7 +180,7 @@ fn gen_password_config(
     let username = args.username.as_deref();
     let mut site = match config.find_site(url, username) {
         Ok(site) => site,
-        Err(Error::Find(FindError::UrlNotFound)) => RawSite::new(url, username, None, 0),
+        Err(Error::UrlNotFound) => RawSite::new(url, username, None, 0),
         Err(err) => return Err(err).context("failed finding site"),
     };
     if args.schema.is_some() {
