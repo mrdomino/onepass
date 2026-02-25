@@ -74,4 +74,4 @@ objc2-security = { version = "0.3.2", optional = true }
 
 [dev-dependencies]
 num-traits = "0.2.19"
-tempfile = "3.25.0"
+tempfile = "3.26.0"
