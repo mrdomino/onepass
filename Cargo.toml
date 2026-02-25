@@ -3,7 +3,7 @@
 [package]
 name = "onepass"
 # TODO(soon): release workflow (tag-based or manual)
-version = "3.0.0-pre.0"
+version = "3.0.0-pre.1"
 categories = ["command-line-utilities"]
 edition.workspace = true
 keywords = ["password", "cryptography", "deterministic"]
@@ -52,8 +52,8 @@ onepass-seed = { path = "crates/seed" }
 [dependencies]
 anyhow = "1.0.100"
 clap = { version = "4.5.53", features = ["derive", "env", "unicode", "wrap_help"] }
-onepass-conf = "0.2.0"
-onepass-seed = "0.1.0"
+onepass-conf = "0.3.0"
+onepass-seed = "0.1.1"
 zeroize = "1.8.2"
 
 [dependencies.readpassphrase-3]
