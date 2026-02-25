@@ -40,7 +40,19 @@ jobs:
         ref: ${{ inputs.tag || github.ref }}
     - uses: rust-lang/crates-io-auth-action@v1
       id: auth
-    - run: cargo publish --no-verify --locked
+    # TODO(soon): smarter release process, this just tries to publish everything
+    # every time, which doesn’t work unless the version has changed.
+    - name: publish base
+      working-directory: crates/base
+      run: cargo publish --locked || true
+    - name: publish seed
+      working-directory: crates/seed
+      run: cargo publish --locked || true
+    - name: publish conf
+      working-directory: crates/conf
+      run: cargo publish --locked || true
+    - name: publish onepass
+      run: cargo publish --no-verify --locked
       env:
         CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
