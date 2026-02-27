@@ -76,7 +76,7 @@ impl Chars {
     }
 }
 
-fn next_char(c: char) -> Option<char> {
+pub(super) fn next_char(c: char) -> Option<char> {
     match c {
         '\u{d799}' => Some(0xe00),
         _ => u32::from(c).checked_add(1),

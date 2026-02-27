@@ -5,7 +5,7 @@ use core::{
 
 use super::{
     Context, Expr, Node,
-    chars::{CharRange, Chars},
+    chars::{CharRange, Chars, next_char},
 };
 
 struct ReprState<'a, 'b>(bool, &'a Context<'b>);
@@ -148,6 +148,8 @@ where
     match c {
         '\x00'..'\x20' | '\x7f' => write!(w, "\\x{:02x}", c as u8),
         ']' => w.write_str("\\]"),
+        '\\' => w.write_str("\\\\"),
+        c if c.is_ascii() => w.write_char(c),
         _ => write!(w, "{}", c.escape_debug()),
     }
 }
@@ -158,7 +160,11 @@ where
 {
     write_escape(w, cr.start)?;
     if cr.end != cr.start {
-        write!(w, "-")?;
+        if let Some(next) = next_char(cr.start)
+            && next != cr.end
+        {
+            w.write_char('-')?;
+        }
         write_escape(w, cr.end)?;
     }
     Ok(())
@@ -173,7 +179,9 @@ mod tests {
         let tests: [(&str, &[(char, char)]); _] = [
             ("[-a]", &[('-', '-'), ('a', 'a')]),
             ("[Z!--]", &[('Z', 'Z'), ('!', '-')]),
-            ("[\\\\-\\]]", &[('\\', ']')]),
+            ("[\\\\\\]]", &[('\\', ']')]),
+            ("[!-#]", &[('!', '#')]),
+            ("[!\"]", &[('!', '"')]),
         ];
         for (want, cs) in tests {
             let cs = Chars::from_ranges(cs.iter().copied());
