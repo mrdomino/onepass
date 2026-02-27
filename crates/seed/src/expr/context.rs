@@ -58,14 +58,14 @@ impl<'a> Context<'a> {
 
     /// Returns a context with the specified default [`Dict`].
     ///
-    /// The dict is added to the lookup table for this context as well as the returned context, but
-    /// the default only applies to the returned context.
+    /// The dict is added to the lookup table for the returned context. It may or may not be added
+    /// to the table for the original context, depending whether there are other clones of the
+    /// context or not (see [`Arc::make_mut`].)
     pub fn with_default_dict(&mut self, default_dict: Arc<dyn Dict + 'a>) -> Self {
-        let mut dict = self.dict.clone();
-        Arc::make_mut(&mut dict).extend([(*default_dict.hash(), default_dict.clone())]);
+        Arc::make_mut(&mut self.dict).extend([(*default_dict.hash(), default_dict.clone())]);
         Context {
             generator: self.generator.clone(),
-            dict,
+            dict: self.dict.clone(),
             default_dict,
         }
     }
