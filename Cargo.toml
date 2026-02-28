@@ -52,8 +52,8 @@ onepass-seed = { path = "crates/seed" }
 [dependencies]
 anyhow = "1.0.100"
 clap = { version = "4.5.53", features = ["derive", "env", "unicode", "wrap_help"] }
-onepass-conf = "0.3.0"
-onepass-seed = "0.1.1"
+onepass-conf = "0.3.1"
+onepass-seed = "0.2.0"
 zeroize = "1.8.2"
 
 [dependencies.readpassphrase-3]

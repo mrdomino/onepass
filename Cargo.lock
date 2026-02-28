@@ -1169,7 +1169,7 @@ dependencies = [
 
 [[package]]
 name = "onepass-conf"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "onepass-seed",
  "serde",
@@ -1179,7 +1179,7 @@ dependencies = [
 
 [[package]]
 name = "onepass-seed"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "argon2",
  "blake2",
