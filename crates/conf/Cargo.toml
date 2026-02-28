@@ -1,13 +1,13 @@
 [package]
 name = "onepass-conf"
-version = "0.3.1"
+version = "0.3.2"
 edition.workspace = true
 license = "Apache-2.0"
 repository.workspace = true
 description = "TOML configuration format for onepass"
 
 [dependencies]
-onepass-seed = "0.2.0"
+onepass-seed = "0.2.1"
 serde = { version = "1.0.228", default-features = false, features = ["derive", "std"] }
 toml = "1.0.2"
 

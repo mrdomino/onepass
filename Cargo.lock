@@ -1141,7 +1141,7 @@ checksum = "a4895175b425cb1f87721b59f0f286c2092bd4af812243672510e1ac53e2e0ad"
 
 [[package]]
 name = "onepass"
-version = "3.0.0-pre.1"
+version = "3.0.0-pre.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -1160,7 +1160,7 @@ dependencies = [
 
 [[package]]
 name = "onepass-base"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "blake2",
  "digest 0.11.1",
@@ -1169,7 +1169,7 @@ dependencies = [
 
 [[package]]
 name = "onepass-conf"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "onepass-seed",
  "serde",
@@ -1179,7 +1179,7 @@ dependencies = [
 
 [[package]]
 name = "onepass-seed"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argon2",
  "blake2",
