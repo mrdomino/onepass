@@ -45,12 +45,18 @@ jobs:
     - name: publish base
       working-directory: crates/base
       run: cargo publish --locked || true
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
     - name: publish seed
       working-directory: crates/seed
       run: cargo publish --locked || true
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
     - name: publish conf
       working-directory: crates/conf
       run: cargo publish --locked || true
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
     - name: publish onepass
       run: cargo publish --no-verify --locked
       env:
