@@ -9,9 +9,6 @@ on:
       release:
         default: false
         type: boolean
-      publish:
-        default: false
-        type: boolean
       tag:
         description: 'Tag to build (e.g., v1.0.0)'
         type: string
@@ -106,6 +103,3 @@ jobs:
 
     - run: cargo test --profile dev --target ${{ env.target }}
       if: ${{ !inputs.release }}
-
-    - run: cargo publish --locked --dry-run --target ${{ env.target }}
-      if: ${{ inputs.publish && matrix.os != 'windows' }}
