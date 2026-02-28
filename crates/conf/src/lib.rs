@@ -178,7 +178,9 @@ impl Config {
                 Entry::Occupied(mut o) => {
                     let old = o.get_mut();
                     old.0 = url;
-                    old.1 = schema;
+                    if schema.is_some() {
+                        old.1 = schema;
+                    }
                     old.2 = cmp::max(old.2, increment);
                 }
             }
