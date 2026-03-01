@@ -437,6 +437,10 @@ impl Config {
     pub fn resolve_schema<'a>(&'a self, name: &'a str) -> &'a str {
         self.global.alias.get(name).map_or(name, AsRef::as_ref)
     }
+
+    pub fn sites(&self) -> &[RawSite<String>] {
+        &self.site
+    }
 }
 
 impl DiskConfig {

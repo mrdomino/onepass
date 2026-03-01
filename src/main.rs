@@ -102,6 +102,10 @@ struct Args {
     )]
     config_path: Option<Box<Path>>,
 
+    /// Print site URLs for autocompletion
+    #[arg(short, long, help_heading = "Configuration")]
+    print_sites: bool,
+
     /// Print verbose site password entropy output
     #[arg(short, long)]
     verbose: bool,
@@ -120,6 +124,12 @@ fn main() -> Result<()> {
 
     if args.reset_keyring {
         seed_password::delete()?;
+    }
+    if args.print_sites {
+        for site in config.sites() {
+            println!("{}", site.url);
+        }
+        return Ok(());
     }
     if args.sites.is_empty() {
         if args.confirm {
