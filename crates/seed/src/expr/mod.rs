@@ -16,7 +16,7 @@ use std::{
 };
 
 use crypto_bigint::{NonZero, U256};
-use zeroize::Zeroizing;
+use secrecy::ExposeSecretMut;
 
 pub use chars::{CharRange, Chars};
 pub use context::Context;
@@ -48,9 +48,7 @@ pub trait Eval {
     /// at index 0 will be the lowest or lexicographically first password, and the string at
     /// `self.size() - 1` will be the highest or lexicographically last password, but this is not
     /// required.
-    // TODO(soon): do not take `index` this way, it entails copies that may result in their sources
-    // not being zeroed.
-    fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()>;
+    fn write_to(&self, w: &mut dyn Write, index: &mut dyn ExposeSecretMut<U256>) -> Result<()>;
 }
 
 /// Delineates a type that knows how to [`Eval`] itself but needs some extra
@@ -73,7 +71,7 @@ pub trait EvalContext {
         &self,
         context: &Self::Context<'_>,
         w: &mut dyn Write,
-        index: Zeroizing<U256>,
+        index: &mut dyn ExposeSecretMut<U256>,
     ) -> Result<()>;
 }
 
@@ -107,7 +105,7 @@ impl Eval for Expr<'_> {
         self.root.size(self.get_context())
     }
 
-    fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()> {
+    fn write_to(&self, w: &mut dyn Write, index: &mut dyn ExposeSecretMut<U256>) -> Result<()> {
         self.root.write_to(self.get_context(), w, index)
     }
 }

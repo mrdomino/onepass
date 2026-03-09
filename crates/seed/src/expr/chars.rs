@@ -2,7 +2,7 @@ use core::cmp::max;
 use std::io::{Result, Write};
 
 use crypto_bigint::{NonZero, U256};
-use zeroize::Zeroizing;
+use secrecy::ExposeSecretMut;
 
 use super::{Eval, util::u256_to_word};
 
@@ -118,9 +118,9 @@ impl Eval for Chars {
         NonZero::new(Chars::size(self).into()).unwrap()
     }
 
-    fn write_to(&self, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()> {
-        let c: Zeroizing<_> = self.nth(u256_to_word(&index).try_into().unwrap()).into();
-        write!(w, "{}", *c)
+    fn write_to(&self, w: &mut dyn Write, index: &mut dyn ExposeSecretMut<U256>) -> Result<()> {
+        let c = self.nth(u256_to_word(index.expose_secret_mut()).try_into().unwrap());
+        write!(w, "{}", c)
     }
 }
 

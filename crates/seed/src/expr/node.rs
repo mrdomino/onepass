@@ -2,7 +2,7 @@ use core::iter::once;
 use std::io::{Result, Write};
 
 use crypto_bigint::{CheckedSub, NonZero, One, U256, Word};
-use zeroize::Zeroizing;
+use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
 
 use super::{
     Eval, EvalContext, chars::Chars, context::Context, generator::Generator,
@@ -44,9 +44,11 @@ impl EvalContext for Node {
                 //              = (n^(l+1) - n^k) / (n - 1)
                 let k = min;
                 let l = max;
-                let x = u256_saturating_pow(&n, (l + 1).into())
-                    .checked_sub(&u256_saturating_pow(&n, Word::from(k)))
-                    .unwrap();
+                let mut x = U256::ZERO;
+                u256_saturating_pow(&n, (l + 1).into(), &mut x);
+                let mut y = U256::ZERO;
+                u256_saturating_pow(&n, Word::from(k), &mut y);
+                x = x.checked_sub(&y).unwrap();
                 let (x, rem) = x.div_rem(&NonZero::new(n.saturating_sub(&U256::ONE)).unwrap());
                 assert!(bool::from(rem.is_zero()));
                 NonZero::new(x).unwrap()
@@ -56,41 +58,50 @@ impl EvalContext for Node {
         }
     }
 
-    fn write_to(&self, context: &Context, w: &mut dyn Write, index: Zeroizing<U256>) -> Result<()> {
+    fn write_to(
+        &self,
+        context: &Context,
+        w: &mut dyn Write,
+        index: &mut dyn ExposeSecretMut<U256>,
+    ) -> Result<()> {
         match *self {
             Node::Literal(ref s) => w.write_all(s.as_bytes()),
             Node::Chars(ref chars) => chars.write_to(w, index),
 
             Node::List(ref nodes) => nodes
                 .into_iter()
-                .try_fold(index, |mut index, node| {
-                    let node_index;
-                    let (a, b) = index.div_rem(&node.size(context));
-                    (index, node_index) = (Zeroizing::new(a), Zeroizing::new(b));
-                    node.write_to(context, w, node_index)?;
+                .try_fold(index, |index, node| {
+                    let mut node_index = SecretBox::init_with_mut(|node_index| {
+                        let index = index.expose_secret_mut();
+                        (*index, *node_index) = index.div_rem(&node.size(context));
+                    });
+                    node.write_to(context, w, &mut node_index)?;
                     Ok(index)
                 })
                 .map(|_| ()),
 
             Node::Count(ref node, min, max) => {
-                let mut index = index;
                 let node = node.as_ref();
-                let base = Zeroizing::new(node.size(context));
+                let base = SecretBox::init_with(|| node.size(context));
                 let mut count = min;
-                let mut n = Zeroizing::new(u256_saturating_pow(&base, Word::from(min)));
-                while *n <= *index {
+                let mut n: SecretBox<U256> = SecretBox::init_with_mut(|n| {
+                    u256_saturating_pow(base.expose_secret(), Word::from(min), n)
+                });
+                let n = n.expose_secret_mut();
+                while n <= index.expose_secret_mut() {
                     count += 1;
-                    *index -= *n;
-                    *n = n.saturating_mul(&base);
+                    *index.expose_secret_mut() -= *n;
+                    *n = n.saturating_mul(base.expose_secret());
                 }
                 assert!(count <= max);
                 for _ in 0..count {
-                    let node_index;
-                    let (a, b) = index.div_rem(&base);
-                    (index, node_index) = (Zeroizing::new(a), Zeroizing::new(b));
-                    node.write_to(context, w, node_index)?;
+                    let mut node_index = SecretBox::init_with_mut(|node_index| {
+                        let index = index.expose_secret_mut();
+                        (*index, *node_index) = index.div_rem(base.expose_secret());
+                    });
+                    node.write_to(context, w, &mut node_index)?;
                 }
-                assert!(bool::from(index.is_zero()));
+                assert!(bool::from(index.expose_secret_mut().is_zero()));
                 Ok(())
             }
 

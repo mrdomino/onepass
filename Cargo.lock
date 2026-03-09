@@ -1154,6 +1154,7 @@ dependencies = [
  "onepass-conf",
  "onepass-seed",
  "readpassphrase-3",
+ "secrecy",
  "tempfile",
  "zeroize",
 ]
@@ -1190,9 +1191,9 @@ dependencies = [
  "num-traits",
  "onepass-base",
  "rand_core 0.10.0",
+ "secrecy",
  "serde",
  "url",
- "zeroize",
 ]
 
 [[package]]
@@ -1448,6 +1449,15 @@ dependencies = [
  "libc",
  "linux-raw-sys",
  "windows-sys 0.60.2",
+]
+
+[[package]]
+name = "secrecy"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a"
+dependencies = [
+ "zeroize",
 ]
 
 [[package]]
