@@ -28,7 +28,7 @@ impl Site<'_> {
     /// Return this site’s unique password for the given `seed_password`.
     pub fn password(&self, seed_password: &str) -> Result<SecretString> {
         // Write to a pre-allocated buffer to prevent reallocations leaking sensitive data.
-        let mut buf = SecretBox::from(vec![0u8; 2048]);
+        let mut buf = SecretBox::from(vec![0u8; 4096]);
         let mut cursor = Cursor::new(buf.expose_secret_mut());
         self.write_password_into(&mut cursor, seed_password)?;
         let pos = usize::try_from(cursor.position()).unwrap();
