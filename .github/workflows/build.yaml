@@ -95,7 +95,7 @@ jobs:
 
     - run: cargo build --locked --profile ${{ env.profile }} --target ${{ env.target }}${{ env.features }}
 
-    - uses: actions/upload-artifact@v6
+    - uses: actions/upload-artifact@v7
       with:
         name: onepass-${{ env.target }}
         path: target/${{ env.target }}/${{ env.outdir }}/onepass${{ env.suffix }}
