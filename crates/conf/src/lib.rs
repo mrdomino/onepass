@@ -398,19 +398,14 @@ impl Config {
         }
 
         let slice = &self.site[range];
-        let mut usernames = slice
-            .iter()
-            .map(|site| match site.username.as_ref() {
-                Some(username) => username.clone(),
-                None => unreachable!("a None username would have matched earlier"),
-            })
-            .collect::<VecDeque<_>>();
-        let first = usernames.pop_front().unwrap();
+        let mut usernames = slice.iter().map(|site| match site.username.as_ref() {
+            Some(username) => username.clone(),
+            None => unreachable!("a None username would have matched earlier"),
+        });
+        let first = usernames.next().unwrap();
+        let rest = usernames.collect();
 
-        Err(Error::MultipleChoices(MultipleChoices {
-            first,
-            rest: usernames.into_iter().collect(),
-        }))
+        Err(Error::MultipleChoices(MultipleChoices { first, rest }))
     }
 
     /// Returns the configured default schema, or `"{words}"` if none is specified.
