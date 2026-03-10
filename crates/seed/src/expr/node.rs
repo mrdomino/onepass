@@ -48,6 +48,10 @@ impl EvalContext for Node {
                 u256_saturating_pow(&n, (l + 1).into(), &mut x);
                 let mut y = U256::ZERO;
                 u256_saturating_pow(&n, Word::from(k), &mut y);
+                if x == U256::MAX && y == U256::MAX {
+                    // Assume we got an overflow.
+                    return NonZero::MAX;
+                }
                 x = x.checked_sub(&y).unwrap();
                 let (x, rem) = x.div_rem(&NonZero::new(n.saturating_sub(&U256::ONE)).unwrap());
                 assert!(bool::from(rem.is_zero()));
