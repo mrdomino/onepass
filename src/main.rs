@@ -17,6 +17,7 @@ use onepass_seed::{
     expr::{Context, Eval},
     site::Site,
 };
+use readpassphrase_3::Flags as RpFlags;
 
 #[derive(Debug, Parser)]
 #[command(version, about, next_help_heading = "Site Options")]
@@ -82,6 +83,10 @@ struct Args {
     )]
     learn: Option<u32>,
 
+    /// Read seed password from stdin instead of /dev/tty
+    #[arg(long)]
+    stdin: bool,
+
     /// Override word list
     #[arg(
         short,
@@ -113,7 +118,7 @@ struct Args {
 
 fn main() -> Result<()> {
     let mut args = Args::parse();
-    if args.no_keyring {
+    if args.no_keyring || (args.stdin && args.keyring.is_none()) {
         args.keyring = Some(false);
     }
     let args = args;
@@ -121,6 +126,11 @@ fn main() -> Result<()> {
     let config_path = args.config_path.as_deref();
     let config = Config::from_or_init(config_path).context("failed to read config")?;
     let use_keyring = args.keyring.or(config.global.use_keyring).unwrap_or(false);
+    let rp_flags = if args.stdin {
+        RpFlags::STDIN
+    } else {
+        RpFlags::default()
+    };
 
     if args.reset_keyring {
         seed_password::delete()?;
@@ -133,7 +143,7 @@ fn main() -> Result<()> {
     }
     if args.sites.is_empty() {
         if args.confirm {
-            let _ = seed_password::read(use_keyring, true)?;
+            let _ = seed_password::read(use_keyring, true, rp_flags)?;
         }
         if args.reset_keyring || args.confirm {
             return Ok(());
@@ -169,7 +179,7 @@ fn main() -> Result<()> {
     }
 
     let mut stdout = stdout();
-    let seed = seed_password::read(use_keyring, args.confirm)?;
+    let seed = seed_password::read(use_keyring, args.confirm, rp_flags)?;
     for site in &args.sites {
         let res = gen_password_config(seed.expose_secret(), site, &config, &args, &context)?;
         stdout.write_all(res.expose_secret().as_bytes())?;

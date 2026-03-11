@@ -2,7 +2,7 @@ mod keyring;
 
 use anyhow::{Context, Result};
 use keyring::{Error, get_entry};
-use readpassphrase_3::getpass;
+use readpassphrase_3::{Flags, PASSWORD_LEN, getpass, readpassphrase_into};
 use secrecy::{ExposeSecret, SecretString};
 
 /// read reads the seed password from either the system keyring or the console.
@@ -10,7 +10,7 @@ use secrecy::{ExposeSecret, SecretString};
 /// If `confirm` is true, then the password is checked against a confirmation that is always read
 /// from the console. This allows the user to confirm that the seed password is what they think it
 /// is without otherwise exposing the password.
-pub(crate) fn read(use_keyring: bool, confirm: bool) -> Result<SecretString> {
+pub(crate) fn read(use_keyring: bool, confirm: bool, flags: Flags) -> Result<SecretString> {
     let password = use_keyring.then(load_keyring).transpose()?.flatten();
     if let Some(password) = password {
         if confirm && !check_confirm(password.expose_secret())? {
@@ -18,9 +18,10 @@ pub(crate) fn read(use_keyring: bool, confirm: bool) -> Result<SecretString> {
         }
         return Ok(password);
     }
-    let password: SecretString = getpass(c"Seed password: ")
-        .context("failed reading password")?
-        .into();
+    let password: SecretString =
+        readpassphrase_into(c"Seed password: ", Vec::with_capacity(PASSWORD_LEN), flags)
+            .context("failed reading password")?
+            .into();
     if (use_keyring || confirm) && !check_confirm(password.expose_secret())? {
         anyhow::bail!("passwords don’t match");
     }
