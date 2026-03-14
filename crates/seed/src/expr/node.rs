@@ -12,10 +12,19 @@ use super::{
 /// AST representation for [`Expr`][super::Expr] nodes.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Node {
+    /// String literal.
     Literal(Box<str>),
+
+    /// Character class (see [`Chars`].)
     Chars(Chars),
+
+    /// Sequence of nodes.
     List(Box<[Node]>),
+
+    /// Variable count from min to max.
     Count(Box<Node>, u32, u32),
+
+    /// [`Generator`] call.
     Generator(Generator),
 }
 
