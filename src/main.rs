@@ -12,11 +12,12 @@ use anyhow::{Context as _Context, Result};
 use clap::{CommandFactory, Parser, error::ErrorKind};
 use onepass_conf::{Config, Error, RawSite};
 use onepass_seed::{
+    ExposeSecret, SecretBox, SecretString,
     dict::{BoxDict, Dict},
     expr::{Context, Eval},
     site::Site,
 };
-use zeroize::Zeroizing;
+use readpassphrase_3::Flags as RpFlags;
 
 #[derive(Debug, Parser)]
 #[command(version, about, next_help_heading = "Site Options")]
@@ -82,6 +83,10 @@ struct Args {
     )]
     learn: Option<u32>,
 
+    /// Read seed password from stdin instead of /dev/tty
+    #[arg(long)]
+    stdin: bool,
+
     /// Override word list
     #[arg(
         short,
@@ -113,7 +118,7 @@ struct Args {
 
 fn main() -> Result<()> {
     let mut args = Args::parse();
-    if args.no_keyring {
+    if args.no_keyring || (args.stdin && args.keyring.is_none()) {
         args.keyring = Some(false);
     }
     let args = args;
@@ -121,6 +126,11 @@ fn main() -> Result<()> {
     let config_path = args.config_path.as_deref();
     let config = Config::from_or_init(config_path).context("failed to read config")?;
     let use_keyring = args.keyring.or(config.global.use_keyring).unwrap_or(false);
+    let rp_flags = if args.stdin {
+        RpFlags::STDIN
+    } else {
+        RpFlags::default()
+    };
 
     if args.reset_keyring {
         seed_password::delete()?;
@@ -133,7 +143,7 @@ fn main() -> Result<()> {
     }
     if args.sites.is_empty() {
         if args.confirm {
-            let _ = seed_password::read(use_keyring, true)?;
+            let _ = seed_password::read(use_keyring, true, rp_flags)?;
         }
         if args.reset_keyring || args.confirm {
             return Ok(());
@@ -159,7 +169,7 @@ fn main() -> Result<()> {
             println!("{}", site.expr);
 
             let mut buf = BufWriter::new(Vec::new());
-            site.expr.write_to(&mut buf, Zeroizing::default())?;
+            site.expr.write_to(&mut buf, &mut SecretBox::default())?;
             let example = String::from_utf8(buf.into_inner()?)?;
             println!("Looks like: {example:?}");
 
@@ -169,17 +179,17 @@ fn main() -> Result<()> {
     }
 
     let mut stdout = stdout();
-    let seed = seed_password::read(use_keyring, args.confirm)?;
+    let seed = seed_password::read(use_keyring, args.confirm, rp_flags)?;
     for site in &args.sites {
-        let res = gen_password_config(&seed, site, &config, &args, &context)?;
-        stdout.write_all(res.as_bytes())?;
+        let res = gen_password_config(seed.expose_secret(), site, &config, &args, &context)?;
+        stdout.write_all(res.expose_secret().as_bytes())?;
         if stdout.is_terminal() || args.sites.len() > 1 {
             writeln!(stdout)?;
         }
         if let Some(count) = args.learn {
             let mut failures = 0;
             for _ in 0..count {
-                if !seed_password::check_confirm(&res)? {
+                if !seed_password::check_confirm(res.expose_secret())? {
                     failures += 1;
                     eprint!("✘ ");
                 }
@@ -211,7 +221,7 @@ fn gen_password_config(
     config: &Config,
     args: &Args,
     context: &Context<'_>,
-) -> Result<Zeroizing<String>> {
+) -> Result<SecretString> {
     let site = lookup_site(url, config, args, context)?;
     let size = site.expr.size();
     let salt = format!("{site}");
@@ -280,7 +290,7 @@ mod tests {
         for (want, seed, url, schema, increment) in tests {
             let site = Site::new(url, None, schema, increment)?;
             let got = site.password(seed)?;
-            assert_eq!(want, *got);
+            assert_eq!(want, got.expose_secret());
         }
         Ok(())
     }

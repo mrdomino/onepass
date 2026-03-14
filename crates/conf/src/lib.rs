@@ -294,16 +294,16 @@ impl Config {
     /// increment and last schema defined for any given entry.
     pub fn from_file(base_path: &Path) -> Result<Self, io::Error> {
         let base_path = expand_home(base_path).canonicalize()?;
-        let base_config = DiskConfig::from_file(&base_path)?;
+        let DiskConfig {
+            include,
+            mut global,
+            mut site,
+        } = DiskConfig::from_file(&base_path)?;
 
-        let mut includes: VecDeque<_> = base_config
-            .include
+        let mut includes: VecDeque<_> = include
             .into_iter()
             .map(|p| Config::resolve_path(&base_path, p))
             .collect();
-
-        let mut global = base_config.global;
-        let mut site = base_config.site;
 
         let mut visited = HashSet::new();
         visited.insert(base_path);
@@ -398,19 +398,14 @@ impl Config {
         }
 
         let slice = &self.site[range];
-        let mut usernames = slice
-            .iter()
-            .map(|site| match site.username.as_ref() {
-                Some(username) => username.clone(),
-                None => unreachable!("a None username would have matched earlier"),
-            })
-            .collect::<VecDeque<_>>();
-        let first = usernames.pop_front().unwrap();
+        let mut usernames = slice.iter().map(|site| match site.username.as_ref() {
+            Some(username) => username.clone(),
+            None => unreachable!("a None username would have matched earlier"),
+        });
+        let first = usernames.next().unwrap();
+        let rest = usernames.collect();
 
-        Err(Error::MultipleChoices(MultipleChoices {
-            first,
-            rest: usernames.into_iter().collect(),
-        }))
+        Err(Error::MultipleChoices(MultipleChoices { first, rest }))
     }
 
     /// Returns the configured default schema, or `"{words}"` if none is specified.

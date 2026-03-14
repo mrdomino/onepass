@@ -101,5 +101,5 @@ jobs:
         path: target/${{ env.target }}/${{ env.outdir }}/onepass${{ env.suffix }}
         retention-days: ${{ env.retention_days }}
 
-    - run: cargo test --profile dev --target ${{ env.target }}
+    - run: cargo test --profile dev --target ${{ env.target }} -- --include-ignored
       if: ${{ !inputs.release }}

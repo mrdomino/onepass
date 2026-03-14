@@ -1,5 +1,5 @@
-use core::{fmt::Write, mem, pin::Pin};
-use std::io::{self, Error, Result};
+use core::fmt::Write;
+use std::io::{self, Cursor, Error, Result};
 
 use argon2::{Algorithm, Argon2, Params, Version};
 use blake2::{Blake2b256, Digest};
@@ -7,7 +7,7 @@ use chacha20::ChaCha20Rng;
 use crypto_bigint::{NonZero, RandomBits, RandomMod, U256};
 use onepass_base::fmt::DigestWriter;
 use rand_core::SeedableRng;
-use zeroize::Zeroizing;
+use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox, SecretString};
 
 use crate::{expr::Eval, site::Site};
 
@@ -20,26 +20,24 @@ impl Site<'_> {
     {
         let size = self.expr.size();
         let secret = self.secret(seed_password);
-        let index = secret_uniform(&secret, &size);
-        self.expr.write_to(w, index)?;
+        let mut index = secret_uniform(&secret, &size);
+        self.expr.write_to(w, &mut index)?;
         Ok(())
     }
 
     /// Return this site’s unique password for the given `seed_password`.
-    /// If the site password contains non-printable characters, the result is undefined.
-    pub fn password(&self, seed_password: &str) -> Result<Zeroizing<String>> {
+    pub fn password(&self, seed_password: &str) -> Result<SecretString> {
         // Write to a pre-allocated buffer to prevent reallocations leaking sensitive data.
-        let mut buf = Zeroizing::new(vec![0u8; 2048]);
-        self.write_password_into(&mut &mut buf[..], seed_password)?;
-        if let Some(pos) = buf.iter().position(|&b| b == 0) {
-            buf.truncate(pos);
-        }
-        let _ = str::from_utf8(&buf).map_err(Error::other)?;
-        let buf = mem::take(&mut *buf);
-        Ok(Zeroizing::new(unsafe { String::from_utf8_unchecked(buf) }))
+        let mut buf = SecretBox::from(vec![0u8; 4096]);
+        let mut cursor = Cursor::new(buf.expose_secret_mut());
+        self.write_password_into(&mut cursor, seed_password)?;
+        let pos = usize::try_from(cursor.position()).unwrap();
+        let buf = &cursor.into_inner()[..pos];
+        let s = str::from_utf8(buf).map_err(Error::other)?;
+        Ok(SecretString::from(s))
     }
 
-    /// Return the public salt corresponding to this site’s derivation paramters.
+    /// Return the public salt corresponding to this site’s derivation parameters.
     /// This is just `BLAKE2B256(derivation)`.
     pub fn salt(&self) -> [u8; 32] {
         let mut w = DigestWriter(Blake2b256::new());
@@ -48,34 +46,37 @@ impl Site<'_> {
     }
 
     /// Return the per-site secret for the given `seed_password`, running [`Argon2`] with the
-    /// crate parameters.
-    pub fn secret(&self, seed_password: &str) -> Pin<Zeroizing<[u8; 32]>> {
+    /// crate parameters. The parameters are 256MiB memory, 4 iterations, 4 parallelism.
+    pub fn secret(&self, seed_password: &str) -> SecretBox<[u8; 32]> {
+        // NB. m_cost is measured in KiB.
         let params = Params::new(256 * 1024, 4, 4, None).unwrap();
         let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
         let salt = self.salt();
-        let mut out = Pin::new(Zeroizing::new([0u8; 32]));
-        argon2
-            .hash_password_into(seed_password.as_bytes(), &salt, &mut *out)
-            .unwrap();
-        out
+        SecretBox::init_with_mut(|out: &mut [u8; 32]| {
+            argon2
+                .hash_password_into(seed_password.as_bytes(), &salt, out)
+                .unwrap();
+        })
     }
 }
 
 /// Randomly sample a [`U256`] from the given 256-bit secret. Uses rejection sampling to prevent
 /// bias in the results.
-fn secret_uniform(secret: &[u8; 32], n: &NonZero<U256>) -> Zeroizing<U256> {
-    let mut rng = ChaCha20Rng::from_seed(*secret);
+fn secret_uniform(secret: &dyn ExposeSecret<[u8; 32]>, n: &NonZero<U256>) -> SecretBox<U256> {
     let n_bits = n.bits_vartime();
     if n_bits == 1 {
-        return U256::ZERO.into();
+        return SecretBox::default();
     }
 
-    Zeroizing::new(if n.trailing_zeros_vartime() == n_bits - 1 {
-        // For powers of 2, we do not need rejection-sampling.
-        // We can simply generate `n_bits - 1` random bits.
-        RandomBits::random_bits(&mut rng, n_bits - 1)
-    } else {
-        RandomMod::random_mod_vartime(&mut rng, n)
+    let mut rng = ChaCha20Rng::from_seed(*secret.expose_secret());
+    SecretBox::init_with(|| {
+        if n.trailing_zeros_vartime() == n_bits - 1 {
+            // For powers of 2, we do not need rejection-sampling.
+            // We can simply generate `n_bits - 1` random bits.
+            RandomBits::random_bits(&mut rng, n_bits - 1)
+        } else {
+            RandomMod::random_mod_vartime(&mut rng, n)
+        }
     })
 }
 
@@ -114,18 +115,18 @@ mod tests {
     fn secret() {
         assert_eq!(
             "b9d8aeffbcf60b4054d399be576648e1a058d3b61f194a5fab73126362b3a301",
-            hex::encode(*test_site().secret("testpass"))
+            hex::encode(test_site().secret("testpass").expose_secret())
         );
         assert_eq!(
             "92ea6c4c44a3cb223e601ade213bbcfdf55c2758997c8657631e7dd33ffe0ed2",
-            hex::encode(*test_site().secret("testpass2"))
+            hex::encode(test_site().secret("testpass2").expose_secret())
         );
         let mut site2 = test_site();
         site2.increment = 1;
         site2.username = Some("you@example.com".into());
         assert_eq!(
             "d76fbab456c845b005aa8527781197a8691a763984d05e75450d266bc6f1cd27",
-            hex::encode(*site2.secret("testpass"))
+            hex::encode(*site2.secret("testpass").expose_secret())
         );
     }
 
@@ -133,9 +134,12 @@ mod tests {
     fn secret_uniform_short() {
         let tests = [(1, 0x3c5), (2, 0xf6a), (3, 0x180), (4, 0x390), (5, 0x19d)];
         for (seed, want) in tests {
-            let secret = U256::from_u32(seed).to_le_bytes().into();
+            let secret = SecretBox::init_with(|| U256::from_u32(seed).to_le_bytes().into());
             let n = NonZero::new(U256::from_u32(0x1000)).unwrap();
-            assert_eq!(U256::from_u32(want), *secret_uniform(&secret, &n));
+            assert_eq!(
+                U256::from_u32(want),
+                *secret_uniform(&secret, &n).expose_secret()
+            );
         }
     }
 
@@ -174,13 +178,11 @@ mod tests {
             ),
         ];
         for (sec, siz, want) in tests {
-            let sec = U256::from_be_hex(sec);
+            let sec = SecretBox::init_with(|| U256::from_be_hex(sec).to_be_bytes().into());
             assert_eq!(
                 U256::from_be_hex(want),
-                *secret_uniform(
-                    &sec.to_be_bytes().into(),
-                    &NonZero::new(U256::from_be_hex(siz)).unwrap()
-                ),
+                *secret_uniform(&sec, &NonZero::new(U256::from_be_hex(siz)).unwrap())
+                    .expose_secret(),
             );
         }
     }
@@ -190,7 +192,7 @@ mod tests {
     fn password_e2e() {
         assert_eq!(
             "parasitic prompter dimmer overdrive designer",
-            &*test_site().password("testpass").unwrap()
+            &*test_site().password("testpass").unwrap().expose_secret(),
         );
     }
 }

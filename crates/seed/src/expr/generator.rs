@@ -3,7 +3,7 @@ use std::{io, sync::Arc};
 
 use crypto_bigint::{NonZero, U256, Word as _Word};
 use onepass_base::dict::Dict;
-use zeroize::Zeroizing;
+use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
 
 use super::{
     EvalContext,
@@ -23,7 +23,7 @@ pub trait GeneratorFunc: Send + Sync {
         &self,
         context: &Context<'_>,
         w: &mut dyn io::Write,
-        index: Zeroizing<U256>,
+        index: &mut dyn ExposeSecretMut<U256>,
         args: &[&str],
     ) -> io::Result<()>;
 
@@ -70,7 +70,7 @@ impl EvalContext for Generator {
         &self,
         context: &Context,
         w: &mut dyn io::Write,
-        index: Zeroizing<U256>,
+        index: &mut dyn ExposeSecretMut<U256>,
     ) -> io::Result<()> {
         context
             .get_generator(self.name())
@@ -154,12 +154,12 @@ impl GeneratorFunc for Word {
         &self,
         context: &Context<'_>,
         w: &mut dyn io::Write,
-        index: Zeroizing<U256>,
+        index: &mut dyn ExposeSecretMut<U256>,
         args: &[&str],
     ) -> io::Result<()> {
         let dict = context.get_dict(&Context::dict_hash(args)).unwrap();
         let upper = args.iter().copied().any(|s| s == "U");
-        let word = dict.words()[u256_to_word(&index) as usize];
+        let word = dict.words()[u256_to_word(index.expose_secret_mut()) as usize];
         if !upper {
             write!(w, "{word}")?;
             return Ok(());
@@ -221,7 +221,8 @@ impl GeneratorFunc for Words {
     fn size(&self, context: &Context<'_>, args: &[&str]) -> NonZero<U256> {
         let (count, _, upper) = Self::parse_args(args);
         let base = Word.size(context, args);
-        let mut n = u256_saturating_pow(&base, count.into());
+        let mut n = U256::ZERO;
+        u256_saturating_pow(&base, count.into(), &mut n);
         if upper {
             n = n.saturating_mul(&U256::from_u32(count));
         }
@@ -232,7 +233,7 @@ impl GeneratorFunc for Words {
         &self,
         context: &Context<'_>,
         w: &mut dyn io::Write,
-        mut index: Zeroizing<U256>,
+        index: &mut dyn ExposeSecretMut<U256>,
         args: &[&str],
     ) -> io::Result<()> {
         let (count, sep, upper) = Self::parse_args(args);
@@ -240,9 +241,11 @@ impl GeneratorFunc for Words {
         let base = Word.size(context, args);
         let j;
         if upper {
-            let j_uint;
-            (*index, j_uint) = index.div_rem(&NonZero::new(U256::from_u32(count)).unwrap());
-            j = u32::try_from(u256_to_word(&j_uint)).unwrap();
+            let index = index.expose_secret_mut();
+            let j_uint = SecretBox::init_with_mut(|j| {
+                (*index, *j) = index.div_rem(&NonZero::new(U256::from_u32(count)).unwrap());
+            });
+            j = u32::try_from(u256_to_word(j_uint.expose_secret())).unwrap();
         } else {
             j = 0;
         }
@@ -250,13 +253,14 @@ impl GeneratorFunc for Words {
             if i != 0 {
                 write!(w, "{sep}")?;
             }
-            let word_index;
-            let (a, b) = index.div_rem(&base);
-            (index, word_index) = (Zeroizing::new(a), Zeroizing::new(b));
+            let index = index.expose_secret_mut();
+            let mut word_index = SecretBox::init_with_mut(|word_index| {
+                (*index, *word_index) = index.div_rem(&base);
+            });
             let args: &[&str] = if upper && i == j { &["U"] } else { &[] };
-            Word.write_to(context, w, word_index, args)?;
+            Word.write_to(context, w, &mut word_index, args)?;
         }
-        assert!(bool::from(index.is_zero()));
+        assert!(bool::from(index.expose_secret_mut().is_zero()));
         Ok(())
     }
 

@@ -39,7 +39,7 @@ impl<T: Display> Display for TsvField<T> {
     }
 }
 
-/// This type wrapps a [`Formatter`] and implements simple escaping of the semantically meaningful
+/// This type wraps a [`Formatter`] and implements simple escaping of the semantically meaningful
 /// tab-separated-values characters `'\t'`, `'\n'`, `'\r'` and `'\\'`. Writes to instances of this
 /// type are forwarded to the underlying `Formatter` except for these characters, which have their
 /// ANSI C backslash escaped forms emitted instead.

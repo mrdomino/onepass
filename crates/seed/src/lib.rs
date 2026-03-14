@@ -40,8 +40,10 @@
 //!
 //! ```no_run
 //! use onepass_seed::site::Site;
+//! # use secrecy::ExposeSecret;
 //! let site = Site::new("google.com", None, "{words:4:-}", 0).unwrap();
-//! assert_eq!("jaywalker-diffused-verse-abdominal", &*site.password("seedpass").unwrap());
+//! let pw = site.password("seedpass").unwrap();
+//! assert_eq!("jaywalker-diffused-verse-abdominal", pw.expose_secret());
 //! ```
 //!
 //! For more information on the schema language see <code>[Expr]</code>.
@@ -56,3 +58,6 @@ pub mod expr;
 mod macros;
 pub mod site;
 pub mod url;
+
+pub use crypto_bigint::U256;
+pub use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox, SecretString};

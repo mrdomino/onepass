@@ -443,9 +443,9 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
 name = "crypto-bigint"
-version = "0.7.0-rc.28"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96dacf199529fb801ae62a9aafdc01b189e9504c0d1ee1512a4c16bcd8666a93"
+checksum = "9fde2467e74147f492aebb834985186b2c74761927b8b9b3bd303bcb2e72199d"
 dependencies = [
  "cpubits",
  "ctutils",
@@ -1176,7 +1176,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "onepass"
-version = "3.0.0-pre.3"
+version = "3.0.0-pre.4"
 dependencies = [
  "anyhow",
  "clap",
@@ -1189,6 +1189,7 @@ dependencies = [
  "onepass-conf",
  "onepass-seed",
  "readpassphrase-3",
+ "secrecy",
  "tempfile",
  "zeroize",
 ]
@@ -1204,7 +1205,7 @@ dependencies = [
 
 [[package]]
 name = "onepass-conf"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "onepass-seed",
  "serde",
@@ -1214,7 +1215,7 @@ dependencies = [
 
 [[package]]
 name = "onepass-seed"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argon2",
  "blake2",
@@ -1225,9 +1226,9 @@ dependencies = [
  "num-traits",
  "onepass-base",
  "rand_core 0.10.0",
+ "secrecy",
  "serde",
  "url",
- "zeroize",
 ]
 
 [[package]]
@@ -1489,6 +1490,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "secrecy"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a"
+dependencies = [
+ "zeroize",
+]
+
+[[package]]
 name = "secret-service"
 version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1705,9 +1715,9 @@ dependencies = [
 
 [[package]]
 name = "tempfile"
-version = "3.26.0"
+version = "3.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82a72c767771b47409d2345987fda8628641887d5466101319899796367354a0"
+checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
  "getrandom 0.4.2",
