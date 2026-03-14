@@ -294,16 +294,16 @@ impl Config {
     /// increment and last schema defined for any given entry.
     pub fn from_file(base_path: &Path) -> Result<Self, io::Error> {
         let base_path = expand_home(base_path).canonicalize()?;
-        let base_config = DiskConfig::from_file(&base_path)?;
+        let DiskConfig {
+            include,
+            mut global,
+            mut site,
+        } = DiskConfig::from_file(&base_path)?;
 
-        let mut includes: VecDeque<_> = base_config
-            .include
+        let mut includes: VecDeque<_> = include
             .into_iter()
             .map(|p| Config::resolve_path(&base_path, p))
             .collect();
-
-        let mut global = base_config.global;
-        let mut site = base_config.site;
 
         let mut visited = HashSet::new();
         visited.insert(base_path);
