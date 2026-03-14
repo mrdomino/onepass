@@ -37,7 +37,7 @@ impl Site<'_> {
         Ok(SecretString::from(s))
     }
 
-    /// Return the public salt corresponding to this site’s derivation paramters.
+    /// Return the public salt corresponding to this site’s derivation parameters.
     /// This is just `BLAKE2B256(derivation)`.
     pub fn salt(&self) -> [u8; 32] {
         let mut w = DigestWriter(Blake2b256::new());
