@@ -46,8 +46,9 @@ impl Site<'_> {
     }
 
     /// Return the per-site secret for the given `seed_password`, running [`Argon2`] with the
-    /// crate parameters.
+    /// crate parameters. The parameters are 256MiB memory, 4 iterations, 4 parallelism.
     pub fn secret(&self, seed_password: &str) -> SecretBox<[u8; 32]> {
+        // NB. m_cost is measured in KiB.
         let params = Params::new(256 * 1024, 4, 4, None).unwrap();
         let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
         let salt = self.salt();
