@@ -78,7 +78,7 @@ impl Chars {
 
 pub(super) fn next_char(c: char) -> Option<char> {
     match c {
-        '\u{d799}' => Some(0xe00),
+        '\u{d7ff}' => Some(0xe000),
         _ => u32::from(c).checked_add(1),
     }
     .and_then(char::from_u32)
@@ -126,6 +126,10 @@ impl Eval for Chars {
 
 #[cfg(test)]
 mod tests {
+    use std::io::BufWriter;
+
+    use secrecy::SecretBox;
+
     use super::*;
 
     #[test]
@@ -137,5 +141,23 @@ mod tests {
 
         let rs = Chars::from_ranges(vec![('a', 'z')]);
         assert_eq!(26, rs.size());
+    }
+
+    #[test]
+    fn test_eval_boundary() {
+        let cs = Chars::from_ranges([('\u{d7ff}', char::MAX)]);
+        let mut buf = BufWriter::new(Vec::new());
+        cs.write_to(&mut buf, &mut SecretBox::new(Box::new(U256::ONE)))
+            .unwrap();
+        assert_eq!(
+            "\u{e000}",
+            String::from_utf8(buf.into_inner().unwrap()).unwrap()
+        );
+        assert_eq!(char::MAX as u32 - 0xe000 + 2, cs.size());
+    }
+
+    #[test]
+    fn test_next_char_boundary() {
+        assert_eq!(Some('\u{e000}'), next_char('\u{d7ff}'));
     }
 }
