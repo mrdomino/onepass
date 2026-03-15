@@ -368,13 +368,13 @@ impl Config {
         url: String,
         username: Option<&'a str>,
     ) -> Result<RawSite<&'a str>, Error> {
-        let key = (url, username.map(String::from));
+        let mut key = (url, username.map(String::from));
         if let Some(&i) = self.site_by_key.get(&key) {
             return Ok(self.site[i].as_deref());
         }
-        let (url, _) = key;
         if username.is_some() {
-            if let Some(&i) = self.site_by_key.get(&(url, None)) {
+            key.1 = None;
+            if let Some(&i) = self.site_by_key.get(&key) {
                 let mut site = self.site[i].as_deref();
                 site.username = username;
                 return Ok(site);
@@ -382,13 +382,13 @@ impl Config {
             return Err(Error::UsernameNotFound);
         }
 
-        let Some(&i) = self.site_by_url.get(&url) else {
+        let Some(&i) = self.site_by_url.get(&key.0) else {
             return Err(Error::UrlNotFound);
         };
         // Since sites is sorted by normalized url, next is the end of the range for this url.
         let next = self
             .site_by_url
-            .range::<String, _>((Bound::Excluded(&url), Bound::Unbounded))
+            .range::<String, _>((Bound::Excluded(&key.0), Bound::Unbounded))
             .next()
             .map(|(_, &v)| v);
         let range = i..next.unwrap_or(self.site.len());
