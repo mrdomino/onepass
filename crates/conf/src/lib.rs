@@ -52,6 +52,9 @@ pub struct Config {
 /// Compared with [`Config`], this specifies optional include paths and allows any number of sites
 /// without any constraints on mapping.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Hash)]
+// TODO(soon): better handling for unknown fields. We want an error in some cases, a warning in
+// others.
+#[serde(deny_unknown_fields)]
 pub struct DiskConfig {
     /// List of files to be included by this file.
     ///
@@ -109,6 +112,7 @@ pub struct Global {
 /// [`Dict`][onepass_seed::dict::Dict] takes a lifetime parameter, the dictionary cannot be easily
 /// subbed in here without some changes at a higher level.
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(deny_unknown_fields)]
 pub struct RawSite<S> {
     pub url: S,
 
@@ -120,6 +124,7 @@ pub struct RawSite<S> {
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub increment: Option<NonZero<u32>>,
+    // TODO(soon): maybe a comment field
 }
 
 #[derive(Clone, Debug)]
