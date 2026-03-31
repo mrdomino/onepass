@@ -13,10 +13,9 @@
 # use_keyring = true
 
 # Schemas may have named aliases.
-alias = {
-    apple = "{word:U}-{words:3:-}\\d",
-    login = "\\w{12}",
-}
+[global.alias]
+apple = '{words:4:-:U}\d'
+login = '[[:print:]]{12}'
 
 # Sites can be configured by URL, username, schema, and increment.
 # [[site]]
