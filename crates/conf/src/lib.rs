@@ -124,7 +124,14 @@ pub struct RawSite<S> {
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub increment: Option<NonZero<u32>>,
-    // TODO(soon): maybe a comment field
+
+    /// User-facing comment/description. Does not affect generated passwords.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comment: Option<S>,
+
+    /// Internal data, reserved for future use by generators. Does not affect generated passwords.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data: Option<S>,
 }
 
 #[derive(Clone, Debug)]
@@ -175,10 +182,13 @@ impl Config {
             let schema = site.schema.map(S::into);
             let increment = site.increment;
 
+            let comment = site.comment.map(S::into);
+            let data = site.data.map(S::into);
+
             let k = (normal, username);
             match map.entry(k) {
                 Entry::Vacant(v) => {
-                    v.insert((url, schema, increment));
+                    v.insert((url, schema, increment, comment, data));
                 }
                 Entry::Occupied(mut o) => {
                     let old = o.get_mut();
@@ -187,22 +197,36 @@ impl Config {
                         old.1 = schema;
                     }
                     old.2 = cmp::max(old.2, increment);
+                    old.3 = comment;
+                    match (&old.4, &data) {
+                        (None, Some(_)) => old.4 = data,
+                        (None, None) => (),
+                        (Some(d1), Some(d2)) if d1 == d2 => (),
+                        _ => {
+                            // TODO(soon): return error here.
+                            panic!("Cannot merge data fields {:?} and {:?}", old.4, data);
+                        }
+                    }
                 }
             }
         }
         let site = map
             .into_iter()
-            .map(|((normal, username), (url, schema, increment))| {
-                (
-                    normal,
-                    RawSite {
-                        url,
-                        username,
-                        schema,
-                        increment,
-                    },
-                )
-            })
+            .map(
+                |((normal, username), (url, schema, increment, comment, data))| {
+                    (
+                        normal,
+                        RawSite {
+                            url,
+                            username,
+                            schema,
+                            increment,
+                            comment,
+                            data,
+                        },
+                    )
+                },
+            )
             .collect::<Vec<_>>();
 
         let mut site_by_url = site
@@ -500,6 +524,10 @@ where
             username,
             schema,
             increment: NonZero::new(increment),
+
+            // TODO(someday): fix public API.
+            comment: None,
+            data: None,
         }
     }
 
@@ -510,6 +538,8 @@ where
             username: self.get_username(),
             schema: self.schema.as_ref().map(S::as_ref),
             increment: self.increment,
+            comment: self.comment.as_ref().map(S::as_ref),
+            data: self.data.as_ref().map(S::as_ref),
         }
     }
 
