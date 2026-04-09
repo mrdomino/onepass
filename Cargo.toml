@@ -2,7 +2,7 @@
 
 [package]
 name = "onepass"
-version = "3.0.0-pre.4"
+version = "3.0.0-pre.5"
 categories = ["command-line-utilities"]
 edition.workspace = true
 keywords = ["password", "cryptography", "deterministic"]
@@ -52,8 +52,8 @@ onepass-seed = { path = "crates/seed" }
 [dependencies]
 anyhow = "1.0.102"
 clap = { version = "4.6.0", features = ["derive", "env", "unicode", "wrap_help"] }
-onepass-conf = "0.3.3"
-onepass-seed = "0.3.0"
+onepass-conf = "0.4.0"
+onepass-seed = "0.3.1"
 secrecy = "0.10.3"
 
 [dependencies.readpassphrase-3]
