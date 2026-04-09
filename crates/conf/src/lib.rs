@@ -125,13 +125,13 @@ pub struct RawSite<S> {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub increment: Option<NonZero<u32>>,
 
-    /// User-facing comment/description. Does not affect generated passwords.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub comment: Option<S>,
-
-    /// Internal data, reserved for future use by generators. Does not affect generated passwords.
+    /// Internal data, reserved for future use by generators. Does not affect derivation paths.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data: Option<S>,
+
+    /// User-facing comment/description. Does not affect generated passwords at all.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comment: Option<S>,
 }
 
 #[derive(Clone, Debug)]
