@@ -199,8 +199,8 @@ impl Config {
                     old.2 = cmp::max(old.2, increment);
                     old.3 = comment;
                     match (&old.4, &data) {
+                        (_, None) => (),
                         (None, Some(_)) => old.4 = data,
-                        (None, None) => (),
                         (Some(d1), Some(d2)) if d1 == d2 => (),
                         _ => {
                             // TODO(soon): return error here.
