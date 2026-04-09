@@ -197,7 +197,9 @@ impl Config {
                         old.1 = schema;
                     }
                     old.2 = cmp::max(old.2, increment);
-                    old.3 = comment;
+                    if comment.is_some() {
+                        old.3 = comment;
+                    }
                     match (&old.4, &data) {
                         (_, None) => (),
                         (None, Some(_)) => old.4 = data,
