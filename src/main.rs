@@ -251,6 +251,9 @@ fn lookup_site<'a>(
         Err(Error::UrlNotFound) => RawSite::new(url, username, None, 0),
         Err(err) => return Err(err).context("failed finding site"),
     };
+    if let Some(data) = site.data {
+        eprintln!("WARNING: ignoring data field on {url}:\n{data:?}");
+    }
     if let Some(ref schema) = args.schema {
         site.schema = Some(config.resolve_schema(schema));
     }
