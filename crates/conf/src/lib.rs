@@ -325,7 +325,13 @@ impl Config {
     pub fn from_file(base_path: &Path) -> Result<Self, io::Error> {
         let base_path = expand_home(base_path)
             .map_err(io::Error::other)?
-            .canonicalize()?;
+            .canonicalize()
+            .map_err(|e| {
+                io::Error::new(
+                    e.kind(),
+                    format!("failed reading base path {base_path:?}: {e}"),
+                )
+            })?;
         let DiskConfig {
             include,
             mut global,
@@ -340,7 +346,12 @@ impl Config {
         let mut visited = HashSet::new();
         visited.insert(base_path);
         while let Some(path) = includes.pop_front() {
-            let path = path.canonicalize()?;
+            let path = path.canonicalize().map_err(|e| {
+                io::Error::new(
+                    e.kind(),
+                    format!("failed reading include path {path:?}: {e}"),
+                )
+            })?;
             if visited.contains(&path) {
                 continue;
             }
