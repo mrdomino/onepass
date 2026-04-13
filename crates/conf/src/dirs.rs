@@ -60,11 +60,7 @@ pub fn current_home() -> Result<PathBuf, HomeNotSet> {
     Ok(PathBuf::from(dir))
 }
 
-impl core::error::Error for HomeNotSet {
-    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        None
-    }
-}
+impl core::error::Error for HomeNotSet {}
 
 impl core::fmt::Display for HomeNotSet {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
