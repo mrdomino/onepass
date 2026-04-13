@@ -29,10 +29,7 @@ edition = "2024"
 repository = "https://github.com/mrdomino/onepass"
 
 [features]
-default = [
-    "keyring",
-    "readpass-vendored",
-]
+default = ["keyring"]
 macos-biometry = [
     "objc2",
     "objc2-core-foundation",
@@ -41,8 +38,7 @@ macos-biometry = [
     "objc2-security",
     "zeroize",
 ]
-readpass-libbsd = ["readpassphrase-3/libbsd-static"]
-readpass-vendored = ["readpassphrase-3/linux-vendored"]
+readpass-static = ["readpassphrase-3/libbsd-static"]
 
 [patch.crates-io]
 onepass-base = { path = "crates/base" }
@@ -57,12 +53,9 @@ onepass-seed = "0.3.1"
 secrecy = "0.10.3"
 
 [dependencies.readpassphrase-3]
-version = "1.0.2"
+version = "2.0.0-pre.0"
 default-features = false
-features = [
-    "windows-vendored",
-    "zeroize",
-]
+features = ["zeroize"]
 
 [dependencies.keyring]
 version = "3.6.3"
