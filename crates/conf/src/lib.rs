@@ -332,10 +332,10 @@ impl Config {
             mut site,
         } = DiskConfig::from_file(&base_path)?;
 
-        let mut includes: VecDeque<_> = include
+        let mut includes = include
             .into_iter()
             .map(|p| Config::resolve_path(&base_path, p))
-            .collect();
+            .collect::<Result<VecDeque<_>, _>>()?;
 
         let mut visited = HashSet::new();
         visited.insert(base_path);
@@ -345,14 +345,17 @@ impl Config {
                 continue;
             }
             let config = DiskConfig::from_file(&path)?;
-            includes.extend(
-                config
-                    .include
-                    .into_iter()
-                    .map(|p| Config::resolve_path(&path, p)),
-            );
 
-            global.merge(config.global, &path);
+            includes.reserve(config.include.len());
+            includes = config.include.into_iter().try_fold(
+                includes,
+                |mut includes, p| -> Result<_, io::Error> {
+                    includes.push_back(Config::resolve_path(&path, p)?);
+                    Ok(includes)
+                },
+            )?;
+
+            global.merge(config.global, &path)?;
             site.extend(config.site);
 
             visited.insert(path);
@@ -445,13 +448,15 @@ impl Config {
         self.resolve_schema(self.global.default_schema.as_deref().unwrap_or("{words}"))
     }
 
-    fn resolve_path(base_path: &Path, path: PathBuf) -> PathBuf {
-        let path = expand_home(&path).unwrap();
+    fn resolve_path(base_path: &Path, path: PathBuf) -> Result<PathBuf, io::Error> {
+        let path = expand_home(&path).map_err(io::Error::other)?;
         if path.is_absolute() {
-            return path.into_owned();
+            return Ok(path.into_owned());
         }
-        let base_dir = base_path.parent().expect("invalid config path");
-        base_dir.join(path)
+        let base_dir = base_path
+            .parent()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "invalid filename"))?;
+        Ok(base_dir.join(path))
     }
 
     fn default_config_path() -> Result<PathBuf, io::Error> {
@@ -495,18 +500,19 @@ impl Global {
     }
 
     /// Merge `other` into `self`, preferring `other` (i.e. `other` overrides base.)
-    pub fn merge(&mut self, other: Global, other_path: &Path) {
+    pub fn merge(&mut self, other: Global, other_path: &Path) -> Result<(), io::Error> {
         if let Some(s) = other.default_schema {
             self.default_schema = Some(s);
         }
         if let Some(p) = other.words_path {
-            self.words_path = Some(Config::resolve_path(other_path, p));
+            self.words_path = Some(Config::resolve_path(other_path, p)?);
         }
         if let Some(k) = other.use_keyring {
             self.use_keyring = Some(k);
         }
         // NB. this silently clobbers aliases in self.
         self.alias.extend(other.alias);
+        Ok(())
     }
 
     /// Returns true if these settings are all unspecified / [`None`].
