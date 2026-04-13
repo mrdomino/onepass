@@ -12,18 +12,18 @@ pub struct HomeNotSet;
 /// Tries to expand `~` to the user’s home dir.
 ///
 /// If this sees a path whose first component is a `~`, it attempts to replace the `~` with the
-/// user’s home dir (read via [`current_home`].) In all other cases, including when the home cannot
-/// be computed, the literal input path is returned unchanged.
-pub fn expand_home(path: &Path) -> Cow<'_, Path> {
+/// user’s home dir (read via [`current_home`].) In all other cases, the literal input path is
+/// returned unchanged.
+pub fn expand_home(path: &Path) -> Result<Cow<'_, Path>, HomeNotSet> {
     let mut iter = path.components();
     if let Some(Component::Normal(s)) = iter.next()
         && s == OsStr::new("~")
-        && let Ok(mut path) = current_home()
     {
+        let mut path = current_home()?;
         path.extend(iter);
-        return Cow::Owned(path);
+        return Ok(Cow::Owned(path));
     }
-    Cow::Borrowed(path)
+    Ok(Cow::Borrowed(path))
 }
 
 /// Returns the user’s config dir.

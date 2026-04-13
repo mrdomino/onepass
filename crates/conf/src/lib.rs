@@ -323,7 +323,9 @@ impl Config {
     /// site entries are resolved by merge using `(url, username)` as the key, taking the highest
     /// increment and last schema defined for any given entry.
     pub fn from_file(base_path: &Path) -> Result<Self, io::Error> {
-        let base_path = expand_home(base_path).canonicalize()?;
+        let base_path = expand_home(base_path)
+            .map_err(io::Error::other)?
+            .canonicalize()?;
         let DiskConfig {
             include,
             mut global,
@@ -444,7 +446,7 @@ impl Config {
     }
 
     fn resolve_path(base_path: &Path, path: PathBuf) -> PathBuf {
-        let path = expand_home(&path);
+        let path = expand_home(&path).unwrap();
         if path.is_absolute() {
             return path.into_owned();
         }
