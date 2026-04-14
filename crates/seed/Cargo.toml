@@ -14,7 +14,7 @@ crypto-bigint = { version = "0.7.3", default-features = false, features = ["rand
 hex = { version = "0.4.3", default-features = false }
 nom = "8.0.0"
 onepass-base = "0.1.2"
-rand_core = "0.10.0"
+rand_core = "0.10.1"
 secrecy = { version = "0.10.3", default-features = false }
 serde = { version = "1.0.228", default-features = false, features = ["derive"] }
 url = { version = "2.5.8", default-features = false }
