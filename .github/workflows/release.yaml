@@ -240,7 +240,7 @@ jobs:
         cp onepass.provisionprofile release-files/
 
     - name: Create Release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         draft: true
         tag_name: ${{ steps.get-version.outputs.version }}
