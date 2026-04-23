@@ -46,8 +46,6 @@ jobs:
         EOF
     - uses: rust-lang/crates-io-auth-action@v1
       id: auth
-    # TODO(soon): smarter release process, this just tries to publish everything
-    # every time, which doesn’t work unless the version has changed.
     - name: publish base
       working-directory: crates/base
       run: cargo publish --locked || true
