@@ -49,8 +49,11 @@ pub fn config_dir() -> Result<PathBuf, HomeNotSet> {
 
 /// Returns the user’s home dir.
 ///
-/// This only considers the shell environ; on Windows, it checks `%USERPROFILE`; otherwise, it
-/// returns `$HOME`.
+/// This only considers the shell environ; it does not check whether this directory exists, nor
+/// what the system directory says.
+///
+/// If on Windows and `%USERPROFILE%` is set, that is returned. Otherwise, if `$HOME` is set, that
+/// is returned.
 pub fn current_home() -> Result<PathBuf, HomeNotSet> {
     #[cfg(windows)]
     if let Some(dir) = env::var_os("USERPROFILE").map(PathBuf::from) {
