@@ -91,7 +91,9 @@ impl EvalContext for Node {
                     node.write_to(context, w, &mut node_index)?;
                     Ok(index)
                 })
-                .map(|_| ()),
+                .map(|index| {
+                    assert!(bool::from(index.expose_secret_mut().is_zero()));
+                }),
 
             Node::Count(ref node, min, max) => {
                 let node = node.as_ref();
