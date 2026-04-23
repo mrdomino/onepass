@@ -239,16 +239,15 @@ impl GeneratorFunc for Words {
         let (count, sep, upper) = Self::parse_args(args);
         // TODO(soon): better Words -> Word arg mapping
         let base = Word.size(context, args);
-        let j;
-        if upper {
+        let j = if !upper {
+            0
+        } else {
             let index = index.expose_secret_mut();
             let j_uint = SecretBox::init_with_mut(|j| {
                 (*index, *j) = index.div_rem(&NonZero::new(U256::from_u32(count)).unwrap());
             });
-            j = u32::try_from(u256_to_word(j_uint.expose_secret())).unwrap();
-        } else {
-            j = 0;
-        }
+            u32::try_from(u256_to_word(j_uint.expose_secret())).unwrap()
+        };
         for i in 0..count {
             if i != 0 {
                 write!(w, "{sep}")?;
