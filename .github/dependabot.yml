@@ -4,8 +4,24 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    target-branch: v3-dev
+    labels: ["dependencies", "v3-dev"]
+
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    target-branch: main
+    labels: ["dependencies", "main"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    target-branch: main
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: v3-dev
