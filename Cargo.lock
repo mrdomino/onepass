@@ -954,6 +954,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09edd9e8b54e49e587e4f6295a7d29c3ea94d469cb40ab8ca70b288248a81db2"
 
 [[package]]
+name = "libbsd-sys"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60fffbad392dbfd4715e8e4a5504fdfe2eefc37401b0bc9b6609b59b2684840c"
+dependencies = [
+ "libc",
+ "pkg-config",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.182"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1466,13 +1476,13 @@ dependencies = [
 
 [[package]]
 name = "readpassphrase-3"
-version = "1.0.2"
+version = "2.0.0-pre.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "279aecd19e496bd0a574b92895227edd8d4b704cfd36ccca8d4fac74542c7cb7"
+checksum = "40731760b0e4bcbd160a54acda5d52fe3ae1f7254b63b3fca8f03798fa68fa0c"
 dependencies = [
  "bitflags",
  "cc",
- "tcm-readpassphrase-vendored",
+ "libbsd-sys",
  "zeroize",
 ]
 
@@ -1696,15 +1706,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "tcm-readpassphrase-vendored"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a29a01bd8faded69a753c99f2efd8bce68f5a6e003ddf637c47d1ed64d35720e"
-dependencies = [
- "cc",
 ]
 
 [[package]]
