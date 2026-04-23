@@ -38,7 +38,7 @@ impl Chars {
         T: Into<CharRange>,
     {
         let mut ranges = ranges.into_iter().map(Into::into).collect::<Vec<_>>();
-        ranges.sort_unstable_by(|a, b| a.start.cmp(&b.start));
+        ranges.sort_unstable_by_key(|a| a.start);
         let mut i = 0;
         let mut j = 1;
         while j < ranges.len() {
