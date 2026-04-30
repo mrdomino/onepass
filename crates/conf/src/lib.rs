@@ -329,7 +329,7 @@ impl Config {
             .map_err(|e| {
                 io::Error::new(
                     e.kind(),
-                    format!("failed reading base path {base_path:?}: {e}"),
+                    format!("failed reading config path {base_path:?}: {e}"),
                 )
             })?;
         let DiskConfig {
