@@ -22,6 +22,9 @@ permissions: {}
 
 jobs:
   build:
+    name: Build
+    permissions:
+      contents: read
     uses: ./.github/workflows/build.yaml
     with:
       release: true
