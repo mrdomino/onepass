@@ -6,6 +6,12 @@ updates:
       interval: "daily"
     target-branch: v3-dev
     labels: ["dependencies", "v3-dev"]
+    cooldown:
+      default-days: 14
+      exclude:
+        - argon2
+        - blake2
+        - crypto-bigint
 
   - package-ecosystem: "cargo"
     directory: "/"
@@ -13,15 +19,21 @@ updates:
       interval: "daily"
     target-branch: main
     labels: ["dependencies", "main"]
+    cooldown:
+      default-days: 28
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     target-branch: main
+    cooldown:
+      default-days: 7
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     target-branch: v3-dev
+    cooldown:
+      default-days: 7
