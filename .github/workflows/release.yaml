@@ -18,6 +18,8 @@ on:
         type: boolean
         default: false
 
+permissions: {}
+
 jobs:
   build:
     uses: ./.github/workflows/build.yaml
@@ -28,6 +30,7 @@ jobs:
   publish:
     name: Publish to crates.io
     permissions:
+      contents: read
       id-token: write
     needs: build
     runs-on: ubuntu-latest
@@ -246,10 +249,12 @@ jobs:
         cp onepass.provisionprofile release-files/
 
     - name: Create Release
-      uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
-      with:
-        draft: true
-        tag_name: ${{ steps.get-version.outputs.version }}
-        name: Release ${{ steps.get-version.outputs.version }}
-        files: release-files/*
-        generate_release_notes: true
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        VERSION: ${{ steps.get-version.outputs.version }}
+      run: |
+        gh release create "$VERSION" \
+          --draft \
+          --title "Release $VERSION" \
+          --generate-notes \
+          release-files/*
