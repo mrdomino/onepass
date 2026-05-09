@@ -5,6 +5,12 @@ set -eu
 # To use:
 #     git config --local core.hooksPath .githooks/
 #
+if command -v zizmor >/dev/null 2>&1 && ! zizmor .github
+then
+  echo 'There are some zizmor findings.'
+  exit 1
+fi
+
 if ! cargo fmt --all -- --check
 then
   echo 'There are some code style issues.' >&2
