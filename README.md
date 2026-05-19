@@ -40,7 +40,7 @@ A default config file is generated at `${XDG_CONFIG_DIR:-$HOME/.config}/onepass/
 
 Onepass may be installed via cargo:
 ```sh
-cargo install onepass
+cargo install --locked onepass
 ```
 
 Note, however, that on macOS, the biometric keyring support will not be enabled.
