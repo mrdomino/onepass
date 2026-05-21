@@ -11,7 +11,7 @@ use std::{
 use anyhow::{Context as _Context, Result};
 use clap::{CommandFactory, Parser, error::ErrorKind};
 use itertools::Itertools;
-use onepass_conf::{Config, Error, RawSite};
+use onepass_conf::{Config, Error, KeyringSeed, RawSite};
 use onepass_seed::{
     ExposeSecret, SecretBox, SecretString,
     dict::{BoxDict, Dict},
@@ -39,22 +39,13 @@ struct Args {
     #[arg(short, long)]
     username: Option<String>,
 
-    /// Store the seed password in the OS keyring
-    #[arg(
-        short,
-        long,
-        env = "ONEPASS_USE_KEYRING",
-        default_missing_value = "true",
-        num_args = 0..=1,
-        require_equals = true,
-        help_heading = "Keyring Integration",
-    )]
-    keyring: Option<bool>,
+    /// Cache the seed password in the OS keyring
+    #[arg(short = 'k', help_heading = "Keyring Integration")]
+    keyring: bool,
 
-    /// Do not store the seed password
+    /// Do not cache the seed password
     #[arg(
         short = 'K',
-        long,
         conflicts_with = "keyring",
         help_heading = "Keyring Integration"
     )]
@@ -118,15 +109,22 @@ struct Args {
 }
 
 fn main() -> Result<()> {
-    let mut args = Args::parse();
-    if args.no_keyring || (args.stdin && args.keyring.is_none()) {
-        args.keyring = Some(false);
-    }
-    let args = args;
+    let args = Args::parse();
 
     let config_path = args.config_path.as_deref();
     let config = Config::from_or_init(config_path).context("failed to read config")?;
-    let use_keyring = args.keyring.or(config.global.use_keyring).unwrap_or(false);
+    let seed_keyring = if args.no_keyring {
+        false
+    } else if args.keyring {
+        true
+    } else if args.stdin {
+        false
+    } else {
+        match config.global.keyring.seed {
+            KeyringSeed::Unspecified | KeyringSeed::Cache => true,
+            KeyringSeed::Off => false,
+        }
+    };
     let rp_flags = if args.stdin {
         RpFlags::STDIN
     } else {
@@ -144,7 +142,7 @@ fn main() -> Result<()> {
     }
     if args.sites.is_empty() {
         if args.confirm {
-            let _ = seed_password::read(use_keyring, true, rp_flags)?;
+            let _ = seed_password::read(seed_keyring, true, rp_flags)?;
         }
         if args.reset_keyring || args.confirm {
             return Ok(());
@@ -180,7 +178,7 @@ fn main() -> Result<()> {
     }
 
     let mut stdout = stdout();
-    let seed = seed_password::read(use_keyring, args.confirm, rp_flags)?;
+    let seed = seed_password::read(seed_keyring, args.confirm, rp_flags)?;
     for site in &args.sites {
         let res = gen_password_config(seed.expose_secret(), site, &config, &args, &context)?;
         stdout.write_all(res.expose_secret().as_bytes())?;

@@ -52,7 +52,7 @@ pub struct Config {
 /// Compared with [`Config`], this specifies optional include paths and allows any number of sites
 /// without any constraints on mapping.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Hash)]
-// TODO(soon): better handling for unknown fields. We want an error in some cases, a warning in
+// TODO(someday): better handling for unknown fields. We want an error in some cases, a warning in
 // others.
 #[serde(deny_unknown_fields)]
 pub struct DiskConfig {
@@ -78,6 +78,11 @@ pub struct Global {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_schema: Option<String>,
 
+    /// Keyring settings (whether to cache/require seed in keyring or populate site passwords in
+    /// keyring)
+    #[serde(default, skip_serializing_if = "Keyring::is_default")]
+    pub keyring: Keyring,
+
     /// The word list to use for any sites that generate from dictionaries, instead of the built-in
     /// [`EFF wordlist`][onepass_seed::dict::EFF_WORDLIST].
     // TODO(soon): Make the dictionary configurable per site. Probably we want this to be a list of
@@ -86,18 +91,41 @@ pub struct Global {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub words_path: Option<PathBuf>,
 
-    /// Whether to store the seed password in the OS keyring.
-    // TODO(soon): this is poorly named. We probably want a feature to _populate_ generated site
-    // passwords _into_ the OS keyring, as well as this one, which reads the _seed_ password _from_
-    // the OS keyring.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_keyring: Option<bool>,
-
     /// A lookup of shorthand names to schema definitions. If a site has a schema that matches one
     /// of the keys of this map, then that key’s value will be substituted when that site is
     /// processed.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub alias: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct Keyring {
+    #[serde(default, skip_serializing_if = "KeyringSeed::is_default")]
+    pub seed: KeyringSeed,
+    // TODO(someday): auto-sync site passwords to OS keyring
+    // #[serde(default, skip_serializing_if = "KeyringSite::is_default")]
+    // pub site: KeyringSite,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum KeyringSeed {
+    /// KeyringSeed was not set.
+    ///
+    /// Functionally equivalent to [`Cache`] on.macOS, [`Off`] on other platforms.
+    ///
+    /// [`Cache`]: KeyringSeed::Cache
+    /// [`Off`]: KeyringSeed::Off
+    #[default]
+    Unspecified,
+
+    /// Don’t try to store or load the seed in the OS keyring.
+    Off,
+
+    /// Store the seed in the OS keyring, fallback to readpassphrase on error.
+    Cache,
+    // TODO(soon): require the OS keyring, no readpassphrase fallback
+    // Require,
 }
 
 /// A pseudo-[`Site`] that is easier to represent on disk.
@@ -291,8 +319,9 @@ impl Config {
                     "# A custom word list may be specified.\n",
                     "# words_path = \"/usr/share/dict/words\"\n",
                     "\n",
+                    "[global.keyring]\n",
                     "# The OS keyring may be used to store the seed password.\n",
-                    "# use_keyring = true\n",
+                    "# seed = \"cache\"\n",
                     "\n",
                     "# Schemas may have named aliases.\n",
                     "[global.alias]\n",
@@ -518,9 +547,7 @@ impl Global {
         if let Some(p) = other.words_path {
             self.words_path = Some(Config::resolve_path(other_path, p)?);
         }
-        if let Some(k) = other.use_keyring {
-            self.use_keyring = Some(k);
-        }
+        self.keyring.merge(&other.keyring);
         // NB. this silently clobbers aliases in self.
         self.alias.extend(other.alias);
         Ok(())
@@ -530,7 +557,7 @@ impl Global {
     pub fn is_empty(&self) -> bool {
         self.default_schema.is_none()
             && self.words_path.is_none()
-            && self.use_keyring.is_none()
+            && self.keyring.is_default()
             && self.alias.is_empty()
     }
 }
@@ -638,6 +665,24 @@ impl error::Error for Error {
             Self::Site(err) => Some(err),
             _ => None,
         }
+    }
+}
+
+impl Keyring {
+    pub fn is_default(&self) -> bool {
+        self.seed.is_default()
+    }
+
+    pub fn merge(&mut self, other: &Self) {
+        if !other.seed.is_default() {
+            self.seed = other.seed;
+        }
+    }
+}
+
+impl KeyringSeed {
+    pub fn is_default(&self) -> bool {
+        *self == Default::default()
     }
 }
 

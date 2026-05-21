@@ -1185,7 +1185,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "onepass"
-version = "3.0.0-pre.6"
+version = "3.0.0-rc.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1215,7 +1215,7 @@ dependencies = [
 
 [[package]]
 name = "onepass-conf"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "onepass-seed",
  "serde",
