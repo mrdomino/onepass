@@ -9,8 +9,9 @@
 # A custom word list may be specified.
 # words_path = "/usr/share/dict/words"
 
+[global.keyring]
 # The OS keyring may be used to store the seed password.
-# use_keyring = true
+# seed = "cache"
 
 # Schemas may have named aliases.
 [global.alias]
