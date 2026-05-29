@@ -112,7 +112,8 @@ pub struct Keyring {
 pub enum KeyringSeed {
     /// KeyringSeed was not set.
     ///
-    /// Functionally equivalent to [`Cache`] on.macOS, [`Off`] on other platforms.
+    /// The behavior is implementation-defined (in onepass it is currently equivalent to [`Cache`])
+    /// but this value does not override previously specified values on merge.
     ///
     /// [`Cache`]: KeyringSeed::Cache
     /// [`Off`]: KeyringSeed::Off
