@@ -85,11 +85,8 @@ pub struct Global {
 
     /// The word list to use for any sites that generate from dictionaries, instead of the built-in
     /// [`EFF wordlist`][onepass_seed::dict::EFF_WORDLIST].
-    // TODO(soon): Make the dictionary configurable per site. Probably we want this to be a list of
-    // word files, maybe with optional labels and/or parsing instructions, and then we can refer to
-    // dicts by hash or by label in per-site schemas.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub words_path: Option<PathBuf>,
+    pub default_words_path: Option<PathBuf>,
 
     /// A lookup of shorthand names to schema definitions. If a site has a schema that matches one
     /// of the keys of this map, then that key’s value will be substituted when that site is
@@ -161,6 +158,14 @@ pub struct RawSite<S> {
     /// User-facing comment/description. Does not affect generated passwords at all.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub comment: Option<S>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub words: Option<Words<S>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Words<S> {
+    pub path: S,
 }
 
 #[derive(Clone, Debug)]
@@ -213,11 +218,14 @@ impl Config {
 
             let comment = site.comment.map(S::into);
             let data = site.data.map(S::into);
+            let words = site.words.map(|words| Words {
+                path: words.path.into(),
+            });
 
             let k = (normal, username);
             match map.entry(k) {
                 Entry::Vacant(v) => {
-                    v.insert((url, schema, increment, comment, data));
+                    v.insert((url, schema, increment, comment, data, words));
                 }
                 Entry::Occupied(mut o) => {
                     let old = o.get_mut();
@@ -238,13 +246,16 @@ impl Config {
                             panic!("Cannot merge data fields {:?} and {:?}", old.4, data);
                         }
                     }
+                    if words.is_some() {
+                        old.5 = words;
+                    }
                 }
             }
         }
         let site = map
             .into_iter()
             .map(
-                |((normal, username), (url, schema, increment, comment, data))| {
+                |((normal, username), (url, schema, increment, comment, data, words))| {
                     (
                         normal,
                         RawSite {
@@ -254,6 +265,7 @@ impl Config {
                             increment,
                             comment,
                             data,
+                            words,
                         },
                     )
                 },
@@ -528,10 +540,10 @@ impl DiskConfig {
 }
 
 impl Global {
-    /// Returns the word list from disk as a single string suitable for passing to
+    /// Returns the default word list from disk as a single string suitable for passing to
     /// [`BoxDict::from_lines`][onepass_seed::dict::BoxDict::from_lines].
     pub fn get_words_string(&self) -> Result<Option<Box<str>>, io::Error> {
-        let Some(ref path) = self.words_path else {
+        let Some(ref path) = self.default_words_path else {
             return Ok(None);
         };
         let Ok(ret) = fs::read_to_string(path) else {
@@ -545,8 +557,8 @@ impl Global {
         if let Some(s) = other.default_schema {
             self.default_schema = Some(s);
         }
-        if let Some(p) = other.words_path {
-            self.words_path = Some(Config::resolve_path(other_path, p)?);
+        if let Some(p) = other.default_words_path {
+            self.default_words_path = Some(Config::resolve_path(other_path, p)?);
         }
         self.keyring.merge(&other.keyring);
         // NB. this silently clobbers aliases in self.
@@ -557,7 +569,7 @@ impl Global {
     /// Returns true if these settings are all unspecified / [`None`].
     pub fn is_empty(&self) -> bool {
         self.default_schema.is_none()
-            && self.words_path.is_none()
+            && self.default_words_path.is_none()
             && self.keyring.is_default()
             && self.alias.is_empty()
     }
@@ -577,6 +589,7 @@ where
             // TODO(someday): fix public API.
             comment: None,
             data: None,
+            words: None,
         }
     }
 
@@ -589,6 +602,9 @@ where
             increment: self.increment,
             comment: self.comment.as_ref().map(S::as_ref),
             data: self.data.as_ref().map(S::as_ref),
+            words: self.words.as_ref().map(|words| Words {
+                path: words.path.as_ref(),
+            }),
         }
     }
 
