@@ -1,6 +1,6 @@
 # onepass
 
-Onepass is the canonical free/open-source CLI for the onepass deterministic password generator.
+Onepass is the canonical free/open-source CLI for the onepass deterministic password generation algorithm.
 
 ## Background
 
