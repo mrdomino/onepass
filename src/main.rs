@@ -10,7 +10,6 @@ use std::{
 
 use anyhow::{Context as _Context, Result};
 use clap::{CommandFactory, Parser, error::ErrorKind};
-use itertools::Itertools;
 use onepass_conf::{Config, Error, KeyringSeed, RawSite};
 use onepass_seed::{
     ExposeSecret, SecretBox, SecretString,
@@ -135,8 +134,14 @@ fn main() -> Result<()> {
         seed_password::delete()?;
     }
     if args.print_sites {
-        for site in config.sites().iter().unique_by(|&site| &site.url) {
-            println!("{}", site.url);
+        let mut urls = config
+            .sites()
+            .iter()
+            .map(|site| site.url.as_str())
+            .collect::<Vec<_>>();
+        urls.dedup();
+        for url in &urls {
+            println!("{url}");
         }
         return Ok(());
     }
