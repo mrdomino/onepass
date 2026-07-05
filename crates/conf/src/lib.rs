@@ -610,7 +610,7 @@ where
     pub fn to_site_with_context<'a>(
         &self,
         default_schema: &str,
-        context: &'a Context<'a>,
+        context: &'a Context,
     ) -> Result<Site<'a>, SiteError> {
         Site::with_context(
             context,

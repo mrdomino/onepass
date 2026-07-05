@@ -17,7 +17,7 @@ fn main() {
         .filter_map(Result::transpose)
         .collect::<Result<Box<[_]>, _>>()
         .unwrap();
-    let dict = BoxDict::from_iter(words.iter().map(AsRef::as_ref));
+    let dict = BoxDict::from_iter(words.iter());
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let mut dest_path = PathBuf::from(&out_dir);
@@ -36,10 +36,9 @@ fn main() {
     }
     writeln!(f, "];").unwrap();
 
-    let words = dict.words();
-    writeln!(f, "static EFF_WORDLIST_WORDS: [&str; {}] = [", words.len()).unwrap();
-    for &word in words {
-        writeln!(f, "    {word:?},").unwrap();
+    writeln!(f, "static EFF_WORDLIST_WORDS: [&str; {}] = [", dict.len()).unwrap();
+    for i in 0..dict.len() {
+        writeln!(f, "    {:?},", dict.word(i)).unwrap();
     }
     writeln!(f, "];").unwrap();
 }

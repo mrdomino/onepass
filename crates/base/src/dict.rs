@@ -2,6 +2,7 @@ use core::{
     fmt::{self, Write},
     ops::Deref,
 };
+use std::ops::Range;
 
 use blake2::Blake2b256;
 use digest::Digest;
@@ -12,8 +13,16 @@ use crate::fmt::{DigestWriter, Lines, TsvField};
 /// The hash may be used as part of a derivation path to make generated passwords depend upon the
 /// exact word list used.
 pub trait Dict: Send + Sync {
-    /// Return the full word list.
-    fn words(&self) -> &[&str];
+    /// Returns the number of words in the list.
+    fn len(&self) -> usize;
+
+    /// Returns true iff the word list is empty.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Return the `i`th word in the list.
+    fn word(&self, i: usize) -> &str;
 
     /// Return the unique BLAKE2b256 hash of this word list.
     fn hash(&self) -> &[u8; 32];
@@ -21,36 +30,91 @@ pub trait Dict: Send + Sync {
 
 /// This is a runtime generated, owned [`Dict`] with string slices out of some backing store.
 /// These slices may come from a `Vec<String>`, or else from slices out of a single `String`.
-pub struct BoxDict<'a>(Box<[&'a str]>, [u8; 32]);
+pub struct BoxDict {
+    backing: Box<str>,
+    spans: Box<[Range<usize>]>,
+    hash: [u8; 32],
+}
 
 /// This type provides a [`Dict`] over non-owned data. It may be used in tests, or to implement a
 /// static compile-time dictionary, giving the compiler maximum freedom as to how to lay out the
 /// string slices.
 pub struct RefDict<'a>(&'a [&'a str], &'a [u8; 32]);
 
-impl<'a> BoxDict<'a> {
+impl BoxDict {
     /// Construct a dictionary from a single string slice, taking each non-empty line, with leading
     /// and trailing whitespace trimmed, as a single word.
-    pub fn from_lines(s: &'a str) -> Self {
-        Self::from_iter(s.lines().map(str::trim))
+    pub fn from_lines(backing: impl Into<Box<str>>) -> Self {
+        let backing = backing.into();
+        let (words, hash) = canonicalize(backing.lines().map(str::trim));
+        let spans = adopt(&backing, words);
+        Self {
+            backing,
+            spans,
+            hash,
+        }
     }
 
     /// Construct a dictionary from a single string slice, with fields separated by a separator.
     /// Individual words are not trimmed.
-    pub fn from_sep(s: &'a str, sep: &str) -> Self {
-        Self::from_iter(s.split(sep))
+    pub fn from_sep(backing: impl Into<Box<str>>, sep: &str) -> Self {
+        let backing = backing.into();
+        let (words, hash) = canonicalize(backing.split(sep));
+        let spans = adopt(&backing, words);
+        Self {
+            backing,
+            spans,
+            hash,
+        }
     }
 }
 
-impl<'a> FromIterator<&'a str> for BoxDict<'a> {
-    fn from_iter<T: IntoIterator<Item = &'a str>>(iter: T) -> Self {
-        let mut items: Vec<_> = iter.into_iter().filter(|&l| !l.is_empty()).collect();
-        items.sort_unstable();
-        items.dedup();
-        let mut w = DigestWriter(Blake2b256::new());
-        // Does not panic: `Update` is infallible.
-        write!(w, "{}", Lines(items.iter().map(TsvField))).unwrap();
-        BoxDict(items.into(), w.0.finalize().into())
+fn canonicalize<'a>(words: impl Iterator<Item = &'a str>) -> (Vec<&'a str>, [u8; 32]) {
+    let mut words: Vec<_> = words.filter(|&w| !w.is_empty()).collect();
+    words.sort_unstable();
+    words.dedup();
+    let mut w = DigestWriter(Blake2b256::new());
+    write!(w, "{}", Lines(words.iter().map(TsvField))).unwrap();
+    (words, w.0.finalize().into())
+}
+
+fn adopt(backing: &str, words: Vec<&str>) -> Box<[Range<usize>]> {
+    let base = backing.as_ptr() as usize;
+    words
+        .into_iter()
+        .map(|w| {
+            let offset = (w.as_ptr() as usize).checked_sub(base).unwrap();
+            let end = offset.checked_add(w.len()).unwrap();
+            assert!(end <= backing.len());
+            offset..end
+        })
+        .collect()
+}
+
+fn compact(words: Vec<&str>) -> (Box<str>, Box<[Range<usize>]>) {
+    let len = words.iter().copied().map(|w| w.len()).sum();
+    let mut backing = String::with_capacity(len);
+    let spans = words
+        .into_iter()
+        .map(|word| {
+            let start = backing.len();
+            backing.push_str(word);
+            start..start + word.len()
+        })
+        .collect();
+    (backing.into(), spans)
+}
+
+impl<S: AsRef<str>> FromIterator<S> for BoxDict {
+    fn from_iter<T: IntoIterator<Item = S>>(iter: T) -> Self {
+        let words: Vec<_> = iter.into_iter().collect();
+        let (words, hash) = canonicalize(words.iter().map(S::as_ref));
+        let (backing, spans) = compact(words);
+        BoxDict {
+            backing,
+            spans,
+            hash,
+        }
     }
 }
 
@@ -64,39 +128,47 @@ impl<'a> RefDict<'a> {
     }
 }
 
-impl<'a> Deref for BoxDict<'a> {
-    type Target = dyn Dict + 'a;
+impl Deref for BoxDict {
+    type Target = dyn Dict;
     fn deref(&self) -> &Self::Target {
         self
     }
 }
 
-impl<'a> Deref for RefDict<'a> {
-    type Target = dyn Dict + 'a;
+impl Deref for RefDict<'static> {
+    type Target = dyn Dict;
     fn deref(&self) -> &Self::Target {
         self
     }
 }
 
-impl Dict for BoxDict<'_> {
-    fn words(&self) -> &[&str] {
-        &self.0
+impl Dict for BoxDict {
+    fn len(&self) -> usize {
+        self.spans.len()
     }
+
+    fn word(&self, i: usize) -> &str {
+        &self.backing[self.spans[i].clone()]
+    }
+
     fn hash(&self) -> &[u8; 32] {
-        &self.1
+        &self.hash
     }
 }
 
 impl Dict for RefDict<'_> {
-    fn words(&self) -> &[&str] {
-        self.0
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+    fn word(&self, i: usize) -> &str {
+        self.0[i]
     }
     fn hash(&self) -> &[u8; 32] {
         self.1
     }
 }
 
-impl<'a> fmt::Debug for dyn Dict + 'a {
+impl fmt::Debug for dyn Dict {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut out = [0u8; 64];
         hex::encode_to_slice(self.hash(), &mut out).unwrap();
@@ -173,12 +245,12 @@ mod tests {
                 None,
             ),
         ];
-        for (want, inp, sep) in tests {
+        for &(want, inp, sep) in tests {
             let dict = match sep {
                 None => BoxDict::from_lines(inp),
                 Some(sep) => BoxDict::from_sep(inp, sep),
             };
-            assert_eq!(want, &hex::encode(dict.hash()), "{:?}", dict.words());
+            assert_eq!(want, &hex::encode(dict.hash()), "{inp:?}");
         }
     }
 }

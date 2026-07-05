@@ -224,7 +224,7 @@ fn gen_password_config(
     url: &str,
     config: &Config,
     args: &Args,
-    context: &Context<'_>,
+    context: &Context,
 ) -> Result<SecretString> {
     let site = lookup_site(url, config, args, context)?;
     let size = site.expr.size();
@@ -247,7 +247,7 @@ fn lookup_site<'a>(
     url: &str,
     config: &Config,
     args: &Args,
-    context: &'a Context<'a>,
+    context: &'a Context,
 ) -> Result<Site<'a>> {
     let username = args.username.as_deref();
     let mut site = match config.find_site(url, username) {
@@ -273,10 +273,7 @@ fn lookup_site<'a>(
 mod tests {
     use std::{fs::File, path::PathBuf};
 
-    use onepass_seed::{
-        dict::{BoxDict, Dict},
-        site::Site,
-    };
+    use onepass_seed::{dict::BoxDict, site::Site};
     use tempfile::TempDir;
 
     use super::*;
@@ -328,9 +325,11 @@ mod tests {
         let args: [&str; 0] = [];
         let words = read_words_str(&Args::parse_from(args.iter()), &config)?
             .context("failed reading words file")?;
-        let dict = BoxDict::from_lines(&words);
-        let words = dict.words();
-        assert_eq!(&["a", "bob", "dole"], words);
+        let dict = BoxDict::from_lines(words);
+        assert_eq!(3, dict.len());
+        assert_eq!("a", dict.word(0));
+        assert_eq!("bob", dict.word(1));
+        assert_eq!("dole", dict.word(2));
 
         Ok(())
     }

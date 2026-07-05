@@ -13,25 +13,25 @@ use crate::{dict::EFF_WORDLIST, expr::GeneratorFunc};
 /// [Expr]: crate::expr::Expr
 /// [Generator]: crate::expr::Generator
 #[derive(Clone, Debug)]
-pub struct Context<'a> {
+pub struct Context {
     generator: Arc<HashMap<&'static str, Arc<dyn GeneratorFunc>>>,
 
     // TODO(someday): maybe this should be extended into a general-purpose content-addressed
     // context map, i.e. `Map<[u8; 32], Any>`.
-    dict: Arc<HashMap<[u8; 32], Arc<dyn Dict + 'a>>>,
+    dict: Arc<HashMap<[u8; 32], Arc<dyn Dict>>>,
 
-    pub default_dict: Arc<dyn Dict + 'a>,
+    pub default_dict: Arc<dyn Dict>,
 }
 
 /// Error returned on unknown generators or dictionary hashes.
 #[derive(Clone, Copy, Debug)]
 pub struct NotFound;
 
-impl<'a> Context<'a> {
+impl Context {
     pub fn new(
         generator: impl IntoIterator<Item = Arc<dyn GeneratorFunc>>,
-        dict: impl IntoIterator<Item = Arc<dyn Dict + 'a>>,
-        default_dict: Arc<dyn Dict + 'a>,
+        dict: impl IntoIterator<Item = Arc<dyn Dict>>,
+        default_dict: Arc<dyn Dict>,
     ) -> Self {
         let generator = Arc::new(generator.into_iter().map(|g| (g.name(), g)).collect());
         let dict = Arc::new(
@@ -61,7 +61,7 @@ impl<'a> Context<'a> {
     /// The dict is added to the lookup table for the returned context. It may or may not be added
     /// to the table for the original context, depending whether there are other clones of the
     /// context or not (see [`Arc::make_mut`].)
-    pub fn with_default_dict(&mut self, default_dict: Arc<dyn Dict + 'a>) -> Self {
+    pub fn with_default_dict(&mut self, default_dict: Arc<dyn Dict>) -> Self {
         Arc::make_mut(&mut self.dict).extend([(*default_dict.hash(), default_dict.clone())]);
         Context {
             generator: self.generator.clone(),
@@ -84,7 +84,7 @@ impl<'a> Context<'a> {
         self.generator.get(name).map(Arc::clone).ok_or(NotFound)
     }
 
-    pub fn get_dict(&self, hash: &Option<[u8; 32]>) -> Result<Arc<dyn Dict + 'a>, NotFound> {
+    pub fn get_dict(&self, hash: &Option<[u8; 32]>) -> Result<Arc<dyn Dict>, NotFound> {
         let Some(hash) = hash else {
             return Ok(self.default_dict.clone());
         };
@@ -92,8 +92,8 @@ impl<'a> Context<'a> {
     }
 }
 
-impl<'a> Extend<Arc<dyn Dict + 'a>> for Context<'a> {
-    fn extend<T: IntoIterator<Item = Arc<dyn Dict + 'a>>>(&mut self, iter: T) {
+impl Extend<Arc<dyn Dict>> for Context {
+    fn extend<T: IntoIterator<Item = Arc<dyn Dict>>>(&mut self, iter: T) {
         let dict = Arc::make_mut(&mut self.dict);
         dict.extend(iter.into_iter().map(|d| (*d.hash(), d)));
     }

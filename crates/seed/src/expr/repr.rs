@@ -8,7 +8,7 @@ use super::{
     chars::{CharRange, Chars, next_char},
 };
 
-struct ReprState<'a, 'b>(bool, &'a Context<'b>);
+struct ReprState<'a>(bool, &'a Context);
 
 impl Expr<'_> {
     /// Write the canonical serialization of this expression. This function implements this type’s
@@ -42,7 +42,7 @@ impl Chars {
     }
 }
 
-impl ReprState<'_, '_> {
+impl ReprState<'_> {
     pub fn write<W>(&mut self, w: &mut W, node: &Node) -> Result
     where
         W: Write,

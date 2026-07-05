@@ -59,7 +59,7 @@ impl<'a> Site<'a> {
     }
 
     pub fn with_context(
-        ctx: &'a Context<'a>,
+        ctx: &'a Context,
         url: &str,
         username: Option<&str>,
         schema: &str,

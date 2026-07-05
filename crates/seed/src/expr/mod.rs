@@ -30,7 +30,7 @@ pub use parse::Error as ParseError;
 #[derive(Debug)]
 pub struct Expr<'a> {
     pub root: Node,
-    pub context: Option<&'a Context<'a>>,
+    pub context: Option<&'a Context>,
 }
 
 /// The core expression sampling trait for this module.
@@ -61,21 +61,21 @@ pub trait Eval {
 /// `impl<T: EvalContext> Eval for (T, T::Context)`.
 pub trait EvalContext {
     /// This is the extra context that is needed to evaluate this type.
-    type Context<'a>: ?Sized + 'a;
+    type Context: ?Sized;
 
     /// Like [`Eval::size`] but with context.
-    fn size(&self, context: &Self::Context<'_>) -> NonZero<U256>;
+    fn size(&self, context: &Self::Context) -> NonZero<U256>;
 
     /// Like [`Eval::write_to`] but with context.
     fn write_to(
         &self,
-        context: &Self::Context<'_>,
+        context: &Self::Context,
         w: &mut dyn Write,
         index: &mut dyn ExposeSecretMut<U256>,
     ) -> Result<()>;
 }
 
-static DEFAULT_CONTEXT: LazyLock<Context<'static>> = LazyLock::new(Context::default);
+static DEFAULT_CONTEXT: LazyLock<Context> = LazyLock::new(Context::default);
 
 impl Expr<'_> {
     /// Construct a new expression with the default generator context.
@@ -88,14 +88,14 @@ impl Expr<'_> {
 }
 
 impl<'a> Expr<'a> {
-    pub fn with_context(root: Node, context: &'a Context<'a>) -> Self {
+    pub fn with_context(root: Node, context: &'a Context) -> Self {
         Expr {
             root,
             context: Some(context),
         }
     }
 
-    pub fn get_context(&self) -> &Context<'a> {
+    pub fn get_context(&self) -> &Context {
         self.context.unwrap_or(&DEFAULT_CONTEXT)
     }
 }

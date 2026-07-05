@@ -17,11 +17,11 @@ pub trait GeneratorFunc: Send + Sync {
     fn name(&self) -> &'static str;
 
     // TODO(soon): return Result from size so we can report dict lookup failure
-    fn size(&self, context: &Context<'_>, args: &[&str]) -> NonZero<U256>;
+    fn size(&self, context: &Context, args: &[&str]) -> NonZero<U256>;
 
     fn write_to(
         &self,
-        context: &Context<'_>,
+        context: &Context,
         w: &mut dyn io::Write,
         index: &mut dyn ExposeSecretMut<U256>,
         args: &[&str],
@@ -31,7 +31,7 @@ pub trait GeneratorFunc: Send + Sync {
     /// dictionary hashes for canonical serialization.
     // TODO(someday): standardize `write_sep_arg`, and instead have an optional trait method that
     // yields each argument.
-    fn write_repr(&self, _: &Context<'_>, w: &mut dyn fmt::Write, args: &[&str]) -> fmt::Result {
+    fn write_repr(&self, _: &Context, w: &mut dyn fmt::Write, args: &[&str]) -> fmt::Result {
         write!(w, "{}", self.name())?;
         for &arg in args {
             write_sep_arg(w, arg)?;
@@ -57,7 +57,7 @@ where
 }
 
 impl EvalContext for Generator {
-    type Context<'a> = Context<'a>;
+    type Context = Context;
 
     fn size(&self, context: &Context) -> NonZero<U256> {
         context
@@ -104,14 +104,14 @@ impl Generator {
     }
 }
 
-impl<'a> Context<'a> {
+impl Context {
     // TODO(soon): remove
-    pub fn with_dict(dict: Arc<dyn Dict + 'a>) -> Self {
+    pub fn with_dict(dict: Arc<dyn Dict>) -> Self {
         Context::default().with_default_dict(dict)
     }
 }
 
-impl Default for Context<'_> {
+impl Default for Context {
     fn default() -> Self {
         let generators: Vec<Arc<dyn GeneratorFunc>> = vec![Arc::new(Word), Arc::new(Words)];
         Context::new(generators, [], Arc::new(EFF_WORDLIST))
@@ -145,21 +145,21 @@ impl GeneratorFunc for Word {
         "word"
     }
 
-    fn size(&self, context: &Context<'_>, args: &[&str]) -> NonZero<U256> {
+    fn size(&self, context: &Context, args: &[&str]) -> NonZero<U256> {
         let dict = context.get_dict(&Context::dict_hash(args)).unwrap();
-        NonZero::new(_Word::try_from(dict.words().len()).unwrap().into()).unwrap()
+        NonZero::new(_Word::try_from(dict.len()).unwrap().into()).unwrap()
     }
 
     fn write_to(
         &self,
-        context: &Context<'_>,
+        context: &Context,
         w: &mut dyn io::Write,
         index: &mut dyn ExposeSecretMut<U256>,
         args: &[&str],
     ) -> io::Result<()> {
         let dict = context.get_dict(&Context::dict_hash(args)).unwrap();
         let upper = args.iter().copied().any(|s| s == "U");
-        let word = dict.words()[u256_to_word(index.expose_secret_mut()) as usize];
+        let word = dict.word(u256_to_word(index.expose_secret_mut()) as usize);
         if !upper {
             write!(w, "{word}")?;
             return Ok(());
@@ -173,12 +173,7 @@ impl GeneratorFunc for Word {
         Ok(())
     }
 
-    fn write_repr(
-        &self,
-        context: &Context<'_>,
-        w: &mut dyn fmt::Write,
-        args: &[&str],
-    ) -> fmt::Result {
+    fn write_repr(&self, context: &Context, w: &mut dyn fmt::Write, args: &[&str]) -> fmt::Result {
         // TODO(soon): clean up
         let hash = Context::dict_hash(args).unwrap_or_else(|| *context.default_dict.hash());
         write!(w, "{}", self.name())?;
@@ -218,7 +213,7 @@ impl GeneratorFunc for Words {
         "words"
     }
 
-    fn size(&self, context: &Context<'_>, args: &[&str]) -> NonZero<U256> {
+    fn size(&self, context: &Context, args: &[&str]) -> NonZero<U256> {
         let (count, _, upper) = Self::parse_args(args);
         let base = Word.size(context, args);
         let mut n = U256::ZERO;
@@ -231,7 +226,7 @@ impl GeneratorFunc for Words {
 
     fn write_to(
         &self,
-        context: &Context<'_>,
+        context: &Context,
         w: &mut dyn io::Write,
         index: &mut dyn ExposeSecretMut<U256>,
         args: &[&str],
@@ -263,12 +258,7 @@ impl GeneratorFunc for Words {
         Ok(())
     }
 
-    fn write_repr(
-        &self,
-        context: &Context<'_>,
-        w: &mut dyn fmt::Write,
-        args: &[&str],
-    ) -> fmt::Result {
+    fn write_repr(&self, context: &Context, w: &mut dyn fmt::Write, args: &[&str]) -> fmt::Result {
         let hash = Context::dict_hash(args).unwrap_or_else(|| *context.default_dict.hash());
         write!(w, "{}", self.name())?;
         fmt_with_hash(w, &hash, args)
@@ -356,7 +346,7 @@ mod tests {
     #[test]
     fn test_lifetimes() {
         let s = "bob\ndole".to_string();
-        let dict = Arc::new(BoxDict::from_lines(&s));
+        let dict = Arc::new(BoxDict::from_lines(s));
         let ctx = Context::with_dict(dict);
         let g = Generator::new("word");
         assert_eq!(U256::from_u32(2), *g.size(&ctx));
