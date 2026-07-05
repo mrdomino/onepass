@@ -85,9 +85,7 @@ impl Expr {
             context: DEFAULT_CONTEXT.clone(),
         }
     }
-}
 
-impl Expr {
     pub fn with_context(root: Node, context: &Context) -> Self {
         Expr {
             root,

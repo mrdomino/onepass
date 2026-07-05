@@ -39,9 +39,7 @@ impl Site {
             increment,
         })
     }
-}
 
-impl Site {
     pub fn with_expr(
         url: &str,
         username: Option<&str>,
