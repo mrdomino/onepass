@@ -11,7 +11,7 @@ use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox, SecretString};
 
 use crate::{expr::Eval, site::Site};
 
-impl Site<'_> {
+impl Site {
     /// Write this site’s password into the passed [`io::Write`] implementation. For security, `W`
     /// should write to a buffer that will be zeroed as soon as possible.
     pub fn write_password_into<W>(&self, w: &mut W, seed_password: &str) -> Result<()>
@@ -84,7 +84,7 @@ fn secret_uniform(secret: &dyn ExposeSecret<[u8; 32]>, n: &NonZero<U256>) -> Sec
 mod tests {
     use super::*;
 
-    fn test_site() -> Site<'static> {
+    fn test_site() -> Site {
         Site::new("google.com", None, "{words}", 0).unwrap()
     }
 

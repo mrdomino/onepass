@@ -10,14 +10,14 @@ use super::{
 
 struct ReprState<'a>(bool, &'a Context);
 
-impl Expr<'_> {
+impl Expr {
     /// Write the canonical serialization of this expression. This function implements this type’s
     /// [`fmt::Display`].
     pub fn write_repr<W>(&self, w: &mut W) -> Result
     where
         W: Write,
     {
-        ReprState(false, self.get_context()).write(w, &self.root)
+        ReprState(false, self.context()).write(w, &self.root)
     }
 }
 
@@ -90,7 +90,7 @@ impl ReprState<'_> {
     }
 }
 
-impl fmt::Display for Expr<'_> {
+impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result {
         self.write_repr(f)
     }

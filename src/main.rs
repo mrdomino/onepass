@@ -243,12 +243,7 @@ fn gen_password_config(
     site.password(seed).context("failed generating password")
 }
 
-fn lookup_site<'a>(
-    url: &str,
-    config: &Config,
-    args: &Args,
-    context: &'a Context,
-) -> Result<Site<'a>> {
+fn lookup_site(url: &str, config: &Config, args: &Args, context: &Context) -> Result<Site> {
     let username = args.username.as_deref();
     let mut site = match config.find_site(url, username) {
         Ok(site) => site,

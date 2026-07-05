@@ -25,7 +25,7 @@ enum CharFragment {
 
 pub type Error = nom::error::Error<String>;
 
-impl Expr<'_> {
+impl Expr {
     /// Expressions can be parsed from UTF-8 strings.
     ///
     /// The following syntax is supported:
@@ -147,11 +147,9 @@ impl Expr<'_> {
     pub fn parse(input: &str) -> Result<Self, Error> {
         Ok(Expr::new(input.parse()?))
     }
-}
 
-impl<'a> Expr<'a> {
     /// [`parse`][Self::parse] an expression with the given [`Context`].
-    pub fn parse_with_context(input: &str, context: &'a Context) -> Result<Self, Error> {
+    pub fn parse_with_context(input: &str, context: &Context) -> Result<Self, Error> {
         Ok(Expr::with_context(input.parse()?, context))
     }
 }

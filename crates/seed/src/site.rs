@@ -8,10 +8,10 @@ use crate::{
 
 /// A fully parsed [`Site`].
 #[derive(Debug)]
-pub struct Site<'a> {
+pub struct Site {
     pub url: Box<str>,
     pub username: Option<Box<str>>,
-    pub expr: Expr<'a>,
+    pub expr: Expr,
     pub increment: u32,
 }
 
@@ -22,7 +22,7 @@ pub enum Error {
     Url(UrlError),
 }
 
-impl Site<'_> {
+impl Site {
     pub fn new(
         url: &str,
         username: Option<&str>,
@@ -41,11 +41,11 @@ impl Site<'_> {
     }
 }
 
-impl<'a> Site<'a> {
+impl Site {
     pub fn with_expr(
         url: &str,
         username: Option<&str>,
-        expr: Expr<'a>,
+        expr: Expr,
         increment: u32,
     ) -> Result<Self, Error> {
         let url = normalize(url)?.into_boxed_str();
@@ -59,7 +59,7 @@ impl<'a> Site<'a> {
     }
 
     pub fn with_context(
-        ctx: &'a Context,
+        ctx: &Context,
         url: &str,
         username: Option<&str>,
         schema: &str,
@@ -70,7 +70,7 @@ impl<'a> Site<'a> {
     }
 }
 
-impl fmt::Display for Site<'_> {
+impl fmt::Display for Site {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write_tsv!(
             f,

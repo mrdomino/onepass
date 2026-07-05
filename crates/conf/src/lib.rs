@@ -595,7 +595,7 @@ where
     /// Convert this site to a [`Site`].
     ///
     /// See [`Site::new`].
-    pub fn to_site(&self, default_schema: &str) -> Result<Site<'_>, SiteError> {
+    pub fn to_site(&self, default_schema: &str) -> Result<Site, SiteError> {
         Site::new(
             self.url.as_ref(),
             self.get_username(),
@@ -607,11 +607,11 @@ where
     /// Convert this site to a [`Site`] with a specific context.
     ///
     /// See [`Site::with_context`].
-    pub fn to_site_with_context<'a>(
+    pub fn to_site_with_context(
         &self,
         default_schema: &str,
-        context: &'a Context,
-    ) -> Result<Site<'a>, SiteError> {
+        context: &Context,
+    ) -> Result<Site, SiteError> {
         Site::with_context(
             context,
             self.url.as_ref(),

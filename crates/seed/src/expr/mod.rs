@@ -28,9 +28,9 @@ pub use parse::Error as ParseError;
 ///
 /// It may be evaluated with [`Eval`] to generate passwords from its domain.
 #[derive(Debug)]
-pub struct Expr<'a> {
+pub struct Expr {
     pub root: Node,
-    pub context: Option<&'a Context>,
+    context: Context,
 }
 
 /// The core expression sampling trait for this module.
@@ -77,35 +77,35 @@ pub trait EvalContext {
 
 static DEFAULT_CONTEXT: LazyLock<Context> = LazyLock::new(Context::default);
 
-impl Expr<'_> {
+impl Expr {
     /// Construct a new expression with the default generator context.
     pub fn new(root: Node) -> Self {
         Expr {
             root,
-            context: None,
+            context: DEFAULT_CONTEXT.clone(),
         }
     }
 }
 
-impl<'a> Expr<'a> {
-    pub fn with_context(root: Node, context: &'a Context) -> Self {
+impl Expr {
+    pub fn with_context(root: Node, context: &Context) -> Self {
         Expr {
             root,
-            context: Some(context),
+            context: context.clone(),
         }
     }
 
-    pub fn get_context(&self) -> &Context {
-        self.context.unwrap_or(&DEFAULT_CONTEXT)
+    pub fn context(&self) -> &Context {
+        &self.context
     }
 }
 
-impl Eval for Expr<'_> {
+impl Eval for Expr {
     fn size(&self) -> NonZero<U256> {
-        self.root.size(self.get_context())
+        self.root.size(self.context())
     }
 
     fn write_to(&self, w: &mut dyn Write, index: &mut dyn ExposeSecretMut<U256>) -> Result<()> {
-        self.root.write_to(self.get_context(), w, index)
+        self.root.write_to(self.context(), w, index)
     }
 }
