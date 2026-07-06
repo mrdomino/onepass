@@ -388,13 +388,9 @@ impl Config {
             let config = DiskConfig::from_file(&path)?;
 
             includes.reserve(config.include.len());
-            includes = config.include.into_iter().try_fold(
-                includes,
-                |mut includes, p| -> Result<_, io::Error> {
-                    includes.push_back(Config::resolve_path(&path, p)?);
-                    Ok(includes)
-                },
-            )?;
+            for p in config.include {
+                includes.push_back(Config::resolve_path(&path, p)?);
+            }
 
             global.merge(config.global, &path)?;
             site.extend(config.site);
