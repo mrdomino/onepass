@@ -12,7 +12,7 @@ use crate::fmt::{DigestWriter, Lines, TsvField};
 /// This trait implements a hashed word list suitable for use in deterministic password generation.
 /// The hash may be used as part of a derivation path to make generated passwords depend upon the
 /// exact word list used.
-pub trait Dict: Send + Sync {
+pub trait Dict: fmt::Debug + Send + Sync {
     /// Returns the number of words in the list.
     fn len(&self) -> usize;
 
@@ -30,6 +30,7 @@ pub trait Dict: Send + Sync {
 
 /// This is a runtime generated, owned [`Dict`] with string slices out of some backing store.
 /// These slices may come from a `Vec<String>`, or else from slices out of a single `String`.
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct BoxDict {
     backing: Box<str>,
     spans: Box<[Range<usize>]>,
@@ -39,6 +40,7 @@ pub struct BoxDict {
 /// This type provides a [`Dict`] over non-owned data. It may be used in tests, or to implement a
 /// static compile-time dictionary, giving the compiler maximum freedom as to how to lay out the
 /// string slices.
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct RefDict<'a>(&'a [&'a str], &'a [u8; 32]);
 
 impl BoxDict {
@@ -165,15 +167,6 @@ impl Dict for RefDict<'_> {
     }
     fn hash(&self) -> &[u8; 32] {
         self.1
-    }
-}
-
-impl fmt::Debug for dyn Dict {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut out = [0u8; 64];
-        hex::encode_to_slice(self.hash(), &mut out).unwrap();
-        let hash = str::from_utf8(&out).unwrap();
-        write!(f, "Dict({hash})")
     }
 }
 
