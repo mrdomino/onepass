@@ -34,10 +34,39 @@ use serde::{Deserialize, Serialize};
 
 use crate::dirs::{config_dir, expand_home};
 
+const EXAMPLE_CONFIG: &str = concat!(
+    "# Other files may be included.\n",
+    "# include = [\"local.toml\"]\n",
+    "\n",
+    "# These settings affect all sites.\n",
+    "[global]\n",
+    "# The default schema can be overridden.\n",
+    "# default_schema = \"{words:5:-}\"\n",
+    "\n",
+    "# A custom word list may be specified.\n",
+    "# words_path = \"/usr/share/dict/words\"\n",
+    "\n",
+    "[global.keyring]\n",
+    "# The OS keyring may be used to store the seed password.\n",
+    "# seed = \"cache\"\n",
+    "\n",
+    "# Schemas may have named aliases.\n",
+    "[global.alias]\n",
+    "apple = '{words:4:-:U}\\d'\n",
+    "login = '[[:print:]]{12}'\n",
+    "\n",
+    "# Sites can be configured by URL, username, schema, and increment.\n",
+    "# [[site]]\n",
+    "# url = \"google.com\"\n",
+    "# username = \"gmail@example\"\n",
+    "# schema = \"apple\"\n",
+    "# increment = 1\n",
+);
+
 /// Finalized user configuration for `onepass`.
 ///
 /// Consists of [global settings][Global] and a map of URL to Site.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Config {
     pub global: Global,
 
@@ -186,6 +215,15 @@ impl Config {
         Config::from_global_site(ret.global, ret.site).map_err(io::Error::other)
     }
 
+    pub fn example() -> Self {
+        let mut ret = Config::default();
+        ret.global.alias.extend(
+            [("apple", "{words:4:-:U}\\d"), ("login", "[[:print:]]{12}")]
+                .map(|(a, b)| (a.to_string(), b.to_string())),
+        );
+        ret
+    }
+
     /// Create a `Config` from its constituent parts.
     ///
     /// This normalizes all URLs in the [`RawSite`]s and does the conversion from `S` to
@@ -308,36 +346,8 @@ impl Config {
                     return Err(io::Error::other(error));
                 }
                 eprintln!("Configuration not found; creating one");
-                let config = concat!(
-                    "# Other files may be included.\n",
-                    "# include = [\"local.toml\"]\n",
-                    "\n",
-                    "# These settings affect all sites.\n",
-                    "[global]\n",
-                    "# The default schema can be overridden.\n",
-                    "# default_schema = \"{words:5:-}\"\n",
-                    "\n",
-                    "# A custom word list may be specified.\n",
-                    "# words_path = \"/usr/share/dict/words\"\n",
-                    "\n",
-                    "[global.keyring]\n",
-                    "# The OS keyring may be used to store the seed password.\n",
-                    "# seed = \"cache\"\n",
-                    "\n",
-                    "# Schemas may have named aliases.\n",
-                    "[global.alias]\n",
-                    "apple = '{words:4:-:U}\\d'\n",
-                    "login = '[[:print:]]{12}'\n",
-                    "\n",
-                    "# Sites can be configured by URL, username, schema, and increment.\n",
-                    "# [[site]]\n",
-                    "# url = \"google.com\"\n",
-                    "# username = \"gmail@example\"\n",
-                    "# schema = \"apple\"\n",
-                    "# increment = 1\n",
-                );
-                fs::write(config_path, config)?;
-                return Ok(Config::default());
+                fs::write(config_path, EXAMPLE_CONFIG)?;
+                return Ok(Config::example());
             }
             return Err(error);
         }
@@ -843,6 +853,12 @@ mod tests {
         let site = config.find_site("google.com", None).unwrap();
         assert_eq!(Some("b"), site.schema.as_deref());
         assert_eq!(2, site.increment.unwrap().get());
+    }
+
+    #[test]
+    fn test_example_config_is_consistent() {
+        let config = Config::from_str(EXAMPLE_CONFIG).unwrap();
+        assert_eq!(config, Config::example());
     }
 
     // TODO(soon): more tests
