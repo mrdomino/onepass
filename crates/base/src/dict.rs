@@ -101,7 +101,7 @@ fn compact(words: Vec<&str>) -> (Box<str>, Box<[Range<usize>]>) {
         .map(|word| {
             let start = backing.len();
             backing.push_str(word);
-            start..start + word.len()
+            start..backing.len()
         })
         .collect();
     (backing.into(), spans)
