@@ -17,7 +17,7 @@ updates:
     cooldown:
       default-days: 7
     groups:
-      actions-deps:
+      actions:
         patterns:
           - "*"
 
@@ -30,8 +30,9 @@ updates:
     cooldown:
       default-days: 7
     groups:
-      v2-cargo-deps:
-        - patterns: "*"
+      cargo:
+        patterns:
+          - "*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -41,6 +42,6 @@ updates:
     cooldown:
       default-days: 7
     groups:
-      v2-actions-deps:
+      actions:
         patterns:
           - "*"
