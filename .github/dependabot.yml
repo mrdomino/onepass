@@ -1,39 +1,46 @@
 version: 2
 updates:
   - package-ecosystem: "cargo"
+    labels: ["dependencies", "main"]
     directory: "/"
     schedule:
       interval: "daily"
-    target-branch: v3-dev
-    labels: ["dependencies", "v3-dev"]
+    target-branch: main
     cooldown:
-      default-days: 14
-      exclude:
-        - argon2
-        - blake2
-        - crypto-bigint
+      default-days: 7
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: main
+    cooldown:
+      default-days: 7
+    groups:
+      actions-deps:
+        patterns:
+          - "*"
 
   - package-ecosystem: "cargo"
+    labels: ["dependencies", "v2-dev"]
     directory: "/"
     schedule:
       interval: "daily"
-    target-branch: main
-    labels: ["dependencies", "main"]
+    target-branch: v2-dev
     cooldown:
-      default-days: 28
+      default-days: 7
+    groups:
+      v2-cargo-deps:
+        - patterns: "*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-    target-branch: main
+    target-branch: v2-dev
     cooldown:
       default-days: 7
-
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    target-branch: v3-dev
-    cooldown:
-      default-days: 7
+    groups:
+      v2-actions-deps:
+        patterns:
+          - "*"
