@@ -350,6 +350,8 @@ impl Config {
                 if let Some(config_dir) = config_path.parent() {
                     // E.g. `~/.config/onepass/config.toml`.
                     // We will create `onepass` but not `.config` or above.
+                    //
+                    // TODO(soon): warn and proceed without config if `.config` does not exist.
                     let _ = fs::create_dir(config_dir);
                 }
                 fs::write(config_path, EXAMPLE_CONFIG)?;
