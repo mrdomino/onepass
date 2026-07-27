@@ -336,9 +336,9 @@ impl Config {
             .is_none()
             .then(Config::default_config_path)
             .transpose()?;
-        let base_path = config_path.or(default_config_path.as_deref()).unwrap();
-        let res = Config::from_file(base_path);
-        if let Some(ref config_path) = default_config_path
+        let config_path = config_path.or(default_config_path.as_deref()).unwrap();
+        let res = Config::from_file(config_path);
+        if default_config_path.is_some()
             && let Err(error) = res
         {
             if error.kind() == io::ErrorKind::NotFound {
@@ -347,6 +347,11 @@ impl Config {
                     return Err(io::Error::other(error));
                 }
                 eprintln!("Configuration not found; creating one");
+                if let Some(config_dir) = config_path.parent() {
+                    // E.g. `~/.config/onepass/config.toml`.
+                    // We will create `onepass` but not `.config` or above.
+                    let _ = fs::create_dir(config_dir);
+                }
                 fs::write(config_path, EXAMPLE_CONFIG)?;
                 return Ok(Config::example());
             }
