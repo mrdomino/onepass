@@ -48,7 +48,7 @@ const EXAMPLE_CONFIG: &str = concat!(
     "\n",
     "[global.keyring]\n",
     "# The OS keyring may be used to store the seed password.\n",
-    "# seed = \"cache\"\n",
+    "# seed = \"cache\"  # or \"off\"\n",
     "\n",
     "# Schemas may have named aliases.\n",
     "[global.alias]\n",
