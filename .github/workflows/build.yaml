@@ -35,80 +35,115 @@ jobs:
             runner: windows-11-arm
           - os:     windows
             arch:   x86_64
+
+          - os:   ubuntu
+            arch: x86_64
+            musl: true
+          - os:   ubuntu
+            arch: aarch64
+            runner: ubuntu-24.04-arm
+            musl: true
+
     runs-on: ${{ matrix.runner != '' && matrix.runner || format('{0}-latest', matrix.os)}}
 
     steps:
     - name: setup environment
+      id: env
       shell: bash
       run: |
         set -u
-        osname() {
-          case "${{ matrix.os }}" in
-            macos)   echo apple-darwin      ;;
-            ubuntu)  echo unknown-linux-gnu ;;
-            windows) echo pc-windows-msvc   ;;
-          esac
-        }
-        if [[ true = "${INPUTS_RELEASE}" ]]; then
-          profile=release
-          outdir=release
-          retention_days=90
+
+        if [[ "${MATRIX_MUSL}" == true ]]; then
+          osname=unknown-linux-musl
         else
-          profile=dev
-          outdir=debug
-          retention_days=7
+          case "${MATRIX_OS}" in
+            macos)   osname=apple-darwin        ;;
+            ubuntu)  osname=unknown-linux-gnu   ;;
+            windows) osname=pc-windows-msvc     ;;
+          esac
         fi
-        if [[ macos = "${{ matrix.os }}" && true = "${INPUTS_RELEASE}" ]]; then
+        target=${MATRIX_ARCH}-$osname
+        echo CARGO_BUILD_TARGET=$target >> $GITHUB_ENV
+
+        if [[ "${INPUTS_RELEASE}" == true ]]; then
+          outdir=release
+          ( echo profile=release
+            echo retention_days=90
+          ) >> $GITHUB_OUTPUT
+        else
+          outdir=debug
+          ( echo profile=dev
+            echo retention_days=7
+          ) >> $GITHUB_OUTPUT
+        fi
+
+        if [[ "${MATRIX_MUSL}" == true ]]; then
+          echo pkgs=musl-tools >> $GITHUB_OUTPUT
+          echo TARGET_CC=musl-gcc >> $GITHUB_ENV
+        elif [[ "${MATRIX_OS}" == ubuntu ]]; then
+          echo pkgs='libbsd-dev libdbus-1-dev' >> $GITHUB_OUTPUT
+        fi
+
+        if [[ "${MATRIX_MUSL}" == true ]]; then
+          features=' --no-default-features --features=readpass-vendored'
+        elif [[ "${MATRIX_OS}" == macos && "${INPUTS_RELEASE}" == true ]]; then
           features=' --no-default-features --features=macos-biometry'
-        elif [[ ubuntu = "${{ matrix.os }}" && true = "${INPUTS_RELEASE}" ]]; then
+        elif [[ "${MATRIX_OS}" == ubuntu && "${INPUTS_RELEASE}" == true ]]; then
           features=' --no-default-features --features=keyring,readpass-libbsd'
         else
           features=
         fi
-        if [[ windows = "${{ matrix.os }}" ]]; then
+        echo features=$features >> $GITHUB_OUTPUT
+
+        suffix=
+        if [[ "${MATRIX_OS}" == windows ]]; then
           suffix=.exe
-        else
-          suffix=
         fi
-        cat >>$GITHUB_ENV <<EOF
-        target=${{ matrix.arch }}-$(osname)
-        outdir=$outdir
-        profile=$profile
-        retention_days=$retention_days
-        features=$features
-        suffix=$suffix
-        EOF
+        echo binary_path=target/$target/$outdir/onepass$suffix >> $GITHUB_OUTPUT
+        echo binary_name=onepass-$target >> $GITHUB_OUTPUT
+
       env:
+        MATRIX_ARCH: ${{ matrix.arch }}
+        MATRIX_MUSL: ${{ matrix.musl }}
+        MATRIX_OS: ${{ matrix.os }}
         INPUTS_RELEASE: ${{ inputs.release }}
 
     - name: install system dependencies
+      if: ${{ steps.env.outputs.pkgs != '' }}
       run: |
         sudo sh -eu <<EOF
         apt-get update && apt-get install -yy --no-install-recommends \
-            libbsd-dev \
-            libdbus-1-dev
+          $PKGS
         EOF
-      if: ${{ matrix.os == 'ubuntu' }}
+      env:
+        PKGS: ${{ steps.env.outputs.pkgs }}
 
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         ref: ${{ inputs.tag || github.ref }}
         persist-credentials: false
-    - run: | # zizmor: ignore[template-injection]
-        rustup toolchain install --target ${{ env.target }} --profile minimal
+    - run: rustup toolchain install --profile minimal
+    - run: rustup target add "$CARGO_BUILD_TARGET"
+      if: matrix.musl
     - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
       with:
-        key: ${{ env.profile }}
+        key: ${{ steps.env.outputs.profile }}
 
-    - run: | # zizmor: ignore[template-injection]
-        cargo build --locked --profile ${{ env.profile }} --target ${{ env.target }}${{ env.features }}
+    - run: |
+        cargo build --locked --profile "${ENV_PROFILE}" ${ENV_FEATURES}
+      shell: bash
+      env:
+        ENV_PROFILE: ${{ steps.env.outputs.profile }}
+        ENV_FEATURES: ${{ steps.env.outputs.features }}
 
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
       with:
-        name: onepass-${{ env.target }}
-        path: target/${{ env.target }}/${{ env.outdir }}/onepass${{ env.suffix }}
-        retention-days: ${{ env.retention_days }}
+        name: ${{ steps.env.outputs.binary_name }}
+        path: ${{ steps.env.outputs.binary_path }}
+        retention-days: ${{ steps.env.outputs.retention_days }}
 
-    - run: | # zizmor: ignore[template-injection]
-        cargo test --profile dev --target ${{ env.target }} -- --include-ignored
+    - run: |
+        cargo test --profile dev ${ENV_FEATURES} -- --include-ignored
       if: ${{ !inputs.release }}
+      env:
+        ENV_FEATURES: ${{ steps.env.outputs.features }}

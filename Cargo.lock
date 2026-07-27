@@ -1699,9 +1699,9 @@ dependencies = [
 
 [[package]]
 name = "tcm-readpassphrase-vendored"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a29a01bd8faded69a753c99f2efd8bce68f5a6e003ddf637c47d1ed64d35720e"
+checksum = "0d6f970a4f2822ca294c2c7d8a04ba8a3e8a0cda8859b95b40c59dd5097b4af3"
 dependencies = [
  "cc",
 ]
