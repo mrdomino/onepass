@@ -233,8 +233,8 @@ fn gen_password_config(
     if args.verbose {
         eprintln!(
             "schema for {2} has about {0} bits of entropy (0x{1} possible passwords)",
-            &size.bits(),
-            &size.to_string().trim_start_matches('0'),
+            size.bits(),
+            size.to_string().trim_start_matches('0'),
             url,
         );
         eprintln!("salt: {salt:?}");
