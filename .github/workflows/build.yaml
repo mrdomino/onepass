@@ -18,33 +18,20 @@ permissions:
   contents: read
 
 jobs:
+
   build:
     name: Build
     strategy:
       matrix:
         include:
-          - os:   macos
-            arch: aarch64
-          - os:   ubuntu
-            arch: aarch64
-            runner: ubuntu-24.04-arm
-          - os:   ubuntu
-            arch: x86_64
-          - os:   windows
-            arch: aarch64
-            runner: windows-11-arm
-          - os:     windows
-            arch:   x86_64
-
-          - os:   ubuntu
-            arch: x86_64
-            musl: true
-          - os:   ubuntu
-            arch: aarch64
-            runner: ubuntu-24.04-arm
-            musl: true
-
-    runs-on: ${{ matrix.runner != '' && matrix.runner || format('{0}-latest', matrix.os)}}
+          - { runner: macos-latest }
+          - { runner: ubuntu-24.04-arm }
+          - { runner: ubuntu-24.04-arm, libc: musl }
+          - { runner: ubuntu-latest }
+          - { runner: ubuntu-latest, libc: musl }
+          - { runner: windows-11-arm }
+          - { runner: windows-latest }
+    runs-on: ${{ matrix.runner }}
 
     steps:
     - name: setup environment
@@ -53,17 +40,25 @@ jobs:
       run: |
         set -u
 
-        if [[ "${MATRIX_MUSL}" == true ]]; then
+        os=${MATRIX_RUNNER%%-*}
+        if [[ "$os" = "macos" || "${MATRIX_RUNNER##*-}" == arm ]]; then
+          arch=aarch64
+        else
+          arch=x86_64
+        fi
+        echo arch=$arch >> $GITHUB_OUTPUT
+
+        if [[ "${MATRIX_LIBC}" == musl ]]; then
           osname=unknown-linux-musl
         else
-          case "${MATRIX_OS}" in
+          case "${os}" in
             macos)   osname=apple-darwin        ;;
             ubuntu)  osname=unknown-linux-gnu   ;;
             windows) osname=pc-windows-msvc     ;;
           esac
         fi
-        target=${MATRIX_ARCH}-$osname
-        echo CARGO_BUILD_TARGET=$target >> $GITHUB_ENV
+        target=${arch}-${osname}
+        echo "CARGO_BUILD_TARGET=${target}" >> $GITHUB_ENV
 
         if [[ "${INPUTS_RELEASE}" == true ]]; then
           outdir=release
@@ -77,35 +72,35 @@ jobs:
           ) >> $GITHUB_OUTPUT
         fi
 
-        if [[ "${MATRIX_MUSL}" == true ]]; then
+        if [[ "${MATRIX_LIBC}" == musl ]]; then
           echo pkgs=musl-tools >> $GITHUB_OUTPUT
           echo TARGET_CC=musl-gcc >> $GITHUB_ENV
-        elif [[ "${MATRIX_OS}" == ubuntu ]]; then
+        elif [[ "${os}" == ubuntu ]]; then
           echo pkgs='libbsd-dev libdbus-1-dev' >> $GITHUB_OUTPUT
         fi
 
-        if [[ "${MATRIX_MUSL}" == true ]]; then
-          features=' --no-default-features --features=readpass-vendored'
-        elif [[ "${MATRIX_OS}" == macos && "${INPUTS_RELEASE}" == true ]]; then
-          features=' --no-default-features --features=macos-biometry'
-        elif [[ "${MATRIX_OS}" == ubuntu && "${INPUTS_RELEASE}" == true ]]; then
-          features=' --no-default-features --features=keyring,readpass-libbsd'
+        if [[ "${MATRIX_LIBC}" == musl ]]; then
+          features='readpass-vendored'
+        elif [[ "${os}" == macos && "${INPUTS_RELEASE}" == true ]]; then
+          features='macos-biometry'
+        elif [[ "${os}" == ubuntu && "${INPUTS_RELEASE}" == true ]]; then
+          features='keyring,readpass-libbsd'
         else
           features=
         fi
-        echo features=$features >> $GITHUB_OUTPUT
+        echo "features=$features" >> $GITHUB_OUTPUT
 
         suffix=
-        if [[ "${MATRIX_OS}" == windows ]]; then
+        if [[ "${os}" == windows ]]; then
           suffix=.exe
         fi
-        echo binary_path=target/$target/$outdir/onepass$suffix >> $GITHUB_OUTPUT
-        echo binary_name=onepass-$target >> $GITHUB_OUTPUT
+        ( echo "binary_path=target/$target/$outdir/onepass$suffix"
+          echo "binary_name=onepass-$target"
+        ) >> $GITHUB_OUTPUT
 
       env:
-        MATRIX_ARCH: ${{ matrix.arch }}
-        MATRIX_MUSL: ${{ matrix.musl }}
-        MATRIX_OS: ${{ matrix.os }}
+        MATRIX_RUNNER: ${{ matrix.runner }}
+        MATRIX_LIBC: ${{ matrix.libc }}
         INPUTS_RELEASE: ${{ inputs.release }}
 
     - name: install system dependencies
@@ -124,13 +119,23 @@ jobs:
         persist-credentials: false
     - run: rustup toolchain install --profile minimal
     - run: rustup target add "$CARGO_BUILD_TARGET"
-      if: matrix.musl
+      if: ${{ matrix.libc == 'musl' }}
     - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
       with:
         key: ${{ steps.env.outputs.profile }}
 
-    - run: |
-        cargo build --locked --profile "${ENV_PROFILE}" ${ENV_FEATURES}
+    - name: build without features
+      if: ${{ steps.env.outputs.features == '' }}
+      run: cargo build --locked --profile "${ENV_PROFILE}"
+      shell: bash
+      env:
+        ENV_PROFILE: ${{ steps.env.outputs.profile }}
+
+    - name: build with features
+      if: ${{ steps.env.outputs.features != '' }}
+      run: |
+        cargo build --locked --profile "${ENV_PROFILE}" \
+          --no-default-features --features="${ENV_FEATURES}"
       shell: bash
       env:
         ENV_PROFILE: ${{ steps.env.outputs.profile }}
@@ -142,8 +147,15 @@ jobs:
         path: ${{ steps.env.outputs.binary_path }}
         retention-days: ${{ steps.env.outputs.retention_days }}
 
-    - run: |
-        cargo test --profile dev ${ENV_FEATURES} --all -- --include-ignored
-      if: ${{ !inputs.release }}
+    - name: test without features
+      if: ${{ !inputs.release && steps.env.outputs.features == '' }}
+      run: cargo test --profile dev --all -- --include-ignored
+
+    - name: test with features
+      if: ${{ !inputs.release && steps.env.outputs.features != '' }}
+      run: |
+        cargo test --profile dev --all \
+          --no-default-features --features="${ENV_FEATURES}" \
+          -- --include-ignored
       env:
         ENV_FEATURES: ${{ steps.env.outputs.features }}
