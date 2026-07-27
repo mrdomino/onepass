@@ -141,11 +141,12 @@ pub struct Keyring {
 pub enum KeyringSeed {
     /// KeyringSeed was not set.
     ///
-    /// The behavior is implementation-defined (in onepass it is currently equivalent to [`Cache`])
-    /// but this value does not override previously specified values on merge.
+    /// The behavior is implementation-defined. In `onepass`, the keyring is used if support is
+    /// available (like [`Cache`].)
+    ///
+    /// This value does not override previously specified values on merge.
     ///
     /// [`Cache`]: KeyringSeed::Cache
-    /// [`Off`]: KeyringSeed::Off
     #[default]
     Unspecified,
 
