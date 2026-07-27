@@ -1,18 +1,22 @@
-#[cfg(all(target_os = "macos", feature = "macos-biometry"))]
+#[cfg(not(keyring = "rs"))]
+mod error;
+#[cfg(keyring = "macos")]
 mod macos_keychain;
-
-#[cfg(not(any(
-    feature = "keyring",
-    all(target_os = "macos", feature = "macos-biometry")
-)))]
-compile_error!("either \"keyring\" or \"macos-biometry\" must be enabled");
+#[cfg(keyring = "no")]
+mod null_keyring;
 
 use anyhow::{Context, Result};
 
-#[cfg(not(all(target_os = "macos", feature = "macos-biometry")))]
+#[cfg(keyring = "rs")]
 pub(super) use keyring::{Entry, Error};
-#[cfg(all(target_os = "macos", feature = "macos-biometry"))]
-pub(super) use macos_keychain::{Entry, Error};
+
+#[cfg(keyring = "macos")]
+pub(super) use macos_keychain::Entry;
+#[cfg(keyring = "no")]
+pub(super) use null_keyring::Entry;
+
+#[cfg(not(keyring = "rs"))]
+pub(super) use error::Error;
 
 const SERVICE: &str = "onepass.app.whilezero.org";
 const ACCOUNT: &str = "seed";

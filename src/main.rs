@@ -120,7 +120,8 @@ fn main() -> Result<()> {
         false
     } else {
         match config.global.keyring.seed {
-            KeyringSeed::Unspecified | KeyringSeed::Cache => true,
+            KeyringSeed::Unspecified => !cfg!(keyring = "no"),
+            KeyringSeed::Cache => true,
             KeyringSeed::Off => false,
         }
     };

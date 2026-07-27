@@ -1,5 +1,4 @@
 use core::{
-    fmt::Display,
     ptr::{self, NonNull},
     slice,
 };
@@ -18,6 +17,8 @@ use objc2_security::{
     kSecClassGenericPassword, kSecReturnData, kSecUseAuthenticationContext, kSecValueData,
 };
 use zeroize::{Zeroize, ZeroizeOnDrop};
+
+use super::Error;
 
 /// Entry exposes an API superficially compatible with the subset of keyring::Entry used by
 /// onepass. The difference is that it asks for the password it saves to be protected by biometric
@@ -146,32 +147,6 @@ impl Entry {
             )));
         }
         Ok(())
-    }
-}
-
-/// Error is a superficially compatible type with keyring::Error. In particular, it must expose a
-/// NoEntry option, so this can be checked by the functions that call keyring.
-#[derive(Debug)]
-pub(crate) enum Error {
-    NoEntry,
-    Other(anyhow::Error),
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Error::NoEntry => write!(f, "entry not found"),
-            Error::Other(err) => err.fmt(f),
-        }
-    }
-}
-
-impl core::error::Error for Error {
-    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        match self {
-            Error::Other(err) => Some(err.as_ref()),
-            _ => None,
-        }
     }
 }
 

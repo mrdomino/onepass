@@ -10,7 +10,11 @@ use secrecy::{ExposeSecret, SecretString};
 /// If `confirm` is true, then the password is checked against a confirmation that is always read
 /// from the console. This allows the user to confirm that the seed password is what they think it
 /// is without otherwise exposing the password.
-pub(crate) fn read(use_keyring: bool, confirm: bool, flags: Flags) -> Result<SecretString> {
+pub(crate) fn read(mut use_keyring: bool, confirm: bool, flags: Flags) -> Result<SecretString> {
+    if use_keyring && cfg!(keyring = "no") {
+        eprintln!("WARNING: keyring support requested but missing");
+        use_keyring = false;
+    }
     let password = use_keyring.then(load_keyring).transpose()?.flatten();
     if let Some(password) = password {
         if confirm && !check_confirm(password.expose_secret())? {
