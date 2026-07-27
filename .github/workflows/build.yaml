@@ -143,7 +143,7 @@ jobs:
         retention-days: ${{ steps.env.outputs.retention_days }}
 
     - run: |
-        cargo test --profile dev ${ENV_FEATURES} -- --include-ignored
+        cargo test --profile dev ${ENV_FEATURES} --all -- --include-ignored
       if: ${{ !inputs.release }}
       env:
         ENV_FEATURES: ${{ steps.env.outputs.features }}
