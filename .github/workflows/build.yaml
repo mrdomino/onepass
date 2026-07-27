@@ -40,11 +40,10 @@ jobs:
       run: |
         set -u
 
-        os=${MATRIX_RUNNER%%-*}
-        if [[ "$os" = "macos" || "${MATRIX_RUNNER##*-}" == arm ]]; then
+        arch=x86_64
+        if [[ "${os:=${MATRIX_RUNNER%%-*}}" == "macos" ||
+              "${MATRIX_RUNNER##*-}" == arm ]]; then
           arch=aarch64
-        else
-          arch=x86_64
         fi
         echo arch=$arch >> $GITHUB_OUTPUT
 
