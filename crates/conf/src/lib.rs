@@ -354,7 +354,9 @@ impl Config {
                     // TODO(soon): warn and proceed without config if `.config` does not exist.
                     let _ = fs::create_dir(config_dir);
                 }
-                fs::write(config_path, EXAMPLE_CONFIG)?;
+                fs::write(config_path, EXAMPLE_CONFIG).map_err(|e| {
+                    io::Error::new(e.kind(), format!("failed writing {config_path:?}: {e}"))
+                })?;
                 return Ok(Config::example());
             }
             return Err(error);
