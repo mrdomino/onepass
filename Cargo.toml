@@ -33,6 +33,7 @@ default = [
     "keyring",
     "readpass-vendored",
 ]
+keyring = ["dep:keyring"]
 macos-biometry = [
     "objc2",
     "objc2-core-foundation",
