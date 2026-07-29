@@ -79,11 +79,11 @@ jobs:
         fi
 
         if [[ "${MATRIX_LIBC}" == musl ]]; then
-          features='readpass-vendored'
+          features='--no-default-features --features=readpass-vendored'
         elif [[ "${os}" == macos && "${INPUTS_RELEASE}" == true ]]; then
-          features='macos-biometry'
+          features='--no-default-features --features=macos-biometry'
         elif [[ "${os}" == ubuntu && "${INPUTS_RELEASE}" == true ]]; then
-          features='keyring,readpass-libbsd'
+          features='--no-default-features --features=keyring,readpass-libbsd'
         else
           features=
         fi
@@ -123,22 +123,11 @@ jobs:
       with:
         key: ${{ steps.env.outputs.profile }}
 
-    - name: build without features
-      if: ${{ steps.env.outputs.features == '' }}
-      run: cargo build --locked --profile "${ENV_PROFILE}"
+    - run: cargo build --locked --profile "${ENV_PROFILE}" ${ENV_FEATURES}
       shell: bash
       env:
-        ENV_PROFILE: ${{ steps.env.outputs.profile }}
-
-    - name: build with features
-      if: ${{ steps.env.outputs.features != '' }}
-      run: |
-        cargo build --locked --profile "${ENV_PROFILE}" \
-          --no-default-features --features="${ENV_FEATURES}"
-      shell: bash
-      env:
-        ENV_PROFILE: ${{ steps.env.outputs.profile }}
         ENV_FEATURES: ${{ steps.env.outputs.features }}
+        ENV_PROFILE: ${{ steps.env.outputs.profile }}
 
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
       with:
@@ -146,15 +135,8 @@ jobs:
         path: ${{ steps.env.outputs.binary_path }}
         retention-days: ${{ steps.env.outputs.retention_days }}
 
-    - name: test without features
-      if: ${{ !inputs.release && steps.env.outputs.features == '' }}
-      run: cargo test --profile dev --all -- --include-ignored
-
-    - name: test with features
-      if: ${{ !inputs.release && steps.env.outputs.features != '' }}
-      run: |
-        cargo test --profile dev --all \
-          --no-default-features --features="${ENV_FEATURES}" \
-          -- --include-ignored
+    - run: cargo test --profile dev --all ${ENV_FEATURES} -- --include-ignored
+      if: ${{ !inputs.release }}
+      shell: bash
       env:
         ENV_FEATURES: ${{ steps.env.outputs.features }}
