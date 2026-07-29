@@ -26,7 +26,7 @@ fn setup_store() -> keyring_core::Result<()> {
     {
         #[cfg(target_os = "linux")]
         {
-            use zbus_secret_service_keyring_store::Store;
+            use dbus_secret_service_keyring_store::Store;
             set_default_store(Store::new()?);
             Ok(())
         }

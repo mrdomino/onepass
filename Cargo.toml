@@ -36,7 +36,7 @@ default = [
 keyring = [
     "apple-native-keyring-store/keychain",
     "dep:windows-native-keyring-store",
-    "dep:zbus-secret-service-keyring-store",
+    "dep:dbus-secret-service-keyring-store",
 ]
 macos-biometry = ["apple-native-keyring-store/protected"]
 readpass-libbsd = ["readpassphrase-3/libbsd-static"]
@@ -64,9 +64,9 @@ features = [
 ]
 
 [target.'cfg(target_os = "linux")'.dependencies]
-zbus-secret-service-keyring-store = {
+dbus-secret-service-keyring-store = {
     version = "^1.0.0",
-    features = ["rt-async-io-crypto-openssl"],
+    features = ["crypto-openssl"],
     optional = true,
 }
 
