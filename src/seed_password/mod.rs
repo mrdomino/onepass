@@ -1,7 +1,8 @@
 mod keyring;
 
 use anyhow::{Context, Result};
-use keyring::{Error, get_entry};
+use keyring::get_entry;
+use keyring_core::Error;
 use readpassphrase_3::{Flags, PASSWORD_LEN, getpass, readpassphrase_into};
 use secrecy::{ExposeSecret, SecretString};
 

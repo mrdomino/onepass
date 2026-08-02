@@ -33,15 +33,12 @@ default = [
     "keyring",
     "readpass-vendored",
 ]
-keyring = ["dep:keyring"]
-macos-biometry = [
-    "objc2",
-    "objc2-core-foundation",
-    "objc2-foundation",
-    "objc2-local-authentication",
-    "objc2-security",
-    "zeroize",
+keyring = [
+    "apple-native-keyring-store/keychain",
+    "dep:windows-native-keyring-store",
+    "dep:dbus-secret-service-keyring-store",
 ]
+macos-biometry = ["apple-native-keyring-store/protected"]
 readpass-libbsd = ["readpassphrase-3/libbsd-static"]
 readpass-vendored = ["readpassphrase-3/linux-vendored"]
 
@@ -53,6 +50,7 @@ onepass-seed = { path = "crates/seed" }
 [dependencies]
 anyhow = "1.0.102"
 clap = { version = "4.6.1", features = ["derive", "env", "unicode", "wrap_help"] }
+keyring-core = "^1.0.0"
 onepass-conf = "0.7.2"
 onepass-seed = "0.4.0"
 secrecy = "0.10.3"
@@ -65,23 +63,18 @@ features = [
     "zeroize",
 ]
 
-[dependencies.keyring]
-version = "3.6.3"
-features = [
-    "sync-secret-service",
-    "apple-native",
-    "windows-native",
-    "crypto-openssl",
-]
-optional = true
+[target.'cfg(target_os = "linux")'.dependencies]
+dbus-secret-service-keyring-store = {
+    version = "^1.0.0",
+    features = ["crypto-openssl"],
+    optional = true,
+}
 
 [target.'cfg(target_os = "macos")'.dependencies]
-objc2 = { version = "0.6.3", optional = true }
-objc2-core-foundation = { version = "0.3.2", optional = true }
-objc2-foundation = { version = "0.3.2", optional = true }
-objc2-local-authentication = { version = "0.3.2", optional = true }
-objc2-security = { version = "0.3.2", optional = true }
-zeroize = { version = "1.8.2", optional = true }
+apple-native-keyring-store = { version = "^1.0.1", optional = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-native-keyring-store = { version = "^1.1.0", optional = true }
 
 [dev-dependencies]
 tempfile = "3.27.0"

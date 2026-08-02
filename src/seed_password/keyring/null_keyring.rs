@@ -1,30 +1,41 @@
-use core::result;
+use std::{collections::HashMap, sync::Arc};
 
-use anyhow::{self};
+use keyring_core::{Entry, Error, Result, api::CredentialStoreApi};
 
-use super::Error;
+pub(crate) struct Store {}
 
-pub(crate) struct Entry {}
+impl Store {
+    pub fn new() -> Result<Arc<Self>> {
+        Ok(Arc::new(Store {}))
+    }
+}
 
-// TODO(someday): make this and macos_keychain.rs consistent with each other (Result, etc)
-
-impl Entry {
-    pub fn new(_service: &str, _account: &str) -> anyhow::Result<Self> {
-        Ok(Entry {})
+impl CredentialStoreApi for Store {
+    fn id(&self) -> String {
+        "null_keyring_store".to_string()
     }
 
-    pub fn set_password(&self, _password: &str) -> anyhow::Result<()> {
-        eprintln!("skipping set_password: keyring support is disabled");
-        Ok(())
-    }
-
-    pub fn get_password(&self) -> result::Result<String, Error> {
+    fn build(
+        &self,
+        _service: &str,
+        _user: &str,
+        _modifiers: Option<&HashMap<&str, &str>>,
+    ) -> Result<Entry> {
         eprintln!("skipping get_password: keyring support is disabled");
         Err(Error::NoEntry)
     }
 
-    pub fn delete_credential(&self) -> result::Result<(), Error> {
-        eprintln!("skipping delete_credential: keyring support is disabled");
-        Ok(())
+    fn vendor(&self) -> String {
+        "https://crates.io/crates/onepass".to_string()
+    }
+
+    fn search(&self, _spec: &HashMap<&str, &str>) -> Result<Vec<Entry>> {
+        Err(Error::NotSupportedByStore(
+            "keyring support disabled".to_string(),
+        ))
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
