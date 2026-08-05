@@ -120,8 +120,7 @@ jobs:
     - run: rustup target add "$CARGO_BUILD_TARGET"
       if: ${{ matrix.libc == 'musl' }}
     - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-      with:
-        key: ${{ steps.env.outputs.profile }}
+      if: ${{ !inputs.release }}
 
     - run: cargo build --locked --profile "${ENV_PROFILE}" ${ENV_FEATURES}
       shell: bash
