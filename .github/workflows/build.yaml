@@ -140,3 +140,6 @@ jobs:
       shell: bash
       env:
         ENV_FEATURES: ${{ steps.env.outputs.features }}
+
+    - run: cargo publish --locked --dry-run --workspace
+      if: ${{ inputs.release }}

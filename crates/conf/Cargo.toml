@@ -7,7 +7,7 @@ repository.workspace = true
 description = "TOML configuration format for onepass"
 
 [dependencies]
-onepass-seed = "0.4.0"
+onepass-seed.workspace = true
 serde = { version = "1.0.228", default-features = false, features = ["derive", "std"] }
 toml = "1.1.1"
 
