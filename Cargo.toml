@@ -47,6 +47,12 @@ onepass-base = { path = "crates/base" }
 onepass-conf = { path = "crates/conf" }
 onepass-seed = { path = "crates/seed" }
 
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = "z"
+strip = true
+
 [dependencies]
 anyhow = "1.0.102"
 clap = { version = "4.6.1", features = ["derive", "env", "unicode", "wrap_help"] }
