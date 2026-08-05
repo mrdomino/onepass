@@ -142,4 +142,4 @@ jobs:
         ENV_FEATURES: ${{ steps.env.outputs.features }}
 
     - run: cargo publish --locked --dry-run --workspace
-      if: ${{ inputs.release }}
+      if: ${{ inputs.release && matrix.libc != 'musl' }}
