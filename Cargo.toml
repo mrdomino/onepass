@@ -15,8 +15,10 @@ exclude = [
     ".githook/*",
     ".github/**",
     ".gitignore",
-    "example/**",
+    "LICENSE-AGPL",
+    "LICENSE-Apache",
     "data/onepass.entitlements",
+    "example/**",
     "onepass.provisionprofile",
 ]
 
