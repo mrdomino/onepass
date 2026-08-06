@@ -598,4 +598,12 @@ mod tests {
             "a\\".parse::<Node>()
         );
     }
+
+    #[test]
+    fn test_reserved() {
+        assert_eq!(
+            Err(Error::new("a|test".into(), ErrorKind::Complete)),
+            "a|test".parse::<Node>()
+        );
+    }
 }
