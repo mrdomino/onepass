@@ -31,9 +31,13 @@ edition = "2024"
 repository = "https://github.com/mrdomino/onepass"
 
 [workspace.dependencies]
+blake2 = { version = "0.11.0-rc.6", default-features = false }
+hex = { version = "0.4.3", default-features = false }
 onepass-base = { version = "0.2.0", path = "crates/base" }
 onepass-conf = { version = "0.7.3", path = "crates/conf" }
 onepass-seed = { version = "0.4.1", path = "crates/seed" }
+secrecy = "0.10.3"
+tempfile = "3.27.0"
 
 [features]
 default = [
@@ -61,7 +65,7 @@ clap = { version = "4.6.1", features = ["derive", "env", "unicode", "wrap_help"]
 keyring-core = "^1.0.0"
 onepass-conf.workspace = true
 onepass-seed.workspace = true
-secrecy = "0.10.3"
+secrecy.workspace = true
 
 [dependencies.readpassphrase-3]
 version = "1.0.2"
@@ -85,4 +89,4 @@ apple-native-keyring-store = { version = "^1.0.1", optional = true }
 windows-native-keyring-store = { version = "^1.1.0", optional = true }
 
 [dev-dependencies]
-tempfile = "3.27.0"
+tempfile.workspace = true

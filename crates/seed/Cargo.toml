@@ -8,19 +8,19 @@ description = "Core functionality for onepass"
 
 [dependencies]
 argon2 = { version = "0.6.0-rc.8", default-features = false, features = ["alloc", "parallel", "zeroize"] }
-blake2 = { version = "0.11.0-rc.6", default-features = false }
+blake2.workspace = true
 chacha20 = { version = "0.10.0", default-features = false, features = ["rng", "zeroize"] }
 crypto-bigint = { version = "0.7.3", default-features = false, features = ["rand_core", "zeroize"] }
-hex = { version = "0.4.3", default-features = false }
+hex.workspace = true
 nom = "8.0.0"
 onepass-base.workspace = true
 rand_core = "0.10.0"
-secrecy = { version = "0.10.3", default-features = false }
+secrecy.workspace = true
 serde = { version = "1.0.228", default-features = false, features = ["derive"] }
 url = { version = "2.5.8", default-features = false }
 
 [dev-dependencies]
-hex = "0.4.3"
+hex = { workspace = true, default-features = true }
 num-traits = "0.2.19"
 
 [build-dependencies]
