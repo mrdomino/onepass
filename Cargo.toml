@@ -2,7 +2,7 @@
 
 [package]
 name = "onepass"
-version = "3.1.3"
+version = "3.1.4"
 categories = ["command-line-utilities"]
 edition.workspace = true
 keywords = ["password", "cryptography", "deterministic"]
@@ -35,7 +35,7 @@ blake2 = { version = "0.11.0-rc.6", default-features = false }
 hex = { version = "0.4.3", default-features = false }
 onepass-base = { version = "0.2.0", path = "crates/base" }
 onepass-conf = { version = "0.7.3", path = "crates/conf" }
-onepass-seed = { version = "0.4.1", path = "crates/seed" }
+onepass-seed = { version = "0.4.2", path = "crates/seed" }
 secrecy = "0.10.3"
 tempfile = "3.27.0"
 
