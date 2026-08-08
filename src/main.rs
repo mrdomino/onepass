@@ -252,7 +252,7 @@ fn lookup_site(url: &str, config: &Config, args: &Args, context: &Context) -> Re
         Err(err) => return Err(err).context("failed finding site"),
     };
     if let Some(data) = site.data {
-        eprintln!("WARNING: ignoring data field on {url}:\n{data:?}");
+        anyhow::bail!("unknown data field on {url}:\n{data:?}");
     }
     if let Some(ref schema) = args.schema {
         site.schema = Some(config.resolve_schema(schema));
