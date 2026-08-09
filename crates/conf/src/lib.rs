@@ -460,23 +460,22 @@ impl Config {
         url: String,
         username: Option<&'a str>,
     ) -> Result<RawSite<&'a str>, Error> {
-        let mut key = (url, username.map(String::from));
+        let key = (url, username.map(String::from));
         if let Some(&i) = self.site_by_key.get(&key) {
             return Ok(self.site[i].as_deref());
         }
+        let Some(&i) = self.site_by_url.get(&key.0) else {
+            return Err(Error::UrlNotFound);
+        };
         if username.is_some() {
-            key.1 = None;
-            if let Some(&i) = self.site_by_key.get(&key) {
-                let mut site = self.site[i].as_deref();
+            let mut site = self.site[i].as_deref();
+            if site.username.is_none() {
                 site.username = username;
                 return Ok(site);
             }
             return Err(Error::UsernameNotFound);
         }
 
-        let Some(&i) = self.site_by_url.get(&key.0) else {
-            return Err(Error::UrlNotFound);
-        };
         // Since sites is sorted by normalized url, next is the end of the range for this url.
         let next = self
             .site_by_url
@@ -705,7 +704,7 @@ impl KeyringSeed {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, io::Write};
+    use std::{assert_matches, fs::File, io::Write};
 
     use tempfile::{NamedTempFile, TempDir};
 
@@ -869,6 +868,85 @@ mod tests {
     fn test_example_config_is_consistent() {
         let config = Config::from_str(EXAMPLE_CONFIG).unwrap();
         assert_eq!(config, Config::example());
+    }
+
+    #[test]
+    fn test_find_site() {
+        let config = Config::from_global_site(
+            Global::default(),
+            [RawSite::new("example.com", None, Some("a"), 0)],
+        )
+        .unwrap();
+        // Exact match matches
+        let site = config.find_site("example.com", None).unwrap();
+        assert_eq!("example.com", site.url);
+        assert_eq!(None, site.username);
+        assert_eq!(Some("a"), site.schema);
+
+        // Matching url replaces username
+        let site = config.find_site("https://example.com/", Some("b")).unwrap();
+        assert_eq!("example.com", site.url);
+        assert_eq!(Some("b"), site.username);
+        assert_eq!(Some("a"), site.schema);
+
+        // Absent URL returns error
+        let err = config.find_site("google.com", None).unwrap_err();
+        assert_matches!(err, Error::UrlNotFound);
+
+        // UrlNotFound takes priority over UsernameNotFound
+        let err = config.find_site("google.com", Some("x")).unwrap_err();
+        assert_matches!(err, Error::UrlNotFound);
+
+        let config = Config::from_global_site(
+            Global::default(),
+            [
+                RawSite::new("example.com", None, Some("a"), 0),
+                RawSite::new("example.com", Some("x"), Some("b"), 0),
+            ],
+        )
+        .unwrap();
+
+        // Exact match matches
+        let site = config.find_site("example.com", None).unwrap();
+        assert_eq!("example.com", site.url);
+        assert_eq!(None, site.username);
+        assert_eq!(Some("a"), site.schema);
+        let site = config.find_site("example.com", Some("x")).unwrap();
+        assert_eq!("example.com", site.url);
+        assert_eq!(Some("x"), site.username);
+        assert_eq!(Some("b"), site.schema);
+
+        // Matching url replaces None entry's username
+        let site = config.find_site("example.com", Some("y")).unwrap();
+        assert_eq!("example.com", site.url);
+        assert_eq!(Some("y"), site.username);
+        assert_eq!(Some("a"), site.schema);
+
+        let config = Config::from_global_site(
+            Global::default(),
+            [
+                RawSite::new("example.com", Some("y"), Some("a"), 0),
+                RawSite::new("example.com", Some("x"), Some("b"), 0),
+            ],
+        )
+        .unwrap();
+        // Exact match matches
+        let site = config.find_site("example.com", Some("x")).unwrap();
+        assert_eq!("example.com", site.url);
+        assert_eq!(Some("x"), site.username);
+        assert_eq!(Some("b"), site.schema);
+        let site = config.find_site("example.com", Some("y")).unwrap();
+        assert_eq!("example.com", site.url);
+        assert_eq!(Some("y"), site.username);
+        assert_eq!(Some("a"), site.schema);
+
+        // Matching url with missing username returns UsernameNotFound
+        let err = config.find_site("example.com", Some("z")).unwrap_err();
+        assert_matches!(err, Error::UsernameNotFound);
+
+        // Matching url with no username requested returns MultipleChoices
+        let err = config.find_site("example.com", None).unwrap_err();
+        assert_matches!(err, Error::MultipleChoices(_));
     }
 
     // TODO(soon): more tests
