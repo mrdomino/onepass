@@ -16,6 +16,10 @@ pub struct MultipleChoices {
     rest: Vec<String>,
 }
 
+/// Error returned if `$HOME` is not set in the environment.
+#[derive(Clone, Copy, Debug)]
+pub struct HomeNotSet;
+
 impl MultipleChoices {
     pub fn new(usernames: impl IntoIterator<Item = String>) -> Self {
         let mut iter = usernames.into_iter();
@@ -34,11 +38,11 @@ impl From<SiteError> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Site(err) => write!(f, "site error: {err}"),
+            Self::Site(_) => f.write_str("site deserialization error"),
             Self::UrlNotFound => f.write_str("url not found"),
             Self::UsernameNotFound => f.write_str("username not found"),
             Self::MultipleChoices(MultipleChoices { first, rest }) => {
-                write!(f, "multiple choices: {first}")?;
+                write!(f, "multiple username choices: {first}")?;
                 for s in rest {
                     write!(f, ", {s}")?;
                 }
@@ -53,5 +57,12 @@ impl error::Error for Error {
             Self::Site(err) => Some(err),
             _ => None,
         }
+    }
+}
+
+impl error::Error for HomeNotSet {}
+impl fmt::Display for HomeNotSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("failed reading $HOME")
     }
 }

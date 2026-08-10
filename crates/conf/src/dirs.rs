@@ -6,9 +6,7 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
-/// Error returned if `$HOME` is not set in the environment.
-#[derive(Clone, Copy, Debug)]
-pub struct HomeNotSet;
+pub use crate::error::HomeNotSet;
 
 /// Tries to expand `~` to the user’s home dir.
 ///
@@ -98,12 +96,4 @@ pub fn current_home() -> Result<PathBuf, HomeNotSet> {
     }
     let dir = env::var_os("HOME").ok_or(HomeNotSet)?;
     Ok(PathBuf::from(dir))
-}
-
-impl core::error::Error for HomeNotSet {}
-
-impl core::fmt::Display for HomeNotSet {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str("failed reading $HOME")
-    }
 }
