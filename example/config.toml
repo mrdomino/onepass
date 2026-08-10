@@ -11,7 +11,7 @@
 
 [global.keyring]
 # The OS keyring may be used to store the seed password.
-# seed = "cache"
+# seed = "cache"  # or "off"
 
 # Schemas may have named aliases.
 [global.alias]

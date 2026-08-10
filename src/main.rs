@@ -329,4 +329,12 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_example_config() {
+        // Test belongs in `onepass-conf` but that crate deos not have access to the examples dir
+        // from this crate.
+        let example_config = include_str!("../example/config.toml");
+        assert_eq!(onepass_conf::EXAMPLE_CONFIG, example_config);
+    }
 }
