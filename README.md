@@ -48,7 +48,7 @@ Note, however, that on macOS, the biometric keyring support will not be enabled.
 ### From source
 
 ```sh
-cargo build --release &&
+cargo build --locked --release &&
   sudo install target/release/onepass /usr/local/bin/onepass
 ```
 
@@ -60,7 +60,7 @@ Assuming you’re using an Apple Development local-only signing key, you should 
 ```sh
 sed "s/2TM4K8523U.org.whilezero.app.onepass/$MY_TEAM_ID.*/" \
     data/onepass.entitlements > my-onepass.entitlements &&
-  cargo build --no-default-features --features macos-biometry --release &&
+  cargo build --locked --no-default-features --features macos-biometry --release &&
   codesign \
     --force \
     --options runtime \
