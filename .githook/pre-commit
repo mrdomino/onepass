@@ -3,7 +3,7 @@ set -eu
 # Hook courtesy of:
 # <https://deaddabe.fr/blog/2021/09/29/git-pre-commit-hook-for-rust-projects/>
 # To use:
-#     git config --local core.hooksPath .githooks/
+#     git config --local core.hooksPath .githook/
 #
 if command -v zizmor >/dev/null 2>&1 && ! zizmor .github
 then
