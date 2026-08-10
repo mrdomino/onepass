@@ -330,6 +330,8 @@ mod tests {
         Ok(())
     }
 
+    // We do not translate CR/LF on Windows.
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn test_example_config() {
         // Test belongs in `onepass-conf` but that crate deos not have access to the examples dir
