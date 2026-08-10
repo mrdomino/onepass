@@ -14,54 +14,28 @@
 //! [onepass]: https://github.com/mrdomino/onepass
 
 pub mod dirs;
+pub mod disk;
+pub mod error;
 
-use core::{error, fmt};
 use std::{
     cmp,
     collections::{BTreeMap, HashSet, VecDeque, btree_map::Entry},
     fs, io,
-    num::NonZero,
     ops::Bound,
     path::{Path, PathBuf},
 };
 
-use onepass_seed::{
-    expr::Context,
-    site::{Error as SiteError, Site},
-    url::normalize,
+use onepass_seed::{site::Error as SiteError, url::normalize};
+
+use crate::{
+    dirs::{config_dir, expand_home},
+    disk::resolve_path,
 };
-use serde::{Deserialize, Serialize};
-
-use crate::dirs::{config_dir, expand_home};
-
-const EXAMPLE_CONFIG: &str = concat!(
-    "# Other files may be included.\n",
-    "# include = [\"local.toml\"]\n",
-    "\n",
-    "# These settings affect all sites.\n",
-    "[global]\n",
-    "# The default schema can be overridden.\n",
-    "# default_schema = \"{words:5:-}\"\n",
-    "\n",
-    "# A custom word list may be specified.\n",
-    "# words_path = \"/usr/share/dict/words\"\n",
-    "\n",
-    "[global.keyring]\n",
-    "# The OS keyring may be used to store the seed password.\n",
-    "# seed = \"cache\"  # or \"off\"\n",
-    "\n",
-    "# Schemas may have named aliases.\n",
-    "[global.alias]\n",
-    "apple = '{words:4:-:U}\\d'\n",
-    "login = '[[:print:]]{12}'\n",
-    "\n",
-    "# Sites can be configured by URL, username, schema, and increment.\n",
-    "# [[site]]\n",
-    "# url = \"google.com\"\n",
-    "# username = \"gmail@example\"\n",
-    "# schema = \"apple\"\n",
-    "# increment = 1\n",
-);
+// TODO(major): remove some of these public re-exports
+pub use crate::{
+    disk::{Config as DiskConfig, EXAMPLE_CONFIG, Global, Keyring, KeyringSeed, RawSite},
+    error::{Error, MultipleChoices},
+};
 
 /// Finalized user configuration for `onepass`.
 ///
@@ -76,142 +50,11 @@ pub struct Config {
     site_by_key: BTreeMap<(String, Option<String>), usize>,
 }
 
-/// On-disk representation of a single `onepass` configuration file.
-///
-/// Compared with [`Config`], this specifies optional include paths and allows any number of sites
-/// without any constraints on mapping.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Hash)]
-// TODO(someday): better handling for unknown fields. We want an error in some cases, a warning in
-// others.
-#[serde(deny_unknown_fields)]
-pub struct DiskConfig {
-    /// List of files to be included by this file.
-    ///
-    /// Files are merged, with paths interpreted relative to the file in which they are contained,
-    /// to build up a final [`Config`].
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub include: Vec<PathBuf>,
-
-    #[serde(default)]
-    pub global: Global,
-
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub site: Vec<RawSite<String>>,
-}
-
-/// Global settings for `onepass`.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct Global {
-    /// The default schema for any sites that don’t have one of their own. If not specified,
-    /// defaults to `{words}`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub default_schema: Option<String>,
-
-    /// Keyring settings (whether to cache/require seed in keyring or populate site passwords in
-    /// keyring)
-    #[serde(default, skip_serializing_if = "Keyring::is_default")]
-    pub keyring: Keyring,
-
-    /// The word list to use for any sites that generate from dictionaries, instead of the built-in
-    /// [`EFF wordlist`][onepass_seed::dict::EFF_WORDLIST].
-    // TODO(soon): Make the dictionary configurable per site. Probably we want this to be a list of
-    // word files, maybe with optional labels and/or parsing instructions, and then we can refer to
-    // dicts by hash or by label in per-site schemas.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub words_path: Option<PathBuf>,
-
-    /// A lookup of shorthand names to schema definitions. If a site has a schema that matches one
-    /// of the keys of this map, then that key’s value will be substituted when that site is
-    /// processed.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub alias: BTreeMap<String, String>,
-}
-
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct Keyring {
-    #[serde(default, skip_serializing_if = "KeyringSeed::is_default")]
-    pub seed: KeyringSeed,
-    // TODO(someday): auto-sync site passwords to OS keyring
-    // #[serde(default, skip_serializing_if = "KeyringSite::is_default")]
-    // pub site: KeyringSite,
-}
-
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
-#[serde(rename_all = "lowercase")]
-pub enum KeyringSeed {
-    /// KeyringSeed was not set.
-    ///
-    /// The behavior is implementation-defined. In `onepass`, the keyring is used if support is
-    /// available (like [`Cache`].)
-    ///
-    /// This value does not override previously specified values on merge.
-    ///
-    /// [`Cache`]: KeyringSeed::Cache
-    #[default]
-    Unspecified,
-
-    /// Don’t try to store or load the seed in the OS keyring.
-    Off,
-
-    /// Store the seed in the OS keyring, fallback to readpassphrase on error.
-    Cache,
-    // TODO(soon): require the OS keyring, no readpassphrase fallback
-    // Require,
-}
-
-/// A pseudo-[`Site`] that is easier to represent on disk.
-///
-/// Compared with [`Site`], this allows using any [`AsRef<str>`] type, and does not enforce correct
-/// URLs or schemas. Incorrect or missing data will result in errors converting from `RawSite` to
-/// `Site`.
-///
-/// Morally speaking, there is a `impl From<Site> for RawSite`, but only
-/// `impl TryFrom<RawSite> for Site`. But neither of these quite exist, because there needs to be
-/// an optional dictionary passed along as well, and since the current
-/// [`Dict`][onepass_seed::dict::Dict] takes a lifetime parameter, the dictionary cannot be easily
-/// subbed in here without some changes at a higher level.
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(deny_unknown_fields)]
-pub struct RawSite<S> {
-    pub url: S,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub username: Option<S>,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub schema: Option<S>,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub increment: Option<NonZero<u32>>,
-
-    /// Internal data, reserved for future use by generators. Does not affect derivation paths.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub data: Option<S>,
-
-    /// User-facing comment/description. Does not affect generated passwords at all.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub comment: Option<S>,
-}
-
-#[derive(Clone, Debug)]
-pub enum Error {
-    Site(SiteError),
-    UrlNotFound,
-    UsernameNotFound,
-    MultipleChoices(MultipleChoices),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MultipleChoices {
-    first: String,
-    rest: Vec<String>,
-}
-
 impl Config {
     #[cfg(test)]
     /// Create a `Config` directly from a string, for tests. Panics if `include` is nonempty.
     pub fn from_str(s: &str) -> Result<Self, io::Error> {
-        let ret: DiskConfig = toml::from_str(s).map_err(io::Error::other)?;
+        let ret: disk::Config = toml::from_str(s).map_err(io::Error::other)?;
         assert!(ret.include.is_empty());
         Config::from_global_site(ret.global, ret.site).map_err(io::Error::other)
     }
@@ -382,15 +225,15 @@ impl Config {
                     format!("failed reading config path {base_path:?}: {e}"),
                 )
             })?;
-        let DiskConfig {
+        let disk::Config {
             include,
             mut global,
             mut site,
-        } = DiskConfig::from_file(&base_path)?;
+        } = disk::Config::from_file(&base_path)?;
 
         let mut includes = include
             .into_iter()
-            .map(|p| Config::resolve_path(&base_path, p))
+            .map(|p| resolve_path(&base_path, p))
             .collect::<Result<VecDeque<_>, _>>()?;
 
         let mut visited = HashSet::new();
@@ -405,11 +248,11 @@ impl Config {
             if visited.contains(&path) {
                 continue;
             }
-            let config = DiskConfig::from_file(&path)?;
+            let config = disk::Config::from_file(&path)?;
 
             includes.reserve(config.include.len());
             for p in config.include {
-                includes.push_back(Config::resolve_path(&path, p)?);
+                includes.push_back(resolve_path(&path, p)?);
             }
 
             global.merge(config.global, &path)?;
@@ -489,30 +332,17 @@ impl Config {
         }
 
         let slice = &self.site[range];
-        let mut usernames = slice.iter().map(|site| match site.username.as_ref() {
+        let usernames = slice.iter().map(|site| match site.username.as_ref() {
             Some(username) => username.clone(),
             None => unreachable!("a None username would have matched earlier"),
         });
-        let first = usernames.next().unwrap();
-        let rest = usernames.collect();
 
-        Err(Error::MultipleChoices(MultipleChoices { first, rest }))
+        Err(Error::MultipleChoices(MultipleChoices::new(usernames)))
     }
 
     /// Returns the configured default schema, or `"{words}"` if none is specified.
     pub fn default_schema(&self) -> &str {
         self.resolve_schema(self.global.default_schema.as_deref().unwrap_or("{words}"))
-    }
-
-    fn resolve_path(base_path: &Path, path: PathBuf) -> Result<PathBuf, io::Error> {
-        let path = expand_home(&path).map_err(io::Error::other)?;
-        if path.is_absolute() {
-            return Ok(path.into_owned());
-        }
-        let base_dir = base_path
-            .parent()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "invalid filename"))?;
-        Ok(base_dir.join(path))
     }
 
     fn default_config_path() -> Result<PathBuf, io::Error> {
@@ -528,177 +358,6 @@ impl Config {
 
     pub fn sites(&self) -> &[RawSite<String>] {
         &self.site
-    }
-}
-
-impl DiskConfig {
-    /// Read a config from a file, returning it.
-    ///
-    /// This just does simple deserialization without any traversal of includes; see
-    /// [`Config::from_file`].
-    pub fn from_file(path: &Path) -> Result<Self, io::Error> {
-        let config = fs::read_to_string(path)?;
-        toml::from_str(&config).map_err(io::Error::other)
-    }
-}
-
-impl Global {
-    /// Returns the word list from disk as a single string suitable for passing to
-    /// [`BoxDict::from_lines`][onepass_seed::dict::BoxDict::from_lines].
-    pub fn get_words_string(&self) -> Result<Option<Box<str>>, io::Error> {
-        let Some(ref path) = self.words_path else {
-            return Ok(None);
-        };
-        let Ok(ret) = fs::read_to_string(path) else {
-            return Ok(None);
-        };
-        Ok(Some(ret.into_boxed_str()))
-    }
-
-    /// Merge `other` into `self`, preferring `other` (i.e. `other` overrides base.)
-    pub fn merge(&mut self, other: Global, other_path: &Path) -> Result<(), io::Error> {
-        if let Some(s) = other.default_schema {
-            self.default_schema = Some(s);
-        }
-        if let Some(p) = other.words_path {
-            self.words_path = Some(Config::resolve_path(other_path, p)?);
-        }
-        self.keyring.merge(&other.keyring);
-        // NB. this silently clobbers aliases in self.
-        self.alias.extend(other.alias);
-        Ok(())
-    }
-
-    /// Returns true if these settings are all unspecified / [`None`].
-    pub fn is_empty(&self) -> bool {
-        self.default_schema.is_none()
-            && self.words_path.is_none()
-            && self.keyring.is_default()
-            && self.alias.is_empty()
-    }
-}
-
-impl<S> RawSite<S>
-where
-    S: AsRef<str>,
-{
-    pub fn new(url: S, username: Option<S>, schema: Option<S>, increment: u32) -> Self {
-        RawSite {
-            url,
-            username,
-            schema,
-            increment: NonZero::new(increment),
-
-            // TODO(someday): fix public API.
-            comment: None,
-            data: None,
-        }
-    }
-
-    /// Dereference this site, returning a `RawSite<&str>`.
-    pub fn as_deref(&self) -> RawSite<&str> {
-        RawSite {
-            url: self.url.as_ref(),
-            username: self.get_username(),
-            schema: self.schema.as_ref().map(S::as_ref),
-            increment: self.increment,
-            comment: self.comment.as_ref().map(S::as_ref),
-            data: self.data.as_ref().map(S::as_ref),
-        }
-    }
-
-    /// Convert this site to a [`Site`].
-    ///
-    /// See [`Site::new`].
-    pub fn to_site(&self, default_schema: &str) -> Result<Site, SiteError> {
-        Site::new(
-            self.url.as_ref(),
-            self.get_username(),
-            self.get_schema(default_schema),
-            self.get_increment(),
-        )
-    }
-
-    /// Convert this site to a [`Site`] with a specific context.
-    ///
-    /// See [`Site::with_context`].
-    pub fn to_site_with_context(
-        &self,
-        default_schema: &str,
-        context: &Context,
-    ) -> Result<Site, SiteError> {
-        Site::with_context(
-            context,
-            self.url.as_ref(),
-            self.get_username(),
-            self.get_schema(default_schema),
-            self.get_increment(),
-        )
-    }
-
-    /// Return the increment for this site as a u32.
-    ///
-    /// This trivial helper method exists because we use `Option<NonZero<u32>>` to skip serializing
-    /// zero values.
-    fn get_increment(&self) -> u32 {
-        self.increment.map_or(0, NonZero::get)
-    }
-
-    fn get_username(&self) -> Option<&str> {
-        self.username.as_ref().map(S::as_ref)
-    }
-
-    fn get_schema<'a>(&'a self, default: &'a str) -> &'a str {
-        self.schema.as_ref().map_or(default, S::as_ref)
-    }
-}
-
-impl From<SiteError> for Error {
-    fn from(value: SiteError) -> Self {
-        Self::Site(value)
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Site(err) => write!(f, "site error: {err}"),
-            Self::UrlNotFound => f.write_str("url not found"),
-            Self::UsernameNotFound => f.write_str("username not found"),
-            Self::MultipleChoices(MultipleChoices { first, rest }) => {
-                write!(f, "multiple choices: {first}")?;
-                for s in rest {
-                    write!(f, ", {s}")?;
-                }
-                Ok(())
-            }
-        }
-    }
-}
-impl error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Site(err) => Some(err),
-            _ => None,
-        }
-    }
-}
-
-impl Keyring {
-    pub fn is_default(&self) -> bool {
-        self.seed.is_default()
-    }
-
-    pub fn merge(&mut self, other: &Self) {
-        if !other.seed.is_default() {
-            self.seed = other.seed;
-        }
-    }
-}
-
-impl KeyringSeed {
-    pub fn is_default(&self) -> bool {
-        *self == Default::default()
     }
 }
 
@@ -762,24 +421,22 @@ mod tests {
         assert_eq!(Some("mrdomino"), site.username);
         let site = config.find_site("google.com", Some("bobdole")).unwrap();
         assert_eq!(Some("bobdole"), site.username);
-        let Error::UsernameNotFound = config.find_site("google.com", Some("nobody")).unwrap_err()
-        else {
-            panic!();
-        };
-        let Error::MultipleChoices(choices) = config.find_site("google.com", None).unwrap_err()
-        else {
+        assert_matches!(
+            config.find_site("google.com", Some("nobody")),
+            Err(Error::UsernameNotFound)
+        );
+        let Err(Error::MultipleChoices(choices)) = config.find_site("google.com", None) else {
             panic!();
         };
         assert_eq!(
-            MultipleChoices {
-                first: "bobdole".into(),
-                rest: vec!["mrdomino".into()]
-            },
+            MultipleChoices::new(vec!["bobdole".into(), "mrdomino".into()]),
             choices
         );
-        let Error::UrlNotFound = config.find_site("yahoo.com", None).unwrap_err() else {
-            panic!();
-        };
+        assert_matches!(config.find_site("yahoo.com", None), Err(Error::UrlNotFound));
+        assert_matches!(
+            config.find_site("yahoo.com", Some("nobody")),
+            Err(Error::UrlNotFound)
+        );
 
         let config = Config::from_str(
             r#"
@@ -870,6 +527,7 @@ mod tests {
         assert_eq!(config, Config::example());
     }
 
+    // XXX mostly redundant with `test_multiple_usernames` above
     #[test]
     fn test_find_site() {
         let config = Config::from_global_site(
