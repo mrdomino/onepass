@@ -1,7 +1,10 @@
 #[cfg(keyring = "no")]
 mod null_keyring;
 
-use std::sync::OnceLock;
+use std::{
+    collections::HashMap,
+    sync::{LazyLock, OnceLock},
+};
 
 use anyhow::{self, Context};
 use keyring_core::{self, Entry, set_default_store};
@@ -53,10 +56,13 @@ fn setup_store() -> keyring_core::Result<()> {
 
 static START: OnceLock<keyring_core::Result<()>> = OnceLock::new();
 
+static MODS: LazyLock<HashMap<&'static str, &'static str>> =
+    LazyLock::new(|| HashMap::from([("access-policy", "require-user-presence")]));
+
 pub(super) fn get_entry() -> anyhow::Result<Entry> {
     match START.get_or_init(setup_store) {
         Ok(()) => (),
         Err(err) => anyhow::bail!("Store setup failed: {err}"),
     }
-    Entry::new(SERVICE, ACCOUNT).context("failed getting keyring entry")
+    Entry::new_with_modifiers(SERVICE, ACCOUNT, &MODS).context("failed getting keyring entry")
 }
