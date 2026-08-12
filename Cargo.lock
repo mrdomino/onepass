@@ -756,7 +756,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "onepass"
-version = "3.1.7"
+version = "3.1.8"
 dependencies = [
  "anyhow",
  "apple-native-keyring-store",
@@ -782,7 +782,7 @@ dependencies = [
 
 [[package]]
 name = "onepass-conf"
-version = "0.7.5"
+version = "0.8.0"
 dependencies = [
  "onepass-seed",
  "serde",
