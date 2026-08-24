@@ -285,22 +285,22 @@ fn parse_unicode_digits(input: &str) -> IResult<&str, u32> {
 }
 
 fn parse_hex_char(input: &str) -> IResult<&str, char> {
-    let (input, b) = parse_hex_byte(input)?;
+    let (remaining, b) = parse_hex_byte(input)?;
     if b < 0b1000_0000 {
-        return Ok((input, b as char));
+        return Ok((remaining, b as char));
     }
     if b & 0b1110_0000 == 0b1100_0000 {
         map_res(parse_hex_byte, |b2| {
             let bs = [b, b2];
             str_to_char(&bs)
         })
-        .parse(input)
+        .parse(remaining)
     } else if b & 0b1111_0000 == 0b1110_0000 {
         map_res((parse_hex_byte, parse_hex_byte), |(b2, b3)| {
             let bs = [b, b2, b3];
             str_to_char(&bs)
         })
-        .parse(input)
+        .parse(remaining)
     } else if b & 0b1111_1000 == 0b1111_0000 {
         map_res(
             (parse_hex_byte, parse_hex_byte, parse_hex_byte),
@@ -309,9 +309,12 @@ fn parse_hex_char(input: &str) -> IResult<&str, char> {
                 str_to_char(&bs)
             },
         )
-        .parse(input)
+        .parse(remaining)
     } else {
-        Err(nom::Err::Error(error::Error::new(input, ErrorKind::Verify)))
+        Err(nom::Err::Failure(error::Error::new(
+            input,
+            ErrorKind::Verify,
+        )))
     }
 }
 
@@ -578,7 +581,7 @@ mod tests {
         assert_eq!(
             Err(error::Error {
                 input: "\\x80".into(),
-                code: ErrorKind::Char
+                code: ErrorKind::Verify
             }),
             "\\x80".parse::<Node>(),
         );
