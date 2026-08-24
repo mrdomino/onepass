@@ -289,32 +289,42 @@ fn parse_hex_char(input: &str) -> IResult<&str, char> {
     if b < 0b1000_0000 {
         return Ok((remaining, b as char));
     }
-    if b & 0b1110_0000 == 0b1100_0000 {
-        map_res(parse_hex_byte, |b2| {
-            let bs = [b, b2];
-            str_to_char(&bs)
-        })
-        .parse(remaining)
-    } else if b & 0b1111_0000 == 0b1110_0000 {
-        map_res((parse_hex_byte, parse_hex_byte), |(b2, b3)| {
-            let bs = [b, b2, b3];
-            str_to_char(&bs)
-        })
-        .parse(remaining)
-    } else if b & 0b1111_1000 == 0b1111_0000 {
-        map_res(
-            (parse_hex_byte, parse_hex_byte, parse_hex_byte),
-            |(b2, b3, b4)| {
-                let bs = [b, b2, b3, b4];
+    let res = if b & 0b1110_0000 == 0b1100_0000 {
+        Some(
+            map_res(parse_hex_byte, |b2| {
+                let bs = [b, b2];
                 str_to_char(&bs)
-            },
+            })
+            .parse(remaining),
         )
-        .parse(remaining)
+    } else if b & 0b1111_0000 == 0b1110_0000 {
+        Some(
+            map_res((parse_hex_byte, parse_hex_byte), |(b2, b3)| {
+                let bs = [b, b2, b3];
+                str_to_char(&bs)
+            })
+            .parse(remaining),
+        )
+    } else if b & 0b1111_1000 == 0b1111_0000 {
+        Some(
+            map_res(
+                (parse_hex_byte, parse_hex_byte, parse_hex_byte),
+                |(b2, b3, b4)| {
+                    let bs = [b, b2, b3, b4];
+                    str_to_char(&bs)
+                },
+            )
+            .parse(remaining),
+        )
     } else {
-        Err(nom::Err::Failure(error::Error::new(
+        None
+    };
+    match res {
+        None | Some(Err(_)) => Err(nom::Err::Failure(error::Error::new(
             input,
             ErrorKind::Verify,
-        )))
+        ))),
+        Some(res @ Ok(_)) => res,
     }
 }
 
@@ -584,6 +594,13 @@ mod tests {
                 code: ErrorKind::Verify
             }),
             "\\x80".parse::<Node>(),
+        );
+        assert_eq!(
+            Err(error::Error {
+                input: "\\xd0\\x00".into(),
+                code: ErrorKind::Verify
+            }),
+            "\\xd0\\x00".parse::<Node>()
         );
         assert_eq!(
             Err(error::Error {
