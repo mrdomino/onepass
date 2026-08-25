@@ -9,7 +9,7 @@ pub(super) fn u256_to_word(x: &U256) -> Word {
     x.as_words()[0]
 }
 
-pub(super) fn u256_saturating_pow(base: &U256, mut n: Word, res: &mut U256) {
+pub(super) fn u256_saturating_pow(base: &U256, mut n: u64, res: &mut U256) {
     *res = U256::ONE;
     if n == 0 {
         return;

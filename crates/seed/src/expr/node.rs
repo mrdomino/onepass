@@ -43,6 +43,7 @@ impl EvalContext for Node {
             }
 
             Node::Count(ref node, min, max) => {
+                let (min, max) = (min as u64, max as u64);
                 let n = node.size(context);
                 if n.is_one().into() {
                     return NonZero::new((max - min + 1).into()).unwrap();
@@ -54,9 +55,9 @@ impl EvalContext for Node {
                 let k = min;
                 let l = max;
                 let mut x = U256::ZERO;
-                u256_saturating_pow(&n, (l + 1).into(), &mut x);
+                u256_saturating_pow(&n, l + 1, &mut x);
                 let mut y = U256::ZERO;
-                u256_saturating_pow(&n, Word::from(k), &mut y);
+                u256_saturating_pow(&n, k, &mut y);
                 if x == U256::MAX && y == U256::MAX {
                     // Assume we got an overflow.
                     return NonZero::MAX;
@@ -236,6 +237,13 @@ mod tests {
             let index = U256::from_u32(index);
             assert_eq!(want, &format_at_ctx(&count, &context, index));
         }
+    }
+
+    #[test]
+    fn test_count_edge() {
+        let context = Context::empty();
+        let count = Node::Count(Box::new(Node::Literal("a".into())), 0, u32::MAX);
+        assert_eq!(U256::from_u64(1 << 32), *count.size(&context));
     }
 
     #[test]
