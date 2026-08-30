@@ -38,10 +38,12 @@ struct Args {
     #[arg(short, long)]
     username: Option<String>,
 
+    #[cfg(not(keyring = "no"))]
     /// Cache the seed password in the OS keyring
     #[arg(short = 'k', help_heading = "Keyring Integration")]
     keyring: bool,
 
+    #[cfg(not(keyring = "no"))]
     /// Do not cache the seed password
     #[arg(
         short = 'K',
@@ -50,6 +52,7 @@ struct Args {
     )]
     no_keyring: bool,
 
+    #[cfg(not(keyring = "no"))]
     /// Clear the seed password keyring entry
     #[arg(short, long, help_heading = "Keyring Integration")]
     reset_keyring: bool,
@@ -112,26 +115,20 @@ fn main() -> Result<()> {
 
     let config_path = args.config_path.as_deref();
     let config = Config::from_or_init(config_path).context("failed to read config")?;
-    let seed_keyring = if args.no_keyring {
-        false
-    } else if args.keyring {
-        true
-    } else if args.stdin {
-        false
-    } else {
-        match config.global.keyring.seed {
+    let seed_keyring = args
+        .seed_keyring()
+        .unwrap_or(match config.global.keyring.seed {
             KeyringSeed::Unspecified => !cfg!(keyring = "no"),
             KeyringSeed::Cache => true,
             KeyringSeed::Off => false,
-        }
-    };
+        });
     let rp_flags = if args.stdin {
         RpFlags::STDIN
     } else {
         RpFlags::default()
     };
 
-    if args.reset_keyring {
+    if args.reset_keyring() {
         seed_password::delete()?;
     }
     if args.print_sites {
@@ -150,7 +147,7 @@ fn main() -> Result<()> {
         if args.confirm {
             let _ = seed_password::read(seed_keyring, true, rp_flags)?;
         }
-        if args.reset_keyring || args.confirm {
+        if args.reset_keyring() || args.confirm {
             return Ok(());
         }
         Args::command()
@@ -263,6 +260,36 @@ fn lookup_site(url: &str, config: &Config, args: &Args, context: &Context) -> Re
     // TODO(soon): do something about redundant default_schema call here
     site.to_site_with_context(config.default_schema(), context)
         .context("failed generating site")
+}
+
+impl Args {
+    fn seed_keyring(&self) -> Option<bool> {
+        #[cfg(keyring = "no")]
+        {
+            None
+        }
+        #[cfg(not(keyring = "no"))]
+        if self.no_keyring {
+            Some(false)
+        } else if self.keyring {
+            Some(true)
+        } else if self.stdin {
+            Some(false)
+        } else {
+            None
+        }
+    }
+
+    fn reset_keyring(&self) -> bool {
+        #[cfg(keyring = "no")]
+        {
+            false
+        }
+        #[cfg(not(keyring = "no"))]
+        {
+            self.reset_keyring
+        }
+    }
 }
 
 #[cfg(test)]
