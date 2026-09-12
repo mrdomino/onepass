@@ -6,7 +6,7 @@ use std::sync::OnceLock;
 use anyhow::{self, Context};
 use keyring_core::{self, Entry, set_default_store};
 
-#[cfg(target_os = "macos")]
+#[cfg(keyring = "macos")]
 use std::{collections::HashMap, sync::LazyLock};
 
 const SERVICE: &str = "onepass.app.whilezero.org";
@@ -56,16 +56,16 @@ fn setup_store() -> keyring_core::Result<()> {
 
 static START: OnceLock<keyring_core::Result<()>> = OnceLock::new();
 
-#[cfg(target_os = "macos")]
+#[cfg(keyring = "macos")]
 static MODS: LazyLock<HashMap<&'static str, &'static str>> =
     LazyLock::new(|| HashMap::from([("access-policy", "require-user-presence")]));
 
 fn get_raw_entry() -> keyring_core::Result<Entry> {
-    #[cfg(target_os = "macos")]
+    #[cfg(keyring = "macos")]
     {
         Entry::new_with_modifiers(SERVICE, ACCOUNT, &MODS)
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(keyring = "macos"))]
     {
         Entry::new(SERVICE, ACCOUNT)
     }
