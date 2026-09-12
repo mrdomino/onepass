@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn get_entry_succeeds() {
         if let Err(err) = raw_setup_store() {
-            // XXX brittle
+            // XXX brittle: no dbus on the CI system.
             assert!(err.to_string().contains("Platform failure: DBus error: The name org.freedesktop.secrets was not provided by any .service files"), "{err:?}");
             return;
         }
