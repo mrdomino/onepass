@@ -56,13 +56,25 @@ fn setup_store() -> keyring_core::Result<()> {
 
 static START: OnceLock<keyring_core::Result<()>> = OnceLock::new();
 
+#[cfg(target_os = "macos")]
 static MODS: LazyLock<HashMap<&'static str, &'static str>> =
     LazyLock::new(|| HashMap::from([("access-policy", "require-user-presence")]));
+
+fn get_raw_entry() -> keyring_core::Result<Entry> {
+    #[cfg(target_os = "macos")]
+    {
+        Entry::new_with_modifiers(SERVICE, ACCOUNT, &MODS)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Entry::new(SERVICE, ACCOUNT)
+    }
+}
 
 pub(super) fn get_entry() -> anyhow::Result<Entry> {
     match START.get_or_init(setup_store) {
         Ok(()) => (),
         Err(err) => anyhow::bail!("Store setup failed: {err}"),
     }
-    Entry::new_with_modifiers(SERVICE, ACCOUNT, &MODS).context("failed getting keyring entry")
+    get_raw_entry().context("failed getting keyring entry")
 }
