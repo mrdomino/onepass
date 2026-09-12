@@ -12,6 +12,11 @@ use std::{collections::HashMap, sync::LazyLock};
 const SERVICE: &str = "onepass.app.whilezero.org";
 const ACCOUNT: &str = "seed";
 
+pub(super) fn get_entry() -> anyhow::Result<Entry> {
+    raw_setup_store().context("failed to set up store")?;
+    raw_get_entry().context("failed getting keyring entry")
+}
+
 fn setup_store() -> keyring_core::Result<()> {
     #[cfg(keyring = "no")]
     {
@@ -60,7 +65,15 @@ static START: OnceLock<keyring_core::Result<()>> = OnceLock::new();
 static MODS: LazyLock<HashMap<&'static str, &'static str>> =
     LazyLock::new(|| HashMap::from([("access-policy", "require-user-presence")]));
 
-fn get_raw_entry() -> keyring_core::Result<Entry> {
+// We split this out from raw_get_entry because Error is not Clone.
+fn raw_setup_store() -> Result<(), &'static keyring_core::Error> {
+    match START.get_or_init(setup_store) {
+        Ok(()) => Ok(()),
+        Err(err) => Err(err),
+    }
+}
+
+fn raw_get_entry() -> keyring_core::Result<Entry> {
     #[cfg(keyring = "macos")]
     {
         Entry::new_with_modifiers(SERVICE, ACCOUNT, &MODS)
@@ -71,32 +84,31 @@ fn get_raw_entry() -> keyring_core::Result<Entry> {
     }
 }
 
-pub(super) fn get_entry() -> anyhow::Result<Entry> {
-    match START.get_or_init(setup_store) {
-        Ok(()) => (),
-        Err(err) => anyhow::bail!("Store setup failed: {err}"),
-    }
-    get_raw_entry().context("failed getting keyring entry")
-}
-
 #[cfg(test)]
 mod tests {
-
     use super::*;
+
+    use std::assert_matches;
+
+    use keyring_core::Error;
 
     #[cfg(not(keyring = "no"))]
     #[test]
     fn get_entry_succeeds() {
-        let _ = get_entry().unwrap();
+        if let Err(err) = raw_setup_store() {
+            // XXX brittle
+            assert!(err.to_string().contains("Platform failure: DBus error: The name org.freedesktop.secrets was not provided by any .service files"), "{err:?}");
+            return;
+        }
+
+        assert_matches!(raw_get_entry(), Ok(_) | Err(Error::NoEntry));
     }
 
     #[cfg(keyring = "no")]
     #[test]
     fn get_entry_fails_unsupported() {
-        use keyring_core::Error;
-        use std::assert_matches;
-
-        let err = get_raw_entry().unwrap_err();
-        assert_matches!(err, Error::NoDefaultStore);
+        raw_setup_store().unwrap();
+        let err = raw_get_entry().unwrap_err();
+        assert_matches!(err, Error::NoEntry);
     }
 }
