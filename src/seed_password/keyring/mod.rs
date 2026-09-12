@@ -78,3 +78,25 @@ pub(super) fn get_entry() -> anyhow::Result<Entry> {
     }
     get_raw_entry().context("failed getting keyring entry")
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[cfg(not(keyring = "no"))]
+    #[test]
+    fn get_entry_succeeds() {
+        let _ = get_entry().unwrap();
+    }
+
+    #[cfg(keyring = "no")]
+    #[test]
+    fn get_entry_fails_unsupported() {
+        use keyring_core::Error;
+        use std::assert_matches;
+
+        let err = get_raw_entry().unwrap_err();
+        assert_matches!(err, Error::NoDefaultStore);
+    }
+}
