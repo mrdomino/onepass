@@ -1,13 +1,13 @@
 #[cfg(keyring = "no")]
 mod null_keyring;
 
-use std::{
-    collections::HashMap,
-    sync::{LazyLock, OnceLock},
-};
+use std::sync::OnceLock;
 
 use anyhow::{self, Context};
 use keyring_core::{self, Entry, set_default_store};
+
+#[cfg(target_os = "macos")]
+use std::{collections::HashMap, sync::LazyLock};
 
 const SERVICE: &str = "onepass.app.whilezero.org";
 const ACCOUNT: &str = "seed";
