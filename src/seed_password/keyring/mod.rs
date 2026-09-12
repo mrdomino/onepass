@@ -13,7 +13,7 @@ const SERVICE: &str = "onepass.app.whilezero.org";
 const ACCOUNT: &str = "seed";
 
 pub(super) fn get_entry() -> anyhow::Result<Entry> {
-    raw_setup_store().context("failed to set up store")?;
+    setup_store_once().context("failed to set up store")?;
     raw_get_entry().context("failed getting keyring entry")
 }
 
@@ -61,17 +61,17 @@ fn setup_store() -> keyring_core::Result<()> {
 
 static START: OnceLock<keyring_core::Result<()>> = OnceLock::new();
 
-#[cfg(keyring = "macos")]
-static MODS: LazyLock<HashMap<&'static str, &'static str>> =
-    LazyLock::new(|| HashMap::from([("access-policy", "require-user-presence")]));
-
 // We split this out from raw_get_entry because Error is not Clone.
-fn raw_setup_store() -> Result<(), &'static keyring_core::Error> {
+fn setup_store_once() -> Result<(), &'static keyring_core::Error> {
     match START.get_or_init(setup_store) {
         Ok(()) => Ok(()),
         Err(err) => Err(err),
     }
 }
+
+#[cfg(keyring = "macos")]
+static MODS: LazyLock<HashMap<&'static str, &'static str>> =
+    LazyLock::new(|| HashMap::from([("access-policy", "require-user-presence")]));
 
 fn raw_get_entry() -> keyring_core::Result<Entry> {
     #[cfg(keyring = "macos")]
@@ -95,7 +95,7 @@ mod tests {
     #[cfg(not(keyring = "no"))]
     #[test]
     fn get_entry_succeeds() {
-        if let Err(err) = raw_setup_store() {
+        if let Err(err) = setup_store_once() {
             // XXX brittle: no dbus on the CI system.
             assert!(err.to_string().contains("Platform failure: DBus error: The name org.freedesktop.secrets was not provided by any .service files"), "{err:?}");
             return;
@@ -107,7 +107,7 @@ mod tests {
     #[cfg(keyring = "no")]
     #[test]
     fn get_entry_fails_unsupported() {
-        raw_setup_store().unwrap();
+        setup_store_once().unwrap();
         let err = raw_get_entry().unwrap_err();
         assert_matches!(err, Error::NoEntry);
     }
