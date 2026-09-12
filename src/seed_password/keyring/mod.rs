@@ -86,27 +86,27 @@ fn raw_get_entry() -> keyring_core::Result<Entry> {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
+
+    use std::assert_matches;
+
+    use keyring_core::Error;
 
     #[cfg(not(keyring = "no"))]
     #[test]
     fn get_entry_succeeds() {
-        raw_setup_store().unwrap();
-
-        let Err(err) = raw_get_entry() else {
+        if let Err(err) = raw_setup_store() {
+            // XXX brittle
+            assert!(err.to_string().contains("Platform failure: DBus error: The name org.freedesktop.secrets was not provided by any .service files"), "{err:?}");
             return;
-        };
-        // XXX brittle
-        assert!(err.to_string().contains("Platform failure: DBus error: The name org.freedesktop.secrets was not provided by any .service files"));
+        }
+
+        assert_matches!(raw_get_entry(), Ok(_) | Err(Error::NoEntry));
     }
 
     #[cfg(keyring = "no")]
     #[test]
     fn get_entry_fails_unsupported() {
-        use keyring_core::Error;
-        use std::assert_matches;
-
         raw_setup_store().unwrap();
         let err = raw_get_entry().unwrap_err();
         assert_matches!(err, Error::NoEntry);
