@@ -25,7 +25,7 @@ jobs:
     name: Build
     permissions:
       contents: read
-    uses: ./.github/workflows/build.yaml
+    uses: $/.github/workflows/build.yaml
     with:
       release: true
       tag: ${{ inputs.tag }}
