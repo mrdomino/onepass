@@ -479,6 +479,12 @@ fn verify_failure<I, E: ParseError<I>>(input: I) -> nom::Err<E> {
 mod tests {
     use super::*;
 
+    macro_rules! assert_parse {
+        ($input:expr, $ast:expr $(,)?) => {
+            assert_eq!(Ok($ast), parse_node($input))
+        };
+    }
+
     macro_rules! assert_err {
         ($input:expr, $rest:expr, $kind:ident $(,)?) => {
             assert_eq!(
@@ -490,10 +496,11 @@ mod tests {
 
     #[test]
     fn test_literal() {
-        let node = "cats".parse().unwrap();
-        assert_eq!(Node::Literal("cats".into()), node);
-        let node = r#"\\cats\tand\[dogs\]\{woof\}"#.parse().unwrap();
-        assert_eq!(Node::Literal("\\cats\tand[dogs]{woof}".into()), node);
+        assert_parse!("cats", Node::Literal("cats".into()));
+        assert_parse!(
+            r#"\\cats\tand\[dogs\]\{woof\}"#,
+            Node::Literal("\\cats\tand[dogs]{woof}".into())
+        );
     }
 
     #[test]
@@ -503,11 +510,11 @@ mod tests {
 
     #[test]
     fn test_chars() {
-        assert_eq!(
+        assert_parse!(
+            "[A-Za-z0123-9]",
             Node::Chars(unsafe {
                 Chars::from_ranges_unchecked([('0', '9'), ('A', 'Z'), ('a', 'z')])
             }),
-            "[A-Za-z0123-9]".parse::<Node>().unwrap(),
         );
         assert_err!("[z-a]", "z-a]", Verify);
     }
@@ -528,24 +535,25 @@ mod tests {
             (vec![('!', '~')], "[[:punct:]\\w]"),
         ];
         for (ranges, inp) in tests {
-            assert_eq!(
+            assert_parse!(
+                inp,
                 Node::Chars(unsafe { Chars::from_ranges_unchecked(ranges) }),
-                inp.parse().unwrap(),
             );
         }
     }
 
     #[test]
     fn test_generators() {
-        assert_eq!(
+        assert_parse!(
+            "{word\\tup\\}}",
             Node::Generator(Generator::new("word\tup}")),
-            "{word\\tup\\}}".parse().unwrap()
         );
     }
 
     #[test]
     fn test_multi() {
-        assert_eq!(
+        assert_parse!(
+            "{word}(-{word}){4}",
             Node::List(
                 vec![
                     Node::Generator(Generator::new("word")),
@@ -564,7 +572,6 @@ mod tests {
                 ]
                 .into()
             ),
-            "{word}(-{word}){4}".parse().unwrap(),
         );
     }
 
@@ -575,12 +582,9 @@ mod tests {
 
     #[test]
     fn test_literal_digits() {
-        assert_eq!(
-            Node::Literal("—".into()),
-            r#"\xe2\x80\x94"#.parse().unwrap()
-        );
-        assert_eq!(Node::Literal("—".into()), "\\u2014".parse().unwrap());
-        assert_eq!(Node::Literal("—".into()), "\\u{002014}".parse().unwrap());
+        assert_parse!(r#"\xe2\x80\x94"#, Node::Literal("—".into()),);
+        assert_parse!("\\u2014", Node::Literal("—".into()));
+        assert_parse!("\\u{002014}", Node::Literal("—".into()));
         assert_err!("\\x80", "\\x80", Verify);
         assert_err!("\\xd0\\x00", "\\xd0\\x00", Verify);
         assert_err!("\\ud800", "\\ud800", Verify);
