@@ -201,7 +201,7 @@ fn parse_count(input: &str) -> IResult<&str, Node> {
     match count {
         None => Ok((remaining, node)),
         Some((min, max)) if max >= min => Ok((remaining, Node::Count(Box::new(node), min, max))),
-        _ => Err(nom::Err::Failure(NomError::new(input, ErrorKind::Verify))),
+        _ => Err(verify_failure(input)),
     }
 }
 
@@ -335,7 +335,7 @@ fn parse_chars(input: &str) -> IResult<&str, Chars> {
 fn parse_legacy_words_err(input: &str) -> IResult<&str, Chars> {
     let res = alt((tag("[:word:]"), tag("[:Word:]"))).parse(input);
     match res {
-        Ok(_) => Err(nom::Err::Failure(NomError::new(input, ErrorKind::Verify))),
+        Ok(_) => Err(verify_failure(input)),
         Err(e) => Err(e),
     }
 }
@@ -405,7 +405,7 @@ fn parse_chars_range(input: &str) -> IResult<&str, (char, char)> {
         if a <= b {
             return Ok((remaining, (a, b)));
         }
-        return Err(nom::Err::Failure(NomError::new(input, ErrorKind::Verify)));
+        return Err(verify_failure(input));
     }
     map(parse_chars_single, |c| (c, c)).parse(input)
 }
