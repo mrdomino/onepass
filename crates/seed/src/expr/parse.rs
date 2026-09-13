@@ -479,14 +479,26 @@ fn verify_failure<I, E: ParseError<I>>(input: I) -> nom::Err<E> {
 mod tests {
     use super::*;
 
+    macro_rules! assert_err {
+        ($input:expr, $rest:expr, $kind:ident $(,)?) => {
+            assert_eq!(
+                Err(NomError::new($rest, ErrorKind::$kind)),
+                parse_node($input)
+            )
+        };
+    }
+
     #[test]
     fn test_literal() {
         let node = "cats".parse().unwrap();
         assert_eq!(Node::Literal("cats".into()), node);
         let node = r#"\\cats\tand\[dogs\]\{woof\}"#.parse().unwrap();
         assert_eq!(Node::Literal("\\cats\tand[dogs]{woof}".into()), node);
-        let err = "\\a".parse::<Node>().unwrap_err();
-        assert_eq!(Error::new("\\a".into(), ErrorKind::Verify), err)
+    }
+
+    #[test]
+    fn test_bad_escape() {
+        assert_err!("\\a", "\\a", Verify);
     }
 
     #[test]
@@ -497,9 +509,7 @@ mod tests {
             }),
             "[A-Za-z0123-9]".parse::<Node>().unwrap(),
         );
-        let res = "[z-a]".parse::<Node>();
-        assert!(res.is_err(), "{res:?}");
-        assert_eq!("error Verify at: z-a]", &format!("{}", res.unwrap_err()));
+        assert_err!("[z-a]", "z-a]", Verify);
     }
 
     #[test]
@@ -560,11 +570,7 @@ mod tests {
 
     #[test]
     fn test_legacy_words_err() {
-        let res = "[:word:]".parse::<Node>();
-        assert_eq!(
-            "error Verify at: [:word:]",
-            &format!("{}", res.unwrap_err())
-        );
+        assert_err!("[:word:]", "[:word:]", Verify);
     }
 
     #[test]
@@ -575,42 +581,18 @@ mod tests {
         );
         assert_eq!(Node::Literal("—".into()), "\\u2014".parse().unwrap());
         assert_eq!(Node::Literal("—".into()), "\\u{002014}".parse().unwrap());
-        assert_eq!(
-            Err(NomError {
-                input: "\\x80".into(),
-                code: ErrorKind::Verify
-            }),
-            "\\x80".parse::<Node>(),
-        );
-        assert_eq!(
-            Err(NomError {
-                input: "\\xd0\\x00".into(),
-                code: ErrorKind::Verify
-            }),
-            "\\xd0\\x00".parse::<Node>()
-        );
-        assert_eq!(
-            Err(NomError {
-                input: "\\ud800".into(),
-                code: ErrorKind::Verify
-            }),
-            "\\ud800".parse::<Node>(),
-        );
+        assert_err!("\\x80", "\\x80", Verify);
+        assert_err!("\\xd0\\x00", "\\xd0\\x00", Verify);
+        assert_err!("\\ud800", "\\ud800", Verify);
     }
 
     #[test]
     fn test_remaining() {
-        assert_eq!(
-            Err(Error::new("\\".into(), ErrorKind::Eof)),
-            "a\\".parse::<Node>()
-        );
+        assert_err!("a\\", "\\", Eof);
     }
 
     #[test]
     fn test_reserved() {
-        assert_eq!(
-            Err(Error::new("|test".into(), ErrorKind::Eof)),
-            "a|test".parse::<Node>()
-        );
+        assert_err!("a|test", "|test", Eof);
     }
 }
