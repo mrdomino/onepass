@@ -4,9 +4,9 @@ use nom::{
     Finish, IResult, Parser,
     branch::alt,
     bytes::complete::{is_not, tag, take_while_m_n},
-    character::complete::{self, anychar, char, none_of},
+    character::complete::{anychar, char, none_of, u32},
     combinator::{map, map_res, opt, peek, value, verify},
-    error::{self, ErrorKind},
+    error::{Error as NomError, ErrorKind},
     multi::{fold, many1},
     sequence::{delimited, preceded, separated_pair},
 };
@@ -23,7 +23,7 @@ enum CharFragment {
     Multi(&'static [(char, char)]),
 }
 
-pub type Error = nom::error::Error<String>;
+pub type Error = NomError<String>;
 
 impl Expr {
     /// Expressions can be parsed from UTF-8 strings.
@@ -173,7 +173,7 @@ impl FromStr for Node {
                 }
                 Ok(node)
             }
-            Err(error::Error { input, code }) => Err(Error {
+            Err(NomError { input, code }) => Err(Error {
                 input: input.to_string(),
                 code,
             }),
@@ -186,9 +186,9 @@ fn parse_count(input: &str) -> IResult<&str, Node> {
     let (remaining, count) = opt(delimited(
         char('{'),
         alt((
-            separated_pair(complete::u32, char(','), complete::u32),
-            map(complete::u32, |n| (n, n)),
-            map(preceded(char(','), complete::u32), |n| (0, n)),
+            separated_pair(u32, char(','), u32),
+            map(u32, |n| (n, n)),
+            map(preceded(char(','), u32), |n| (0, n)),
         )),
         char('}'),
     ))
@@ -196,10 +196,7 @@ fn parse_count(input: &str) -> IResult<&str, Node> {
     match count {
         None => Ok((remaining, node)),
         Some((min, max)) if max >= min => Ok((remaining, Node::Count(Box::new(node), min, max))),
-        _ => Err(nom::Err::Failure(error::Error::new(
-            input,
-            ErrorKind::Verify,
-        ))),
+        _ => Err(nom::Err::Failure(NomError::new(input, ErrorKind::Verify))),
     }
 }
 
@@ -320,10 +317,7 @@ fn parse_hex_char(input: &str) -> IResult<&str, char> {
         None
     };
     match res {
-        None | Some(Err(_)) => Err(nom::Err::Failure(error::Error::new(
-            input,
-            ErrorKind::Verify,
-        ))),
+        None | Some(Err(_)) => Err(nom::Err::Failure(NomError::new(input, ErrorKind::Verify))),
         Some(res @ Ok(_)) => res,
     }
 }
@@ -360,10 +354,7 @@ fn parse_chars(input: &str) -> IResult<&str, Chars> {
 fn parse_legacy_words_err(input: &str) -> IResult<&str, Chars> {
     let res = alt((tag("[:word:]"), tag("[:Word:]"))).parse(input);
     match res {
-        Ok(_) => Err(nom::Err::Failure(error::Error::new(
-            input,
-            ErrorKind::Verify,
-        ))),
+        Ok(_) => Err(nom::Err::Failure(NomError::new(input, ErrorKind::Verify))),
         Err(e) => Err(e),
     }
 }
@@ -434,10 +425,7 @@ fn parse_chars_range(input: &str) -> IResult<&str, (char, char)> {
         if a <= b {
             return Ok((remaining, (a, b)));
         }
-        return Err(nom::Err::Failure(error::Error::new(
-            input,
-            ErrorKind::Verify,
-        )));
+        return Err(nom::Err::Failure(NomError::new(input, ErrorKind::Verify)));
     }
     map(parse_chars_single, |c| (c, c)).parse(input)
 }
@@ -589,21 +577,21 @@ mod tests {
         assert_eq!(Node::Literal("—".into()), "\\u2014".parse().unwrap());
         assert_eq!(Node::Literal("—".into()), "\\u{002014}".parse().unwrap());
         assert_eq!(
-            Err(error::Error {
+            Err(NomError {
                 input: "\\x80".into(),
                 code: ErrorKind::Verify
             }),
             "\\x80".parse::<Node>(),
         );
         assert_eq!(
-            Err(error::Error {
+            Err(NomError {
                 input: "\\xd0\\x00".into(),
                 code: ErrorKind::Verify
             }),
             "\\xd0\\x00".parse::<Node>()
         );
         assert_eq!(
-            Err(error::Error {
+            Err(NomError {
                 input: "\\ud800".into(),
                 code: ErrorKind::Char
             }),
