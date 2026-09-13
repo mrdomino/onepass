@@ -5,7 +5,7 @@ use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, take_while_m_n},
     character::complete::{anychar, char, none_of, u32},
-    combinator::{cut, map, map_res, opt, peek, value, verify},
+    combinator::{all_consuming, cut, map, map_res, opt, peek, value, verify},
     error::{Error as NomError, ErrorKind, ParseError},
     multi::{fold, many1},
     sequence::{delimited, preceded, separated_pair},
@@ -160,11 +160,18 @@ impl Expr {
     }
 }
 
-/// Parse a [`Node`], returning an [`IResult`].
+/// Parse a [`Node`].
 ///
-/// This function is used to implement the [`FromStr`] instance on which
-/// [`Expr::parse`] is based.
-pub fn parse_node(input: &str) -> IResult<&str, Node> {
+/// This function is identical to [`Node::from_str`] (and [`Expr::parse`]) aside from the return
+/// and error types.
+pub fn parse_node(input: &str) -> Result<Node, NomError<&'_ str>> {
+    all_consuming(parse_node_inner)
+        .parse(input)
+        .finish()
+        .map(|(_, node)| node)
+}
+
+fn parse_node_inner(input: &str) -> IResult<&str, Node> {
     map(many1(parse_count), Node::from_iter).parse(input)
 }
 
@@ -172,18 +179,7 @@ impl FromStr for Node {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match parse_node(s).finish() {
-            Ok((remaining, node)) => {
-                if !remaining.is_empty() {
-                    return Err(Error::new(s.to_string(), ErrorKind::Complete));
-                }
-                Ok(node)
-            }
-            Err(NomError { input, code }) => Err(Error {
-                input: input.to_string(),
-                code,
-            }),
-        }
+        parse_node(s).map_err(|e| Error::from_error_kind(e.input.to_string(), e.code))
     }
 }
 
@@ -457,7 +453,7 @@ fn parse_generator_verbatim(input: &str) -> IResult<&str, &str> {
 }
 
 fn parse_list(input: &str) -> IResult<&str, Node> {
-    braced(Brace::Paren, parse_node).parse(input)
+    braced(Brace::Paren, parse_node_inner).parse(input)
 }
 
 fn braced<I, O, E, F>(brace: Brace, inner: F) -> impl Parser<I, Output = O, Error = E>
@@ -613,7 +609,7 @@ mod tests {
     #[test]
     fn test_reserved() {
         assert_eq!(
-            Err(Error::new("a|test".into(), ErrorKind::Complete)),
+            Err(Error::new("|test".into(), ErrorKind::Eof)),
             "a|test".parse::<Node>()
         );
     }
