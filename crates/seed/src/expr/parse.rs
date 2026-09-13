@@ -1,4 +1,4 @@
-use core::str::{self, Utf8Error};
+use core::str::{FromStr, Utf8Error, from_utf8};
 
 use nom::{
     Finish, IResult, Parser,
@@ -156,13 +156,13 @@ impl Expr {
 
 /// Parse a [`Node`], returning an [`IResult`].
 ///
-/// This function is used to implement the [`FromStr`][str::FromStr] instance on which
+/// This function is used to implement the [`FromStr`] instance on which
 /// [`Expr::parse`] is based.
 pub fn parse_node(input: &str) -> IResult<&str, Node> {
     map(many1(parse_count), Node::from_iter).parse(input)
 }
 
-impl str::FromStr for Node {
+impl FromStr for Node {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -329,7 +329,7 @@ fn parse_hex_char(input: &str) -> IResult<&str, char> {
 }
 
 fn str_to_char(bs: &[u8]) -> Result<char, Utf8Error> {
-    let s = str::from_utf8(bs)?;
+    let s = from_utf8(bs)?;
     let mut iter = s.chars();
     let c = iter.next().expect(s);
     assert!(iter.next().is_none());
