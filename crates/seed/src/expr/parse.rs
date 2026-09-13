@@ -1,12 +1,12 @@
 use core::str::{FromStr, Utf8Error, from_utf8};
 
 use nom::{
-    Finish, IResult, Parser,
+    AsChar, Finish, IResult, Input, Parser,
     branch::alt,
     bytes::complete::{is_not, tag, take_while_m_n},
     character::complete::{anychar, char, none_of, u32},
-    combinator::{map, map_res, opt, peek, value, verify},
-    error::{Error as NomError, ErrorKind},
+    combinator::{cut, map, map_res, opt, peek, value, verify},
+    error::{Error as NomError, ErrorKind, ParseError},
     multi::{fold, many1},
     sequence::{delimited, preceded, separated_pair},
 };
@@ -21,6 +21,12 @@ enum StringFragment<'a> {
 enum CharFragment {
     Single((char, char)),
     Multi(&'static [(char, char)]),
+}
+
+enum Brace {
+    Paren,
+    Curly,
+    Square,
 }
 
 pub type Error = NomError<String>;
@@ -183,14 +189,13 @@ impl FromStr for Node {
 
 fn parse_count(input: &str) -> IResult<&str, Node> {
     let (input, node) = parse_single(input)?;
-    let (remaining, count) = opt(delimited(
-        char('{'),
+    let (remaining, count) = opt(braced(
+        Brace::Curly,
         alt((
             separated_pair(u32, char(','), u32),
             map(u32, |n| (n, n)),
             map(preceded(char(','), u32), |n| (0, n)),
         )),
-        char('}'),
     ))
     .parse(input)?;
     match count {
@@ -269,10 +274,9 @@ fn parse_unicode_digits(input: &str) -> IResult<&str, u32> {
         map_res(
             alt((
                 take_while_m_n(4, 4, |c: char| c.is_ascii_hexdigit()),
-                delimited(
-                    char('{'),
+                braced(
+                    Brace::Curly,
                     take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit()),
-                    char('}'),
                 ),
             )),
             |s| u32::from_str_radix(s, 16),
@@ -360,8 +364,8 @@ fn parse_legacy_words_err(input: &str) -> IResult<&str, Chars> {
 }
 
 fn parse_chars_brackets(input: &str) -> IResult<&str, Chars> {
-    delimited(
-        char('['),
+    braced(
+        Brace::Square,
         map(
             fold(
                 1..,
@@ -381,7 +385,6 @@ fn parse_chars_brackets(input: &str) -> IResult<&str, Chars> {
             ),
             Chars::from_ranges,
         ),
-        char(']'),
     )
     .parse(input)
 }
@@ -459,7 +462,7 @@ fn parse_generator(input: &str) -> IResult<&str, Generator> {
         ),
         Generator::from,
     );
-    delimited(char('{'), preceded(verify_inner, parse_inner), char('}')).parse(input)
+    braced(Brace::Curly, preceded(verify_inner, parse_inner)).parse(input)
 }
 
 fn parse_generator_fragment(input: &str) -> IResult<&str, StringFragment<'_>> {
@@ -475,7 +478,22 @@ fn parse_generator_verbatim(input: &str) -> IResult<&str, &str> {
 }
 
 fn parse_list(input: &str) -> IResult<&str, Node> {
-    delimited(char('('), parse_node, char(')')).parse(input)
+    braced(Brace::Paren, parse_node).parse(input)
+}
+
+fn braced<I, O, E, F>(brace: Brace, inner: F) -> impl Parser<I, Output = O, Error = E>
+where
+    I: Input,
+    <I as Input>::Item: AsChar,
+    E: ParseError<I>,
+    F: Parser<I, Output = O, Error = E>,
+{
+    let (open, close) = match brace {
+        Brace::Paren => ('(', ')'),
+        Brace::Curly => ('{', '}'),
+        Brace::Square => ('[', ']'),
+    };
+    delimited(char(open), inner, cut(char(close)))
 }
 
 #[cfg(test)]
