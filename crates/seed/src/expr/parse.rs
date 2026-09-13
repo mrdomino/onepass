@@ -207,8 +207,8 @@ fn parse_count(input: &str) -> IResult<&str, Node> {
 
 fn parse_single(input: &str) -> IResult<&str, Node> {
     alt((
-        map(parse_literal, Node::Literal),
         map(parse_chars, Node::Chars),
+        map(parse_literal, Node::Literal), // must come after parse_chars
         map(parse_generator, Node::Generator),
         parse_list,
     ))
@@ -248,7 +248,10 @@ fn parse_literal_verbatim(input: &str) -> IResult<&str, &str> {
 }
 
 fn parse_literal_escaped(input: &str) -> IResult<&str, char> {
-    alt((
+    let _ = peek(char('\\')).parse(input)?;
+    cut(alt((
+        parse_hex_char,
+        parse_unicode_char,
         preceded(
             char('\\'),
             alt((
@@ -258,20 +261,15 @@ fn parse_literal_escaped(input: &str) -> IResult<&str, char> {
                 verify(anychar, |&c| !c.is_ascii_alphanumeric()),
             )),
         ),
-        parse_hex_char,
-        parse_unicode_char,
-    ))
+    )))
     .parse(input)
+    .map_err(|e| e.map(|inner| NomError::from_error_kind(input, inner.code)))
 }
 
 fn parse_unicode_char(input: &str) -> IResult<&str, char> {
-    map_res(parse_unicode_digits, char::try_from).parse(input)
-}
-
-fn parse_unicode_digits(input: &str) -> IResult<&str, u32> {
-    preceded(
+    let (remaining, n) = preceded(
         tag("\\u"),
-        map_res(
+        cut(map_res(
             alt((
                 take_while_m_n(4, 4, |c: char| c.is_ascii_hexdigit()),
                 braced(
@@ -280,9 +278,13 @@ fn parse_unicode_digits(input: &str) -> IResult<&str, u32> {
                 ),
             )),
             |s| u32::from_str_radix(s, 16),
-        ),
+        )),
     )
-    .parse(input)
+    .parse(input)?;
+    Ok((
+        remaining,
+        char::try_from(n).map_err(|_| verify_failure(input))?,
+    ))
 }
 
 fn parse_hex_char(input: &str) -> IResult<&str, char> {
@@ -487,6 +489,8 @@ mod tests {
         assert_eq!(Node::Literal("cats".into()), node);
         let node = r#"\\cats\tand\[dogs\]\{woof\}"#.parse().unwrap();
         assert_eq!(Node::Literal("\\cats\tand[dogs]{woof}".into()), node);
+        let err = "\\a".parse::<Node>().unwrap_err();
+        assert_eq!(Error::new("\\a".into(), ErrorKind::Verify), err)
     }
 
     #[test]
@@ -592,7 +596,7 @@ mod tests {
         assert_eq!(
             Err(NomError {
                 input: "\\ud800".into(),
-                code: ErrorKind::Char
+                code: ErrorKind::Verify
             }),
             "\\ud800".parse::<Node>(),
         );
@@ -601,7 +605,7 @@ mod tests {
     #[test]
     fn test_remaining() {
         assert_eq!(
-            Err(Error::new("a\\".into(), ErrorKind::Complete)),
+            Err(Error::new("\\".into(), ErrorKind::Eof)),
             "a\\".parse::<Node>()
         );
     }
