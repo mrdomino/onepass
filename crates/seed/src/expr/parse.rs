@@ -286,44 +286,21 @@ fn parse_unicode_digits(input: &str) -> IResult<&str, u32> {
 }
 
 fn parse_hex_char(input: &str) -> IResult<&str, char> {
-    let (remaining, b) = parse_hex_byte(input)?;
-    if b < 0b1000_0000 {
+    let (mut remaining, b) = parse_hex_byte(input)?;
+    let size = b.leading_ones() as usize;
+    if size == 0 {
         return Ok((remaining, b as char));
     }
-    let res = if b & 0b1110_0000 == 0b1100_0000 {
-        Some(
-            map_res(parse_hex_byte, |b2| {
-                let bs = [b, b2];
-                str_to_char(&bs)
-            })
-            .parse(remaining),
-        )
-    } else if b & 0b1111_0000 == 0b1110_0000 {
-        Some(
-            map_res((parse_hex_byte, parse_hex_byte), |(b2, b3)| {
-                let bs = [b, b2, b3];
-                str_to_char(&bs)
-            })
-            .parse(remaining),
-        )
-    } else if b & 0b1111_1000 == 0b1111_0000 {
-        Some(
-            map_res(
-                (parse_hex_byte, parse_hex_byte, parse_hex_byte),
-                |(b2, b3, b4)| {
-                    let bs = [b, b2, b3, b4];
-                    str_to_char(&bs)
-                },
-            )
-            .parse(remaining),
-        )
-    } else {
-        None
-    };
-    match res {
-        None | Some(Err(_)) => Err(nom::Err::Failure(NomError::new(input, ErrorKind::Verify))),
-        Some(res @ Ok(_)) => res,
+    if size == 1 || size > 4 {
+        return Err(verify_failure(input));
     }
+    let mut bs = [0u8; 4];
+    bs[0] = b;
+    for slot in &mut bs[1..size] {
+        (remaining, *slot) = cut(parse_hex_byte).parse(remaining)?;
+    }
+    let c = str_to_char(&bs[..size]).map_err(|_| verify_failure(input))?;
+    Ok((remaining, c))
 }
 
 fn str_to_char(bs: &[u8]) -> Result<char, Utf8Error> {
@@ -494,6 +471,10 @@ where
         Brace::Square => ('[', ']'),
     };
     delimited(char(open), inner, cut(char(close)))
+}
+
+fn verify_failure<I, E: ParseError<I>>(input: I) -> nom::Err<E> {
+    nom::Err::Failure(E::from_error_kind(input, ErrorKind::Verify))
 }
 
 #[cfg(test)]
