@@ -278,7 +278,7 @@ fn parse_literal_escaped(input: &str) -> IResult<&str, char> {
 fn parse_unicode_char(input: &str) -> IResult<&str, char> {
     let (remaining, n) = preceded(
         tag("\\u"),
-        cut(map_res(
+        map_res(
             alt((
                 take_while_m_n(4, 4, |c: char| c.is_ascii_hexdigit()),
                 braced(
@@ -287,7 +287,7 @@ fn parse_unicode_char(input: &str) -> IResult<&str, char> {
                 ),
             )),
             |s| u32::from_str_radix(s, 16),
-        )),
+        ),
     )
     .parse(input)?;
     Ok((
@@ -629,8 +629,8 @@ mod tests {
         assert_err!("\\x80", "\\x80", Verify);
         assert_err!("\\xd0\\x00", "\\xd0\\x00", Verify);
         assert_err!("\\ud800", "\\ud800", Verify);
-        assert_err!("\\u{}", "\\u{}", TakeWhileMN);
-        assert_err!("\\u{za}", "\\u{za}", TakeWhileMN);
+        assert_err!("\\u{}", "\\u{}", Verify);
+        assert_err!("\\u{za}", "\\u{za}", Verify);
         assert_err!("\\xza", "\\xza", Verify);
     }
 
