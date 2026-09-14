@@ -5,7 +5,7 @@ use core::str::{FromStr, Utf8Error, from_utf8};
 use nom::{
     AsChar, Finish, IResult, Input, Parser,
     branch::alt,
-    bytes::complete::{is_not, tag, take_while_m_n},
+    bytes::complete::{is_not, tag, take_while_m_n, take_while1},
     character::complete::{anychar, char, none_of, u32},
     combinator::{all_consuming, cut, map, map_res, opt, peek, value, verify},
     error::{Error as NomError, ErrorKind, ParseError},
@@ -390,21 +390,26 @@ static PRINT: &[(char, char)] = &[(' ', '~')];
 static WORD: &[(char, char)] = &[('0', '9'), ('A', 'Z'), ('_', '_'), ('a', 'z')];
 
 fn parse_chars_posix(input: &str) -> IResult<&str, &'static [(char, char)]> {
-    delimited(
+    let (remaining, class) = delimited(
         tag("[:"),
-        alt((
-            value(LOWER, tag("lower")),
-            value(UPPER, tag("upper")),
-            value(ALPHA, tag("alpha")),
-            value(ALNUM, tag("alnum")),
-            value(DIGIT, tag("digit")),
-            value(XDIGIT, tag("xdigit")),
-            value(PUNCT, tag("punct")),
-            value(PRINT, tag("print")),
-        )),
+        take_while1(|c: char| c.is_ascii_alphabetic()),
         tag(":]"),
     )
-    .parse(input)
+    .parse(input)?;
+    Ok((
+        remaining,
+        match class {
+            "lower" => LOWER,
+            "upper" => UPPER,
+            "alpha" => ALPHA,
+            "alnum" => ALNUM,
+            "digit" => DIGIT,
+            "xdigit" => XDIGIT,
+            "punct" => PUNCT,
+            "print" => PRINT,
+            _ => return Err(verify_failure(input)),
+        },
+    ))
 }
 
 fn parse_chars_range(input: &str) -> IResult<&str, (char, char)> {
@@ -496,6 +501,8 @@ fn verify_failure<I, E: ParseError<I>>(input: I) -> nom::Err<E> {
 mod tests {
     use super::*;
 
+    use std::assert_matches;
+
     macro_rules! assert_parse {
         ($input:expr, $ast:expr $(,)?) => {
             assert_eq!(Ok($ast), parse_node($input))
@@ -544,6 +551,7 @@ mod tests {
             (vec![('a', 'j')], "[a-cb-ea-fb-j]"),
             (vec![('a', 'a'), ('c', 'c')], "[ac]"),
             (vec![('0', '9'), ('A', 'Z'), ('_', '_'), ('a', 'z')], "\\w"),
+            (vec![('0', '9')], "[[:digit:]]"),
             (vec![('a', 'z')], "[[:lower:]]"),
             (
                 vec![('!', '/'), (':', '@'), ('[', '`'), ('{', '~')],
@@ -560,12 +568,19 @@ mod tests {
     }
 
     #[test]
-    fn test_chars_errors() {
+    fn test_chars_after_literal() {
         let chars = "\\w".parse().unwrap();
         assert_parse!(
             "a\\w",
             Node::List([Node::Literal("a".into()), chars].into())
         );
+    }
+
+    #[test]
+    fn test_posix_errors() {
+        assert_err!("[[:foo:]]", "[:foo:]]", Verify);
+        assert_err!("[[:Digit:]]", "[:Digit:]]", Verify);
+        assert_matches!(parse_node("[[:]"), Ok(Node::Chars(_)));
     }
 
     #[test]
