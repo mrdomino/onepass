@@ -1,3 +1,5 @@
+// Header {{{1
+
 use core::str::{FromStr, Utf8Error, from_utf8};
 
 use nom::{
@@ -30,6 +32,8 @@ enum Brace {
 }
 
 pub type Error = NomError<String>;
+
+// Expr {{{1
 
 impl Expr {
     /// Expressions can be parsed from UTF-8 strings.
@@ -160,6 +164,9 @@ impl Expr {
     }
 }
 
+// Node {{{1
+// Top {{{2
+
 impl FromStr for Node {
     type Err = Error;
 
@@ -210,6 +217,12 @@ fn parse_single(input: &str) -> IResult<&str, Node> {
     ))
     .parse(input)
 }
+
+fn parse_list(input: &str) -> IResult<&str, Node> {
+    braced(Brace::Paren, parse_node_inner).parse(input)
+}
+
+// Literals {{{2
 
 fn parse_literal(input: &str) -> IResult<&str, Box<str>> {
     map(
@@ -319,6 +332,8 @@ fn parse_hex_byte(input: &str) -> IResult<&str, u8> {
     .parse(input)
 }
 
+// Chars {{{2
+
 fn parse_chars(input: &str) -> IResult<&str, Chars> {
     alt((
         parse_legacy_words_err,
@@ -420,6 +435,8 @@ fn parse_chars_special(input: &str) -> IResult<&str, &'static [(char, char)]> {
     .parse(input)
 }
 
+// Generators {{{2
+
 fn parse_generator(input: &str) -> IResult<&str, Generator> {
     let verify_inner = peek(verify(anychar, |c| c.is_ascii_lowercase()));
     let parse_inner = map(
@@ -452,9 +469,7 @@ fn parse_generator_verbatim(input: &str) -> IResult<&str, &str> {
     verify(is_not("\\}"), |s: &str| !s.is_empty()).parse(input)
 }
 
-fn parse_list(input: &str) -> IResult<&str, Node> {
-    braced(Brace::Paren, parse_node_inner).parse(input)
-}
+// Utility {{{2
 
 fn braced<I, O, E, F>(brace: Brace, inner: F) -> impl Parser<I, Output = O, Error = E>
 where
@@ -474,6 +489,8 @@ where
 fn verify_failure<I, E: ParseError<I>>(input: I) -> nom::Err<E> {
     nom::Err::Failure(E::from_error_kind(input, ErrorKind::Verify))
 }
+
+// Tests {{{1
 
 #[cfg(test)]
 mod tests {
@@ -600,3 +617,6 @@ mod tests {
         assert_err!("a|test", "|test", Eof);
     }
 }
+
+// Coda
+// vim:fdm=marker
