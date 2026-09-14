@@ -640,6 +640,24 @@ mod tests {
     fn test_reserved() {
         assert_err!("a|test", "|test", Eof);
     }
+
+    #[test]
+    fn test_counts() {
+        fn extract_count(s: &str) -> Result<(u32, u32), NomError<&'_ str>> {
+            parse_node(s).map(|node| match node {
+                Node::Count(_, min, max) => (min, max),
+                _ => panic!(),
+            })
+        }
+        assert_matches!(extract_count("a{2,5}"), Ok((2, 5)));
+        assert_matches!(extract_count("a{,3}"), Ok((0, 3)));
+        assert_matches!(
+            extract_count(&format!("a{{{},{}}}", u32::MAX, u32::MAX)),
+            Ok((u32::MAX, u32::MAX))
+        );
+        assert_err!("a{5,2}", "{5,2}", Verify);
+        assert_err!("a{3,}", ",}", Char);
+    }
 }
 
 // Coda
