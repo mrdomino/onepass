@@ -629,6 +629,9 @@ mod tests {
         assert_err!("\\x80", "\\x80", Verify);
         assert_err!("\\xd0\\x00", "\\xd0\\x00", Verify);
         assert_err!("\\ud800", "\\ud800", Verify);
+        assert_err!("\\u{}", "\\u{}", TakeWhileMN);
+        assert_err!("\\u{za}", "\\u{za}", TakeWhileMN);
+        assert_err!("\\xza", "\\xza", Verify);
     }
 
     #[test]
