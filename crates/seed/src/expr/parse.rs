@@ -662,6 +662,37 @@ mod tests {
         assert_err!("a{5,2}", "{5,2}", Verify);
         assert_err!("a{3,}", ",}", Char);
     }
+
+    #[test]
+    fn test_misc() {
+        assert_parse!(
+            "{words:4:-:U}\\d",
+            Node::from_iter([
+                Node::Generator(Generator::new("words:4:-:U")),
+                Node::Chars(Chars::from_ranges([('0', '9')]))
+            ])
+        );
+        let node = Node::List(
+            [
+                Node::Chars(Chars::from_ranges([('a', 'z')])),
+                Node::Chars(Chars::from_ranges([('A', 'Z')])),
+                Node::Chars(Chars::from_ranges([('0', '9')])),
+                Node::Literal("!".into()),
+                Node::Count(
+                    Box::new(Node::Chars(Chars::from_ranges([
+                        ('0', '9'),
+                        ('A', 'Z'),
+                        ('_', '_'),
+                        ('a', 'z'),
+                    ]))),
+                    16,
+                    16,
+                ),
+            ]
+            .into(),
+        );
+        assert_parse!("[[:lower:]][[:upper:]][[:digit:]]!\\w{16}", node);
+    }
 }
 
 // Coda {{{1
