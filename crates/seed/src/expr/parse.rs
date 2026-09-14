@@ -160,6 +160,14 @@ impl Expr {
     }
 }
 
+impl FromStr for Node {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        parse_node(s).map_err(|e| Error::from_error_kind(e.input.to_string(), e.code))
+    }
+}
+
 /// Parse a [`Node`].
 ///
 /// This function is identical to [`Node::from_str`] (and [`Expr::parse`]) aside from the return
@@ -173,14 +181,6 @@ pub fn parse_node(input: &str) -> Result<Node, NomError<&'_ str>> {
 
 fn parse_node_inner(input: &str) -> IResult<&str, Node> {
     map(many1(parse_count), Node::from_iter).parse(input)
-}
-
-impl FromStr for Node {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        parse_node(s).map_err(|e| Error::from_error_kind(e.input.to_string(), e.code))
-    }
 }
 
 fn parse_count(input: &str) -> IResult<&str, Node> {
