@@ -501,8 +501,6 @@ fn verify_failure<I, E: ParseError<I>>(input: I) -> nom::Err<E> {
 mod tests {
     use super::*;
 
-    use std::assert_matches;
-
     macro_rules! assert_parse {
         ($input:expr, $ast:expr $(,)?) => {
             assert_eq!(Ok($ast), parse_node($input))
@@ -580,7 +578,10 @@ mod tests {
     fn test_posix_errors() {
         assert_err!("[[:foo:]]", "[:foo:]]", Verify);
         assert_err!("[[:Digit:]]", "[:Digit:]]", Verify);
-        assert_matches!(parse_node("[[:]"), Ok(Node::Chars(_)));
+        assert_parse!(
+            "[[:]",
+            Node::Chars(Chars::from_ranges([('[', '['), (':', ':')]))
+        );
     }
 
     #[test]
@@ -652,9 +653,9 @@ mod tests {
                 _ => panic!(),
             })
         }
-        assert_matches!(extract_count("a{2,5}"), Ok((2, 5)));
-        assert_matches!(extract_count("a{,3}"), Ok((0, 3)));
-        assert_matches!(
+        assert_eq!(extract_count("a{2,5}"), Ok((2, 5)));
+        assert_eq!(extract_count("a{,3}"), Ok((0, 3)));
+        assert_eq!(
             extract_count(&format!("a{{{},{}}}", u32::MAX, u32::MAX)),
             Ok((u32::MAX, u32::MAX))
         );
