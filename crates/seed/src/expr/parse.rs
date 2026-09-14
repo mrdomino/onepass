@@ -225,35 +225,11 @@ fn parse_list(input: &str) -> IResult<&str, Node> {
 // Literals {{{2
 
 fn parse_literal(input: &str) -> IResult<&str, Box<str>> {
-    map(
-        fold(
-            1..,
-            parse_literal_fragment,
-            String::new,
-            |mut string, fragment| {
-                match fragment {
-                    StringFragment::Escaped(c) => string.push(c),
-                    StringFragment::Verbatim(s) => string.push_str(s),
-                }
-                string
-            },
-        ),
-        Into::into,
-    )
-    .parse(input)
-}
-
-fn parse_literal_fragment(input: &str) -> IResult<&str, StringFragment<'_>> {
-    alt((
-        map(parse_literal_verbatim, StringFragment::Verbatim),
-        map(parse_literal_escaped, StringFragment::Escaped),
-    ))
-    .parse(input)
+    map(escaped_verbatim(parse_literal_verbatim), Into::into).parse(input)
 }
 
 fn parse_literal_verbatim(input: &str) -> IResult<&str, &str> {
-    let (input, res) = verify(is_not("\\[](){}|"), |s: &str| !s.is_empty()).parse(input)?;
-    Ok((input, res))
+    verify(is_not("\\[](){}|"), |s: &str| !s.is_empty()).parse(input)
 }
 
 fn parse_literal_escaped(input: &str) -> IResult<&str, char> {
@@ -272,6 +248,7 @@ fn parse_literal_escaped(input: &str) -> IResult<&str, char> {
         ),
     )))
     .parse(input)
+    // input should be start of escape
     .map_err(|e| e.map(|inner| NomError::from_error_kind(input, inner.code)))
 }
 
@@ -443,31 +420,9 @@ fn parse_chars_special(input: &str) -> IResult<&str, &'static [(char, char)]> {
 // Generators {{{2
 
 fn parse_generator(input: &str) -> IResult<&str, Generator> {
-    let verify_inner = peek(verify(anychar, |c| c.is_ascii_lowercase()));
-    let parse_inner = map(
-        fold(
-            1..,
-            parse_generator_fragment,
-            String::new,
-            |mut string, fragment| {
-                match fragment {
-                    StringFragment::Escaped(c) => string.push(c),
-                    StringFragment::Verbatim(s) => string.push_str(s),
-                }
-                string
-            },
-        ),
-        Generator::from,
-    );
-    braced(Brace::Curly, preceded(verify_inner, parse_inner)).parse(input)
-}
-
-fn parse_generator_fragment(input: &str) -> IResult<&str, StringFragment<'_>> {
-    alt((
-        map(parse_generator_verbatim, StringFragment::Verbatim),
-        map(parse_literal_escaped, StringFragment::Escaped),
-    ))
-    .parse(input)
+    let _ = peek((char('{'), verify(anychar, |c| c.is_ascii_lowercase()))).parse(input)?;
+    let inner = map(escaped_verbatim(parse_generator_verbatim), Generator::from);
+    braced(Brace::Curly, inner).parse(input)
 }
 
 fn parse_generator_verbatim(input: &str) -> IResult<&str, &str> {
@@ -489,6 +444,32 @@ where
         Brace::Square => ('[', ']'),
     };
     delimited(char(open), inner, cut(char(close)))
+}
+
+fn escaped_verbatim<'a, F>(
+    verbatim: F,
+) -> impl Parser<&'a str, Output = String, Error = NomError<&'a str>>
+where
+    F: Parser<&'a str, Output = &'a str, Error = NomError<&'a str>>,
+{
+    let fragment = |verbatim| {
+        alt((
+            map(verbatim, StringFragment::Verbatim),
+            map(parse_literal_escaped, StringFragment::Escaped),
+        ))
+    };
+    fold(
+        1..,
+        fragment(verbatim),
+        String::new,
+        |mut string, fragment| {
+            match fragment {
+                StringFragment::Escaped(c) => string.push(c),
+                StringFragment::Verbatim(s) => string.push_str(s),
+            }
+            string
+        },
+    )
 }
 
 fn verify_failure<I, E: ParseError<I>>(input: I) -> nom::Err<E> {
