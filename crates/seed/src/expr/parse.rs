@@ -660,5 +660,5 @@ mod tests {
     }
 }
 
-// Coda
+// Coda {{{1
 // vim:fdm=marker
