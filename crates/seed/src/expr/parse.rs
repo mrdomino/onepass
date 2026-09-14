@@ -211,7 +211,7 @@ fn parse_count(input: &str) -> IResult<&str, Node> {
 fn parse_single(input: &str) -> IResult<&str, Node> {
     alt((
         map(parse_chars, Node::Chars),
-        map(parse_literal, Node::Literal), // must come after parse_chars
+        map(parse_literal, Node::Literal),
         map(parse_generator, Node::Generator),
         parse_list,
     ))
@@ -257,7 +257,7 @@ fn parse_literal_verbatim(input: &str) -> IResult<&str, &str> {
 }
 
 fn parse_literal_escaped(input: &str) -> IResult<&str, char> {
-    let _ = peek(char('\\')).parse(input)?;
+    let _ = peek((char('\\'), is_not("dw"))).parse(input)?;
     cut(alt((
         parse_hex_char,
         parse_unicode_char,
@@ -557,6 +557,15 @@ mod tests {
                 Node::Chars(unsafe { Chars::from_ranges_unchecked(ranges) }),
             );
         }
+    }
+
+    #[test]
+    fn test_chars_errors() {
+        let chars = "\\w".parse().unwrap();
+        assert_parse!(
+            "a\\w",
+            Node::List([Node::Literal("a".into()), chars].into())
+        );
     }
 
     #[test]
