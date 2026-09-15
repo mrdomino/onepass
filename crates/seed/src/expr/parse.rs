@@ -276,11 +276,10 @@ fn parse_unicode_char(input: &str) -> IResult<&str, char> {
 fn parse_hex_char(input: &str) -> IResult<&str, char> {
     let (mut remaining, b) = parse_hex_byte(input)?;
     let size = b.leading_ones() as usize;
-    if size == 0 {
-        return Ok((remaining, b as char));
-    }
-    if size == 1 || size > 4 {
-        return Err(verify_failure(input));
+    match size {
+        0 => return Ok((remaining, b as char)),
+        1 | 5.. => return Err(verify_failure(input)),
+        2..=4 => (),
     }
     let mut bs = [0u8; 4];
     bs[0] = b;
