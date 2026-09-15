@@ -232,7 +232,7 @@ fn parse_literal_verbatim(input: &str) -> IResult<&str, &str> {
     verify(is_not("\\[](){}|"), |s: &str| !s.is_empty()).parse(input)
 }
 
-fn parse_literal_escaped(input: &str) -> IResult<&str, char> {
+fn parse_escape(input: &str) -> IResult<&str, char> {
     let _ = peek((char('\\'), is_not("dw"))).parse(input)?;
     cut(alt((
         parse_hex_char,
@@ -405,7 +405,7 @@ fn parse_chars_range(input: &str) -> IResult<&str, (char, char)> {
 }
 
 fn parse_chars_single(input: &str) -> IResult<&str, char> {
-    alt((none_of("\\]"), parse_literal_escaped)).parse(input)
+    alt((none_of("\\]"), parse_escape)).parse(input)
 }
 
 fn parse_chars_special(input: &str) -> IResult<&str, &'static [(char, char)]> {
@@ -451,15 +451,12 @@ fn escaped_verbatim<'a, F>(
 where
     F: Parser<&'a str, Output = &'a str, Error = NomError<&'a str>>,
 {
-    let fragment = |verbatim| {
-        alt((
-            map(verbatim, StringFragment::Verbatim),
-            map(parse_literal_escaped, StringFragment::Escaped),
-        ))
-    };
     fold(
         1..,
-        fragment(verbatim),
+        alt((
+            map(verbatim, StringFragment::Verbatim),
+            map(parse_escape, StringFragment::Escaped),
+        )),
         String::new,
         |mut string, fragment| {
             match fragment {
