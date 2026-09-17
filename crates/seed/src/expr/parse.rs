@@ -500,6 +500,7 @@ mod tests {
             r#"\\cats\tand\[dogs\]\{woof\}"#,
             Node::Literal("\\cats\tand[dogs]{woof}".into())
         );
+        assert_parse!("\\!", Node::Literal("!".into()));
     }
 
     #[test]
