@@ -476,6 +476,8 @@ fn verify_failure<I, E: ParseError<I>>(input: I) -> nom::Err<E> {
 
 #[cfg(test)]
 mod tests {
+    use crate::expr::CharRange;
+
     use super::*;
 
     macro_rules! assert_parse {
@@ -495,12 +497,12 @@ mod tests {
 
     #[test]
     fn test_literal() {
-        assert_parse!("cats", Node::Literal("cats".into()));
+        assert_parse!("cats", lit("cats"));
         assert_parse!(
             r#"\\cats\tand\[dogs\]\{woof\}"#,
-            Node::Literal("\\cats\tand[dogs]{woof}".into())
+            lit("\\cats\tand[dogs]{woof}")
         );
-        assert_parse!("\\!", Node::Literal("!".into()));
+        assert_parse!("\\!", lit("!"));
     }
 
     #[test]
@@ -510,12 +512,7 @@ mod tests {
 
     #[test]
     fn test_chars() {
-        assert_parse!(
-            "[A-Za-z0123-9]",
-            Node::Chars(unsafe {
-                Chars::from_ranges_unchecked([('0', '9'), ('A', 'Z'), ('a', 'z')])
-            }),
-        );
+        assert_parse!("[A-Za-z0123-9]", cs([('0', '9'), ('A', 'Z'), ('a', 'z')]));
         assert_err!("[z-a]", "z-a]", Verify);
     }
 
@@ -536,62 +533,33 @@ mod tests {
             (vec![('!', '~')], "[[:punct:]\\w]"),
         ];
         for (ranges, inp) in tests {
-            assert_parse!(
-                inp,
-                Node::Chars(unsafe { Chars::from_ranges_unchecked(ranges) }),
-            );
+            assert_parse!(inp, cs(ranges));
         }
     }
 
     #[test]
     fn test_chars_after_literal() {
         let chars = "\\w".parse().unwrap();
-        assert_parse!(
-            "a\\w",
-            Node::List([Node::Literal("a".into()), chars].into())
-        );
+        assert_parse!("a\\w", list([lit("a"), chars]));
     }
 
     #[test]
     fn test_posix_errors() {
         assert_err!("[[:foo:]]", "[:foo:]]", Verify);
         assert_err!("[[:Digit:]]", "[:Digit:]]", Verify);
-        assert_parse!(
-            "[[:]",
-            Node::Chars(Chars::from_ranges([('[', '['), (':', ':')]))
-        );
+        assert_parse!("[[:]", cs([(':', ':'), ('[', '[')]));
     }
 
     #[test]
     fn test_generators() {
-        assert_parse!(
-            "{word\\tup\\}}",
-            Node::Generator(Generator::new("word\tup}")),
-        );
+        assert_parse!("{word\\tup\\}}", gener("word\tup}"));
     }
 
     #[test]
     fn test_multi() {
         assert_parse!(
             "{word}(-{word}){4}",
-            Node::List(
-                vec![
-                    Node::Generator(Generator::new("word")),
-                    Node::Count(
-                        Node::List(
-                            vec![
-                                Node::Literal("-".into()),
-                                Node::Generator(Generator::new("word")),
-                            ]
-                            .into()
-                        )
-                        .into(),
-                        4,
-                        4
-                    ),
-                ]
-                .into()
-            ),
+            list([gener("word"), count(list([lit("-"), gener("word")]), 4, 4)])
         );
     }
 
@@ -602,9 +570,9 @@ mod tests {
 
     #[test]
     fn test_literal_digits() {
-        assert_parse!(r#"\xe2\x80\x94"#, Node::Literal("—".into()),);
-        assert_parse!("\\u2014", Node::Literal("—".into()));
-        assert_parse!("\\u{002014}", Node::Literal("—".into()));
+        assert_parse!(r#"\xe2\x80\x94"#, lit("—"));
+        assert_parse!("\\u2014", lit("—"));
+        assert_parse!("\\u{002014}", lit("—"));
         assert_err!("\\x80", "\\x80", Verify);
         assert_err!("\\xd0\\x00", "\\xd0\\x00", Verify);
         assert_err!("\\ud800", "\\ud800", Verify);
@@ -645,31 +613,32 @@ mod tests {
     fn test_misc() {
         assert_parse!(
             "{words:4:-:U}\\d",
-            Node::from_iter([
-                Node::Generator(Generator::new("words:4:-:U")),
-                Node::Chars(Chars::from_ranges([('0', '9')]))
-            ])
+            list([gener("words:4:-:U"), cs([('0', '9')])])
         );
-        let node = Node::List(
-            [
-                Node::Chars(Chars::from_ranges([('a', 'z')])),
-                Node::Chars(Chars::from_ranges([('A', 'Z')])),
-                Node::Chars(Chars::from_ranges([('0', '9')])),
-                Node::Literal("!".into()),
-                Node::Count(
-                    Box::new(Node::Chars(Chars::from_ranges([
-                        ('0', '9'),
-                        ('A', 'Z'),
-                        ('_', '_'),
-                        ('a', 'z'),
-                    ]))),
-                    16,
-                    16,
-                ),
-            ]
-            .into(),
-        );
+        let node = list([
+            cs([('a', 'z')]),
+            cs([('A', 'Z')]),
+            cs([('0', '9')]),
+            lit("!"),
+            count(cs([('0', '9'), ('A', 'Z'), ('_', '_'), ('a', 'z')]), 16, 16),
+        ]);
         assert_parse!("[[:lower:]][[:upper:]][[:digit:]]!\\w{16}", node);
+    }
+
+    fn lit<S: AsRef<str>>(s: S) -> Node {
+        Node::Literal(s.as_ref().into())
+    }
+    fn cs<T: Into<CharRange>, C: IntoIterator<Item = T>>(c: C) -> Node {
+        Node::Chars(unsafe { Chars::from_ranges_unchecked(c) })
+    }
+    fn list<N: IntoIterator<Item = Node>>(n: N) -> Node {
+        Node::List(n.into_iter().collect())
+    }
+    fn count(n: Node, a: u32, b: u32) -> Node {
+        Node::Count(Box::new(n), a, b)
+    }
+    fn gener<S: AsRef<str>>(g: S) -> Node {
+        Node::Generator(Generator::new(g.as_ref()))
     }
 }
 
