@@ -181,9 +181,14 @@ fn main() -> Result<()> {
     }
 
     let mut stdout = stdout();
-    let seed = seed_password::read(seed_keyring, args.confirm, rp_flags)?;
-    for site in &args.sites {
-        let res = gen_password_config(seed.expose_secret(), site, &config, &args, &context)?;
+    let mut seed = None;
+    for url in &args.sites {
+        // Check for schema validity before unlocking seed keyring.
+        let site = lookup_site(url, &config, &args, &context)?;
+        if seed.is_none() {
+            seed = Some(seed_password::read(seed_keyring, args.confirm, rp_flags)?);
+        }
+        let res = gen_password_config(seed.as_ref().unwrap().expose_secret(), &site, url, &args)?;
         stdout.write_all(res.expose_secret().as_bytes())?;
         if stdout.is_terminal() || args.sites.len() > 1 {
             writeln!(stdout)?;
@@ -217,14 +222,7 @@ fn read_words_str(args: &Args, config: &Config) -> Result<Option<Box<str>>> {
         .context("failed reading words file")
 }
 
-fn gen_password_config(
-    seed: &str,
-    url: &str,
-    config: &Config,
-    args: &Args,
-    context: &Context,
-) -> Result<SecretString> {
-    let site = lookup_site(url, config, args, context)?;
+fn gen_password_config(seed: &str, site: &Site, url: &str, args: &Args) -> Result<SecretString> {
     let size = site.expr.size();
     let salt = format!("{site}");
 
