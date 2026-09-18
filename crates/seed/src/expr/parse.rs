@@ -230,7 +230,7 @@ fn parse_literal(input: &str) -> IResult<&str, Box<str>> {
 }
 
 fn parse_literal_verbatim(input: &str) -> IResult<&str, &str> {
-    is_not("\\[](){}|").parse(input)
+    is_not("\\[](){}|\n\r\t").parse(input)
 }
 
 fn parse_escape(input: &str) -> IResult<&str, char> {
@@ -244,7 +244,7 @@ fn parse_escape(input: &str) -> IResult<&str, char> {
                 value('\n', char('n')),
                 value('\r', char('r')),
                 value('\t', char('t')),
-                verify(anychar, |&c| !c.is_ascii_alphanumeric()),
+                verify(none_of("\n\r\t"), |&c| !c.is_ascii_alphanumeric()),
             )),
         ),
     )))
@@ -403,7 +403,7 @@ fn parse_chars_range(input: &str) -> IResult<&str, (char, char)> {
 }
 
 fn parse_chars_single(input: &str) -> IResult<&str, char> {
-    alt((none_of("\\]"), parse_escape)).parse(input)
+    alt((none_of("\\]\n\r\t"), parse_escape)).parse(input)
 }
 
 fn parse_chars_special(input: &str) -> IResult<&str, &'static [(char, char)]> {
@@ -423,7 +423,7 @@ fn parse_generator(input: &str) -> IResult<&str, Generator> {
 }
 
 fn parse_generator_verbatim(input: &str) -> IResult<&str, &str> {
-    is_not("\\}").parse(input)
+    is_not("\\}\n\r\t").parse(input)
 }
 
 // Utility {{{2
@@ -621,6 +621,17 @@ mod tests {
             count(cs([('0', '9'), ('A', 'Z'), ('_', '_'), ('a', 'z')]), 16, 16),
         ]);
         assert_parse!("[[:lower:]][[:upper:]][[:digit:]]!\\w{16}", node);
+    }
+
+    #[test]
+    fn test_banned_whitespace() {
+        assert_err!("\n", "\n", Char);
+        assert_err!("\r", "\r", Char);
+        assert_err!("\t", "\t", Char);
+        assert_parse!("\\n", lit("\n"));
+        assert_parse!("\\r", lit("\r"));
+        assert_parse!("\\t", lit("\t"));
+        assert_parse!(" ", lit(" "));
     }
 
     fn lit<S: AsRef<str>>(s: S) -> Node {
