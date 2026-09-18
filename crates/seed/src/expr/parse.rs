@@ -169,7 +169,6 @@ impl Expr {
 
 impl FromStr for Node {
     type Err = Error;
-
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(parse_node(s)?)
     }
