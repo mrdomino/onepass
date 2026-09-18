@@ -230,7 +230,7 @@ fn parse_literal(input: &str) -> IResult<&str, Box<str>> {
 }
 
 fn parse_literal_verbatim(input: &str) -> IResult<&str, &str> {
-    verify(is_not("\\[](){}|"), |s: &str| !s.is_empty()).parse(input)
+    is_not("\\[](){}|").parse(input)
 }
 
 fn parse_escape(input: &str) -> IResult<&str, char> {
@@ -423,7 +423,7 @@ fn parse_generator(input: &str) -> IResult<&str, Generator> {
 }
 
 fn parse_generator_verbatim(input: &str) -> IResult<&str, &str> {
-    verify(is_not("\\}"), |s: &str| !s.is_empty()).parse(input)
+    is_not("\\}").parse(input)
 }
 
 // Utility {{{2
