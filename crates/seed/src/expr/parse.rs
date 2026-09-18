@@ -7,7 +7,7 @@ use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, take_while_m_n, take_while1},
     character::complete::{anychar, char, none_of, u32},
-    combinator::{all_consuming, cut, map, map_res, opt, peek, value, verify},
+    combinator::{all_consuming, cut, map, map_res, not, opt, peek, value, verify},
     error::{Error as NomError, ErrorKind, ParseError},
     multi::{fold, many1},
     sequence::{delimited, preceded, separated_pair},
@@ -191,21 +191,22 @@ fn parse_node_inner(input: &str) -> IResult<&str, Node> {
 }
 
 fn parse_count(input: &str) -> IResult<&str, Node> {
-    let (input, node) = parse_single(input)?;
-    let (remaining, count) = opt(braced(
-        Brace::Curly,
-        alt((
-            separated_pair(u32, char(','), u32),
-            map(u32, |n| (n, n)),
-            map(preceded(char(','), u32), |n| (0, n)),
+    let inner = (
+        parse_single,
+        opt(braced(
+            Brace::Curly,
+            alt((
+                verify(separated_pair(u32, char(','), u32), |&(a, b)| a <= b),
+                map(u32, |n| (n, n)),
+                map(preceded(char(','), u32), |n| (0, n)),
+            )),
         )),
-    ))
-    .parse(input)?;
-    match count {
-        None => Ok((remaining, node)),
-        Some((min, max)) if max >= min => Ok((remaining, Node::Count(Box::new(node), min, max))),
-        _ => Err(verify_failure(input)),
-    }
+    );
+    map(inner, |(node, count)| match count {
+        None => node,
+        Some((a, b)) => Node::Count(Box::new(node), a, b),
+    })
+    .parse(input)
 }
 
 fn parse_single(input: &str) -> IResult<&str, Node> {
@@ -253,24 +254,23 @@ fn parse_escape(input: &str) -> IResult<&str, char> {
 }
 
 fn parse_unicode_char(input: &str) -> IResult<&str, char> {
-    let (remaining, n) = preceded(
+    preceded(
         tag("\\u"),
-        map_res(
-            alt((
-                take_while_m_n(4, 4, |c: char| c.is_ascii_hexdigit()),
-                braced(
-                    Brace::Curly,
-                    take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit()),
-                ),
-            )),
-            |s| u32::from_str_radix(s, 16),
-        ),
+        cut(map_res(
+            map_res(
+                alt((
+                    take_while_m_n(4, 4, |c: char| c.is_ascii_hexdigit()),
+                    braced(
+                        Brace::Curly,
+                        take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit()),
+                    ),
+                )),
+                |s| u32::from_str_radix(s, 16),
+            ),
+            char::try_from,
+        )),
     )
-    .parse(input)?;
-    Ok((
-        remaining,
-        char::try_from(n).map_err(|_| verify_failure(input))?,
-    ))
+    .parse(input)
 }
 
 fn parse_hex_char(input: &str) -> IResult<&str, char> {
@@ -311,8 +311,8 @@ fn parse_hex_byte(input: &str) -> IResult<&str, u8> {
 // Chars {{{2
 
 fn parse_chars(input: &str) -> IResult<&str, Chars> {
+    let _ = parse_legacy_words_err(input)?;
     alt((
-        parse_legacy_words_err,
         parse_chars_brackets,
         map(parse_chars_special, |ps| {
             Chars::from_ranges(ps.iter().copied())
@@ -321,12 +321,8 @@ fn parse_chars(input: &str) -> IResult<&str, Chars> {
     .parse(input)
 }
 
-fn parse_legacy_words_err(input: &str) -> IResult<&str, Chars> {
-    let res = alt((tag("[:word:]"), tag("[:Word:]"))).parse(input);
-    match res {
-        Ok(_) => Err(verify_failure(input)),
-        Err(e) => Err(e),
-    }
+fn parse_legacy_words_err(input: &str) -> IResult<&str, ()> {
+    cut(not(alt((tag("[:word:]"), tag("[:Word:]"))))).parse(input)
 }
 
 fn parse_chars_brackets(input: &str) -> IResult<&str, Chars> {
@@ -338,6 +334,7 @@ fn parse_chars_brackets(input: &str) -> IResult<&str, Chars> {
                 alt((
                     map(parse_chars_posix, CharFragment::Multi),
                     map(parse_chars_special, CharFragment::Multi),
+                    // must come last
                     map(parse_chars_range, CharFragment::Single),
                 )),
                 Vec::new,
@@ -389,19 +386,20 @@ fn parse_chars_posix(input: &str) -> IResult<&str, &'static [(char, char)]> {
 }
 
 fn parse_chars_range(input: &str) -> IResult<&str, (char, char)> {
-    if let (remaining, Some((a, b))) = opt(separated_pair(
-        parse_chars_single,
-        char('-'),
-        parse_chars_single,
-    ))
-    .parse(input)?
-    {
-        if a <= b {
-            return Ok((remaining, (a, b)));
-        }
-        return Err(verify_failure(input));
-    }
-    map(parse_chars_single, |c| (c, c)).parse(input)
+    preceded(
+        peek(not(char(']'))),
+        map(
+            cut(verify(
+                (
+                    parse_chars_single,
+                    opt(preceded(char('-'), parse_chars_single)),
+                ),
+                |&(a, b)| b.is_none_or(|b| a <= b),
+            )),
+            |(a, b)| (a, b.unwrap_or(a)),
+        ),
+    )
+    .parse(input)
 }
 
 fn parse_chars_single(input: &str) -> IResult<&str, char> {
@@ -565,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_legacy_words_err() {
-        assert_err!("[:word:]", "[:word:]", Verify);
+        assert_err!("[:word:]", "[:word:]", Not);
     }
 
     #[test]
@@ -575,9 +573,9 @@ mod tests {
         assert_parse!("\\u{002014}", lit("—"));
         assert_err!("\\x80", "\\x80", Verify);
         assert_err!("\\xd0\\x00", "\\xd0\\x00", Verify);
-        assert_err!("\\ud800", "\\ud800", Verify);
-        assert_err!("\\u{}", "\\u{}", Verify);
-        assert_err!("\\u{za}", "\\u{za}", Verify);
+        assert_err!("\\ud800", "\\ud800", MapRes);
+        assert_err!("\\u{}", "\\u{}", TakeWhileMN);
+        assert_err!("\\u{za}", "\\u{za}", TakeWhileMN);
         assert_err!("\\xza", "\\xza", Verify);
     }
 
@@ -605,7 +603,7 @@ mod tests {
             extract_count(&format!("a{{{},{}}}", u32::MAX, u32::MAX)),
             Ok((u32::MAX, u32::MAX))
         );
-        assert_err!("a{5,2}", "{5,2}", Verify);
+        assert_err!("a{5,2}", ",2}", Char);
         assert_err!("a{3,}", ",}", Char);
     }
 
