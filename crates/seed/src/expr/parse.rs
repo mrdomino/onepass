@@ -171,7 +171,7 @@ impl FromStr for Node {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        parse_node(s).map_err(|e| Error::from_error_kind(e.input.to_string(), e.code))
+        Ok(parse_node(s)?)
     }
 }
 
