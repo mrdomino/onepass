@@ -1,14 +1,16 @@
 // Header {{{1
 
-use core::str::{FromStr, Utf8Error, from_utf8};
+use core::str::{FromStr, from_utf8};
 
 use nom::{
     AsChar, Finish, IResult, Input, Parser,
     branch::alt,
     bytes::complete::{is_not, tag, take_while_m_n, take_while1},
     character::complete::{anychar, char, none_of, u32},
-    combinator::{all_consuming, cut, map, map_res, not, opt, peek, value, verify},
-    error::{Error as NomError, ErrorKind, ParseError},
+    combinator::{
+        all_consuming, cut, fail, map, map_opt, map_res, not, opt, peek, success, value, verify,
+    },
+    error::{Error as NomError, ParseError},
     multi::{fold, many1},
     sequence::{delimited, preceded, separated_pair},
 };
@@ -248,8 +250,6 @@ fn parse_escape(input: &str) -> IResult<&str, char> {
         ),
     )))
     .parse(input)
-    // input should be start of escape
-    .map_err(|e| e.map(|inner| NomError::from_error_kind(input, inner.code)))
 }
 
 fn parse_unicode_char(input: &str) -> IResult<&str, char> {
@@ -277,7 +277,7 @@ fn parse_hex_char(input: &str) -> IResult<&str, char> {
     let size = b.leading_ones() as usize;
     match size {
         0 => return Ok((remaining, b as char)),
-        1 | 5.. => return Err(verify_failure(input)),
+        1 | 5.. => return cut(fail()).parse(input),
         2..=4 => (),
     }
     let mut bs = [0u8; 4];
@@ -285,16 +285,11 @@ fn parse_hex_char(input: &str) -> IResult<&str, char> {
     for slot in &mut bs[1..size] {
         (remaining, *slot) = cut(parse_hex_byte).parse(remaining)?;
     }
-    let c = str_to_char(&bs[..size]).map_err(|_| verify_failure(input))?;
+    let (_, c) = cut(map_opt(success(()), |()| {
+        from_utf8(&bs[..size]).ok().and_then(|s| s.chars().next())
+    }))
+    .parse(input)?;
     Ok((remaining, c))
-}
-
-fn str_to_char(bs: &[u8]) -> Result<char, Utf8Error> {
-    let s = from_utf8(bs)?;
-    let mut iter = s.chars();
-    let c = iter.next().expect(s);
-    assert!(iter.next().is_none());
-    Ok(c)
 }
 
 fn parse_hex_byte(input: &str) -> IResult<&str, u8> {
@@ -379,7 +374,7 @@ fn parse_chars_posix(input: &str) -> IResult<&str, &'static [(char, char)]> {
             "xdigit" => XDIGIT,
             "punct" => PUNCT,
             "print" => PRINT,
-            _ => return Err(verify_failure(input)),
+            _ => return cut(fail()).parse(input),
         },
     ))
 }
@@ -465,14 +460,12 @@ where
     )
 }
 
-fn verify_failure<I, E: ParseError<I>>(input: I) -> nom::Err<E> {
-    nom::Err::Failure(E::from_error_kind(input, ErrorKind::Verify))
-}
-
 // Tests {{{1
 
 #[cfg(test)]
 mod tests {
+    use nom::error::ErrorKind;
+
     use crate::expr::CharRange;
 
     use super::*;
@@ -504,7 +497,7 @@ mod tests {
 
     #[test]
     fn test_bad_escape() {
-        assert_err!("\\a", "\\a", Verify);
+        assert_err!("\\a", "a", Verify);
     }
 
     #[test]
@@ -542,8 +535,8 @@ mod tests {
 
     #[test]
     fn test_posix_errors() {
-        assert_err!("[[:foo:]]", "[:foo:]]", Verify);
-        assert_err!("[[:Digit:]]", "[:Digit:]]", Verify);
+        assert_err!("[[:foo:]]", "[:foo:]]", Fail);
+        assert_err!("[[:Digit:]]", "[:Digit:]]", Fail);
         assert_parse!("[[:]", cs([(':', ':'), ('[', '[')]));
     }
 
@@ -570,12 +563,14 @@ mod tests {
         assert_parse!(r#"\xe2\x80\x94"#, lit("—"));
         assert_parse!("\\u2014", lit("—"));
         assert_parse!("\\u{002014}", lit("—"));
-        assert_err!("\\x80", "\\x80", Verify);
-        assert_err!("\\xd0\\x00", "\\xd0\\x00", Verify);
-        assert_err!("\\ud800", "\\ud800", MapRes);
-        assert_err!("\\u{}", "\\u{}", TakeWhileMN);
-        assert_err!("\\u{za}", "\\u{za}", TakeWhileMN);
-        assert_err!("\\xza", "\\xza", Verify);
+        assert_parse!("\\x0a", lit("\n"));
+        assert_err!("\\x80", "\\x80", Fail);
+        assert_err!("\\xd0a", "a", Tag);
+        assert_err!("\\xd0\\x00", "\\xd0\\x00", MapOpt);
+        assert_err!("\\ud800", "d800", MapRes);
+        assert_err!("\\u{}", "}", TakeWhileMN);
+        assert_err!("\\u{za}", "za}", TakeWhileMN);
+        assert_err!("\\xza", "xza", Verify);
     }
 
     #[test]
