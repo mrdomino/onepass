@@ -295,9 +295,10 @@ fn parse_hex_char(input: &str) -> IResult<&str, char> {
 fn parse_hex_byte(input: &str) -> IResult<&str, u8> {
     preceded(
         tag("\\x"),
-        map_res(take_while_m_n(2, 2, |c: char| c.is_ascii_hexdigit()), |s| {
-            u8::from_str_radix(s, 16)
-        }),
+        cut(map_res(
+            take_while_m_n(2, 2, |c: char| c.is_ascii_hexdigit()),
+            |s| u8::from_str_radix(s, 16),
+        )),
     )
     .parse(input)
 }
@@ -570,7 +571,7 @@ mod tests {
         assert_err!("\\ud800", "d800", MapRes);
         assert_err!("\\u{}", "}", TakeWhileMN);
         assert_err!("\\u{za}", "za}", TakeWhileMN);
-        assert_err!("\\xza", "xza", Verify);
+        assert_err!("\\xza", "za", TakeWhileMN);
     }
 
     #[test]
