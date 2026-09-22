@@ -83,6 +83,18 @@ impl Expr {
     /// assert_eq!("[A-Za-z0-9_]".parse::<Node>().unwrap(), "\\w".parse().unwrap());
     /// ```
     ///
+    /// In many regex languages, it is possible to write a negated character class by preceding a
+    /// square bracket range with a caret, like: `[^a-z]` to mean “not lowercase ASCII letters.”
+    /// Onepass expressions do not support this form of negation, but because the syntax is so
+    /// common, a caret at the beginning of a square bracket class that contains other characters is
+    /// rejected:
+    ///
+    /// ```
+    /// # use {onepass_seed::expr::Node, core::str::FromStr};
+    /// assert!("[^a-z]".parse::<Node>().is_err());
+    /// assert!("[a-z^]".parse::<Node>().is_ok());
+    /// ```
+    ///
     /// # Lists
     /// A sequence of nodes is represented by its concatenation. A nested list may be created using
     /// parentheses (`()`). This is of limited utility since the language does not support choices,
@@ -306,29 +318,31 @@ fn parse_legacy_words_err(input: &str) -> IResult<&str, ()> {
 }
 
 fn parse_chars_brackets(input: &str) -> IResult<&str, Chars> {
-    braced(
-        Brace::Square,
-        map(
-            fold(
-                1..,
-                alt((
-                    map(parse_chars_posix, CharFragment::Multi),
-                    map(parse_chars_special, CharFragment::Multi),
-                    // must come last
-                    map(parse_chars_range, CharFragment::Single),
-                )),
-                Vec::new,
-                |mut chars, fragment| {
-                    match fragment {
-                        CharFragment::Single(p) => chars.push(p),
-                        CharFragment::Multi(ps) => chars.extend(ps),
-                    }
-                    chars
-                },
-            ),
-            Chars::from_ranges,
+    let inner = map(
+        fold(
+            1..,
+            alt((
+                map(parse_chars_posix, CharFragment::Multi),
+                map(parse_chars_special, CharFragment::Multi),
+                // must come last
+                map(parse_chars_range, CharFragment::Single),
+            )),
+            Vec::new,
+            |mut chars, fragment| {
+                match fragment {
+                    CharFragment::Single(p) => chars.push(p),
+                    CharFragment::Multi(ps) => chars.extend(ps),
+                }
+                chars
+            },
         ),
-    )
+        Chars::from_ranges,
+    );
+    let no_caret = preceded(char('['), cut(not(char('^'))));
+    alt((
+        map(tag("[^]"), |_| Chars::from_ranges([('^', '^')])),
+        preceded(peek(no_caret), braced(Brace::Square, inner)),
+    ))
     .parse(input)
 }
 
@@ -604,6 +618,14 @@ mod tests {
         assert_parse!("\\r", lit("\r"));
         assert_parse!("\\t", lit("\t"));
         assert_parse!(" ", lit(" "));
+    }
+
+    #[test]
+    fn test_caret() {
+        assert_parse!("[^]", cs([('^', '^')]));
+        assert_err!("[^a-z]", "^a-z]", Not);
+        assert_parse!("[\\^a-z]", cs([('^', '^'), ('a', 'z')]));
+        assert_parse!("[a-z^]", cs([('^', '^'), ('a', 'z')]));
     }
 
     fn lit<S: AsRef<str>>(s: S) -> Node {
