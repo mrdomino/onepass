@@ -68,29 +68,26 @@ impl Chars {
             fmt_charclass(w, r)?;
         } else if let Some(mut r) = rest.next_if(|r| r.start == '^') {
             if r.size() == 2 {
-                w.write_str("_^")?;
+                write!(w, "_^")?;
             } else if r.size() == 3 {
-                w.write_str("_^`")?;
+                write!(w, "_^`")?;
             } else if let Some(q) = rest.next() {
                 fmt_charclass(w, &q)?;
                 fmt_charclass(w, &r)?;
             } else if r.end != '^' {
                 r.start = next_char(r.start).unwrap();
                 fmt_charclass(w, &r)?;
-                w.write_char('^')?;
+                write!(w, "^")?;
             } else if let Some(q) = end_hyphen.as_mut() {
                 write_escape(w, q.start)?;
                 q.start = next_char(q.start).unwrap();
                 fmt_charclass(w, &r)?;
             } else {
                 // A plain `^` is also accepted here at parse.
-                w.write_str("\\^")?;
+                write!(w, "\\^")?;
             }
         }
-        for r in rest {
-            fmt_charclass(w, &r)?;
-        }
-        if let Some(r) = end_hyphen {
+        for r in rest.chain(end_hyphen) {
             fmt_charclass(w, &r)?;
         }
         write!(w, "]")?;
