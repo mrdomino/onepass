@@ -66,7 +66,7 @@ impl Chars {
         write!(w, "[")?;
         if let Some(r) = start_hyphen {
             fmt_charclass(w, r)?;
-        } else if let Some(mut r) = rest.next_if(|r| r.start == '^') {
+        } else if let Some(r) = rest.next_if(|r| r.start == '^') {
             if r.size() == 2 {
                 write!(w, "_^")?;
             } else if r.size() == 3 {
@@ -75,8 +75,7 @@ impl Chars {
                 fmt_charclass(w, &q)?;
                 fmt_charclass(w, &r)?;
             } else if r.end != '^' {
-                r.start = next_char(r.start).unwrap();
-                fmt_charclass(w, &r)?;
+                fmt_charclass(w, &CharRange::from(('_', r.end)))?;
                 write!(w, "^")?;
             } else if let Some(q) = end_hyphen.as_mut() {
                 write_escape(w, q.start)?;
