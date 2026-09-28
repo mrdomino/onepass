@@ -192,17 +192,12 @@ fn parse_node_inner(input: &str) -> IResult<&str, Node> {
 }
 
 fn parse_count(input: &str) -> IResult<&str, Node> {
-    let inner = (
-        parse_single,
-        opt(braced(
-            Brace::Curly,
-            alt((
-                verify(separated_pair(u32, char(','), u32), |&(a, b)| a <= b),
-                map(u32, |n| (n, n)),
-                map(preceded(char(','), u32), |n| (0, n)),
-            )),
-        )),
-    );
+    let inner = alt((
+        verify(separated_pair(u32, char(','), u32), |&(a, b)| a <= b),
+        map(u32, |n| (n, n)),
+        map(preceded(char(','), u32), |n| (0, n)),
+    ));
+    let inner = (parse_single, opt(braced(Brace::Curly, inner)));
     map(inner, |(node, count)| match count {
         None => node,
         Some((a, b)) => Node::Count(Box::new(node), a, b),
@@ -236,36 +231,27 @@ fn parse_literal_verbatim(input: &str) -> IResult<&str, &str> {
 
 fn parse_escape(input: &str) -> IResult<&str, char> {
     let _ = peek((char('\\'), is_not("dw"))).parse(input)?;
+    let special = alt((
+        value('\n', char('n')),
+        value('\r', char('r')),
+        value('\t', char('t')),
+        verify(none_of("\n\r\t"), |c| !c.is_ascii_alphanumeric()),
+    ));
     cut(alt((
         parse_hex_char,
         parse_unicode_char,
-        preceded(
-            char('\\'),
-            alt((
-                value('\n', char('n')),
-                value('\r', char('r')),
-                value('\t', char('t')),
-                verify(none_of("\n\r\t"), |&c| !c.is_ascii_alphanumeric()),
-            )),
-        ),
+        preceded(char('\\'), special),
     )))
     .parse(input)
 }
 
 fn parse_unicode_char(input: &str) -> IResult<&str, char> {
+    let hex_range = |a, b| take_while_m_n(a, b, |c: char| c.is_ascii_hexdigit());
+    let inner = alt((hex_range(4, 4), braced(Brace::Curly, hex_range(1, 6))));
     preceded(
         tag("\\u"),
         cut(map_res(
-            map_res(
-                alt((
-                    take_while_m_n(4, 4, |c: char| c.is_ascii_hexdigit()),
-                    braced(
-                        Brace::Curly,
-                        take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit()),
-                    ),
-                )),
-                |s| u32::from_str_radix(s, 16),
-            ),
+            map_res(inner, |s| u32::from_str_radix(s, 16)),
             char::try_from,
         )),
     )
@@ -280,8 +266,7 @@ fn parse_hex_char(input: &str) -> IResult<&str, char> {
         1 | 5.. => return cut(fail()).parse(input),
         2..=4 => (),
     }
-    let mut bs = [0u8; 4];
-    bs[0] = b;
+    let mut bs = [b, 0, 0, 0];
     for slot in &mut bs[1..size] {
         (remaining, *slot) = cut(parse_hex_byte).parse(remaining)?;
     }
@@ -381,20 +366,15 @@ fn parse_chars_posix(input: &str) -> IResult<&str, &'static [(char, char)]> {
 }
 
 fn parse_chars_range(input: &str) -> IResult<&str, (char, char)> {
-    preceded(
-        peek(not(char(']'))),
-        map(
-            cut(verify(
-                (
-                    parse_chars_single,
-                    opt(preceded(char('-'), parse_chars_single)),
-                ),
-                |&(a, b)| b.is_none_or(|b| a <= b),
-            )),
-            |(a, b)| (a, b.unwrap_or(a)),
-        ),
-    )
-    .parse(input)
+    let inner = (
+        parse_chars_single,
+        opt(preceded(char('-'), parse_chars_single)),
+    );
+    let inner = map(
+        cut(verify(inner, |&(a, b)| b.is_none_or(|b| a <= b))),
+        |(a, b)| (a, b.unwrap_or(a)),
+    );
+    preceded(peek(not(char(']'))), inner).parse(input)
 }
 
 fn parse_chars_single(input: &str) -> IResult<&str, char> {
@@ -402,11 +382,8 @@ fn parse_chars_single(input: &str) -> IResult<&str, char> {
 }
 
 fn parse_chars_special(input: &str) -> IResult<&str, &'static [(char, char)]> {
-    preceded(
-        char('\\'),
-        alt((value(WORD, char('w')), value(DIGIT, char('d')))),
-    )
-    .parse(input)
+    let inner = alt((value(WORD, char('w')), value(DIGIT, char('d'))));
+    preceded(char('\\'), inner).parse(input)
 }
 
 // Generators {{{2
