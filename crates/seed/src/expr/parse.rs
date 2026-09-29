@@ -318,26 +318,19 @@ fn parse_legacy_words_err(input: &str) -> IResult<&str, ()> {
 }
 
 fn parse_chars_brackets(input: &str) -> IResult<&str, Chars> {
-    let inner = map(
-        fold(
-            1..,
-            alt((
-                map(parse_chars_posix, CharFragment::Multi),
-                map(parse_chars_special, CharFragment::Multi),
-                // must come last
-                map(parse_chars_range, CharFragment::Single),
-            )),
-            Vec::new,
-            |mut chars, fragment| {
-                match fragment {
-                    CharFragment::Single(p) => chars.push(p),
-                    CharFragment::Multi(ps) => chars.extend(ps),
-                }
-                chars
-            },
-        ),
-        Chars::from_ranges,
-    );
+    let choice = alt((
+        map(parse_chars_posix, CharFragment::Multi),
+        map(parse_chars_special, CharFragment::Multi),
+        map(parse_chars_range, CharFragment::Single), // must come last
+    ));
+    let reduce = |mut chars: Vec<(char, char)>, fragment| {
+        match fragment {
+            CharFragment::Single(p) => chars.push(p),
+            CharFragment::Multi(ps) => chars.extend(ps),
+        }
+        chars
+    };
+    let inner = map(fold(1.., choice, Vec::new, reduce), Chars::from_ranges);
     let no_caret = preceded(char('['), cut(not(char('^'))));
     alt((
         map(tag("[^]"), |_| Chars::from_ranges([('^', '^')])),
@@ -435,21 +428,18 @@ fn escaped_verbatim<'a, F>(
 where
     F: Parser<&'a str, Output = &'a str, Error = NomError<&'a str>>,
 {
-    fold(
-        1..,
-        alt((
-            map(verbatim, StringFragment::Verbatim),
-            map(parse_escape, StringFragment::Escaped),
-        )),
-        String::new,
-        |mut string, fragment| {
-            match fragment {
-                StringFragment::Escaped(c) => string.push(c),
-                StringFragment::Verbatim(s) => string.push_str(s),
-            }
-            string
-        },
-    )
+    let alt = alt((
+        map(verbatim, StringFragment::Verbatim),
+        map(parse_escape, StringFragment::Escaped),
+    ));
+    let reduce = |mut string: String, fragment| {
+        match fragment {
+            StringFragment::Escaped(c) => string.push(c),
+            StringFragment::Verbatim(s) => string.push_str(s),
+        }
+        string
+    };
+    fold(1.., alt, String::new, reduce)
 }
 
 // Tests {{{1
