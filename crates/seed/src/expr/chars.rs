@@ -37,7 +37,10 @@ impl Chars {
         V: IntoIterator<Item = T>,
         T: Into<CharRange>,
     {
-        let mut ranges = ranges.into_iter().map(Into::into).collect::<Vec<_>>();
+        Self::from_vec(ranges.into_iter().map(Into::into).collect())
+    }
+
+    fn from_vec(mut ranges: Vec<CharRange>) -> Self {
         ranges.sort_unstable_by_key(|a| a.start);
         let mut i = 0;
         let mut j = 1;
