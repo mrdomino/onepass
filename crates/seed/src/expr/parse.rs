@@ -468,6 +468,7 @@ mod tests {
     fn test_chars() {
         assert_parse("[A-Za-z0123-9]", cs([('0', '9'), ('A', 'Z'), ('a', 'z')]));
         assert_err!("[z-a]", "z-a]", Verify);
+        assert_err!("[]", "[]", Char);
     }
 
     #[test]

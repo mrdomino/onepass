@@ -59,12 +59,12 @@ impl Chars {
             i += 1;
             j += 1;
         }
-        ranges.drain(i + 1..);
+        ranges.truncate(i + 1);
         Chars(ranges.into())
     }
 
     fn size(&self) -> u32 {
-        self.0.iter().map(|range| range.size()).sum()
+        max(1, self.0.iter().map(|range| range.size()).sum())
     }
 
     fn nth(&self, mut n: u32) -> char {
@@ -162,5 +162,11 @@ mod tests {
     #[test]
     fn test_next_char_boundary() {
         assert_eq!(Some('\u{e000}'), next_char('\u{d7ff}'));
+    }
+
+    #[test]
+    fn test_empty() {
+        let rs = Chars::from_ranges::<CharRange, [_; 0]>([]);
+        assert_eq!(NonZero::ONE, Eval::size(&rs));
     }
 }
