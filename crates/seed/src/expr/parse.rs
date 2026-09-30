@@ -435,10 +435,9 @@ mod tests {
 
     use super::*;
 
-    macro_rules! assert_parse {
-        ($input:expr, $ast:expr $(,)?) => {
-            assert_eq!(Ok($ast), parse_node($input))
-        };
+    #[track_caller]
+    fn assert_parse(input: &str, want: Node) {
+        assert_eq!(Ok(want), parse_node(input), "{input}");
     }
 
     macro_rules! assert_err {
@@ -452,12 +451,12 @@ mod tests {
 
     #[test]
     fn test_literal() {
-        assert_parse!("cats", lit("cats"));
-        assert_parse!(
+        assert_parse("cats", lit("cats"));
+        assert_parse(
             r#"\\cats\tand\[dogs\]\{woof\}"#,
-            lit("\\cats\tand[dogs]{woof}")
+            lit("\\cats\tand[dogs]{woof}"),
         );
-        assert_parse!("\\!", lit("!"));
+        assert_parse("\\!", lit("!"));
     }
 
     #[test]
@@ -467,7 +466,7 @@ mod tests {
 
     #[test]
     fn test_chars() {
-        assert_parse!("[A-Za-z0123-9]", cs([('0', '9'), ('A', 'Z'), ('a', 'z')]));
+        assert_parse("[A-Za-z0123-9]", cs([('0', '9'), ('A', 'Z'), ('a', 'z')]));
         assert_err!("[z-a]", "z-a]", Verify);
     }
 
@@ -488,33 +487,33 @@ mod tests {
             (vec![('!', '~')], "[[:punct:]\\w]"),
         ];
         for (ranges, inp) in tests {
-            assert_parse!(inp, cs(ranges));
+            assert_parse(inp, cs(ranges));
         }
     }
 
     #[test]
     fn test_chars_after_literal() {
         let chars = "\\w".parse().unwrap();
-        assert_parse!("a\\w", list([lit("a"), chars]));
+        assert_parse("a\\w", list([lit("a"), chars]));
     }
 
     #[test]
     fn test_posix_errors() {
         assert_err!("[[:foo:]]", "[:foo:]]", Fail);
         assert_err!("[[:Digit:]]", "[:Digit:]]", Fail);
-        assert_parse!("[[:]", cs([(':', ':'), ('[', '[')]));
+        assert_parse("[[:]", cs([(':', ':'), ('[', '[')]));
     }
 
     #[test]
     fn test_generators() {
-        assert_parse!("{word\\tup\\}}", gener("word\tup}"));
+        assert_parse("{word\\tup\\}}", gener("word\tup}"));
     }
 
     #[test]
     fn test_multi() {
-        assert_parse!(
+        assert_parse(
             "{word}(-{word}){4}",
-            list([gener("word"), count(list([lit("-"), gener("word")]), 4, 4)])
+            list([gener("word"), count(list([lit("-"), gener("word")]), 4, 4)]),
         );
     }
 
@@ -525,10 +524,10 @@ mod tests {
 
     #[test]
     fn test_literal_digits() {
-        assert_parse!(r#"\xe2\x80\x94"#, lit("—"));
-        assert_parse!("\\u2014", lit("—"));
-        assert_parse!("\\u{002014}", lit("—"));
-        assert_parse!("\\x0a", lit("\n"));
+        assert_parse(r#"\xe2\x80\x94"#, lit("—"));
+        assert_parse("\\u2014", lit("—"));
+        assert_parse("\\u{002014}", lit("—"));
+        assert_parse("\\x0a", lit("\n"));
         assert_err!("\\x80", "\\x80", Fail);
         assert_err!("\\xd0a", "a", Tag);
         assert_err!("\\xd0\\x00", "\\xd0\\x00", MapOpt);
@@ -568,9 +567,9 @@ mod tests {
 
     #[test]
     fn test_misc() {
-        assert_parse!(
+        assert_parse(
             "{words:4:-:U}\\d",
-            list([gener("words:4:-:U"), cs([('0', '9')])])
+            list([gener("words:4:-:U"), cs([('0', '9')])]),
         );
         let node = list([
             cs([('a', 'z')]),
@@ -579,7 +578,7 @@ mod tests {
             lit("!"),
             count(cs([('0', '9'), ('A', 'Z'), ('_', '_'), ('a', 'z')]), 16, 16),
         ]);
-        assert_parse!("[[:lower:]][[:upper:]][[:digit:]]!\\w{16}", node);
+        assert_parse("[[:lower:]][[:upper:]][[:digit:]]!\\w{16}", node);
     }
 
     #[test]
@@ -587,10 +586,10 @@ mod tests {
         assert_err!("\n", "\n", Char);
         assert_err!("\r", "\r", Char);
         assert_err!("\t", "\t", Char);
-        assert_parse!("\\n", lit("\n"));
-        assert_parse!("\\r", lit("\r"));
-        assert_parse!("\\t", lit("\t"));
-        assert_parse!(" ", lit(" "));
+        assert_parse("\\n", lit("\n"));
+        assert_parse("\\r", lit("\r"));
+        assert_parse("\\t", lit("\t"));
+        assert_parse(" ", lit(" "));
     }
 
     fn lit<S: AsRef<str>>(s: S) -> Node {
