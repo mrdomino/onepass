@@ -1,7 +1,7 @@
 use core::iter::once;
 use std::io::{Result, Write};
 
-use crypto_bigint::{CheckedSub, NonZero, One, U256, Word};
+use crypto_bigint::{NonZero, One, U64, U256, U512, Word};
 use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
 
 use super::{
@@ -43,29 +43,28 @@ impl EvalContext for Node {
             }
 
             Node::Count(ref node, min, max) => {
-                let (min, max) = (min as u64, max as u64);
+                assert!(min <= max);
                 let n = node.size(context);
-                if n.is_one().into() {
-                    return NonZero::new((max - min + 1).into()).unwrap();
+                if bool::from(n.is_one()) {
+                    return NonZero::new(U256::from(max - min) + U256::ONE).unwrap();
                 }
                 // Closed form of n^k + … + n^l
                 //              = n^k (1 + … + n^(l-k))
                 //              = n^k (n^(l-k+1) - 1) / (n - 1)
                 //              = (n^(l+1) - n^k) / (n - 1)
-                let k = min;
-                let l = max;
-                let mut x = U256::ZERO;
-                u256_saturating_pow(&n, l + 1, &mut x);
-                let mut y = U256::ZERO;
-                u256_saturating_pow(&n, k, &mut y);
-                if x == U256::MAX && y == U256::MAX {
-                    // Assume we got an overflow.
+                let (k, l) = (U64::from(min), U64::from(max));
+                let n_wide: U512 = n.resize();
+                let Some(x) = n_wide.checked_pow(&(l + U64::ONE)).into_option() else {
+                    return NonZero::MAX;
+                };
+                let y = n_wide.checked_pow(&k).unwrap();
+                let d = NonZero::new(n_wide - U512::ONE).unwrap();
+                let (q, rem) = (x - y).div_rem(&d);
+                debug_assert!(bool::from(rem.is_zero()));
+                if q.bits_vartime() > U256::BITS {
                     return NonZero::MAX;
                 }
-                x = x.checked_sub(&y).unwrap();
-                let (x, rem) = x.div_rem(&NonZero::new(n.saturating_sub(&U256::ONE)).unwrap());
-                assert!(bool::from(rem.is_zero()));
-                NonZero::new(x).unwrap()
+                NonZero::new(q.resize()).unwrap()
             }
 
             Node::Generator(ref generator) => generator.size(context),
@@ -244,6 +243,19 @@ mod tests {
         let context = Context::empty();
         let count = Node::Count(Box::new(Node::Literal("a".into())), 0, u32::MAX);
         assert_eq!(U256::from_u64(1 << 32), *count.size(&context));
+
+        let count = Node::Count(Box::new(Chars::from_ranges([('a', 'd')]).into()), 0, 127);
+        let n = U512::from_word(4)
+            .checked_pow(&U512::from_word(128))
+            .unwrap()
+            .checked_div(&U512::from_word(3))
+            .unwrap();
+        assert!(n.bits_vartime() == 255);
+        let n = n.resize();
+        assert_eq!(n, *count.size(&context));
+
+        let count = Node::Count(Box::new(Chars::from_ranges([('a', 'b')]).into()), 0, 511);
+        assert_eq!(U256::MAX, *count.size(&context));
     }
 
     #[test]
