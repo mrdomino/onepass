@@ -45,9 +45,8 @@ impl Expr {
     /// # String literals
     /// Any literal string that does not otherwise consist of syntax characters stands for itself.
     /// A schema consisting of a literal string generates itself as the single password. Other
-    /// characters may be escaped with `'\\'`; aside from newline, carriage return, and tab, any
-    /// non-alphanumeric character stands for itself as a literal value when preceded by a
-    /// backslash.
+    /// characters may be escaped with `'\\'`; any ASCII punctuation character stands for itself as
+    /// a literal value when preceded by a backslash.
     /// ```
     /// # use {onepass_seed::expr::Node, core::str::FromStr};
     /// assert_eq!(Node::Literal("test".into()), "test".parse().unwrap());
@@ -235,7 +234,7 @@ fn parse_escape(input: &str) -> IResult<&str, char> {
         value('\n', char('n')),
         value('\r', char('r')),
         value('\t', char('t')),
-        verify(none_of("\n\r\t"), |c| !c.is_ascii_alphanumeric()),
+        verify(anychar, char::is_ascii_punctuation),
     ));
     cut(alt((
         parse_hex_char,
@@ -463,6 +462,8 @@ mod tests {
     #[test]
     fn test_bad_escape() {
         assert_err!("\\a", "a", Verify);
+        assert_err!("\\\n", "\n", Verify);
+        assert_err!("\\é", "é", Verify);
     }
 
     #[test]
