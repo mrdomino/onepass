@@ -11,8 +11,9 @@ use super::{
 struct ReprState<'a>(bool, &'a Context);
 
 impl Expr {
-    /// Write the canonical serialization of this expression. This function implements this type’s
-    /// [`fmt::Display`].
+    /// Write the canonical serialization of this expression.
+    ///
+    /// This function implements this type’s [`fmt::Display`].
     pub fn write_repr<W>(&self, w: &mut W) -> Result
     where
         W: Write,
@@ -22,20 +23,71 @@ impl Expr {
 }
 
 impl Chars {
+    /// Canonically serialize a character class.
+    ///
+    /// Character ranges are written sorted according to the Unicode ordering of the start of their
+    /// range, with the exception of ranges that start or end with a hyphen, or start with a caret.
+    /// A range starting with a hyphen is written at the start of the class; a range ending with a
+    /// hyphen is written at the end of the class; and a caret is never written at the beginning of
+    /// a class.
+    ///
+    /// The hyphen rules are to ensure that character classes parse correctly; the class containing
+    /// the three characters `!`, `-`, and `z` would otherwise be written `[!-z]`, which would
+    /// parse as the class ranging from `!` to `z`.
+    ///
+    /// The caret rule is to prevent a class’s canonical representation from looking like a negated
+    /// character class in traditional regex languages. Onepass does not have a concept of negated
+    /// character classes, so `[^a-z]` and `[a-z^]` would be equivalent if the former were allowed.
+    ///
+    /// In case the caret range is exactly two or three characters, it is written `_^` or `` _^ ``.
+    /// Otherwise, if there is another (non-hyphen) range in the class, it is written first.
+    /// Otherwise, the remainder of the range after the caret is written first (`[_^-z]`.)
+    /// Otherwise, if there is an ending hyphen range, its first character is written first.
+    /// Finally, if the range is a single caret, it is backslash-escaped.
+    ///
+    /// A user or program that does not need to write canonical forms may simply backslash-escape a
+    /// caret (or hyphen) anywhere in a range.
     pub fn write_repr<W>(&self, w: &mut W) -> Result
     where
         W: Write,
     {
-        write!(w, "[")?;
-        if let Some(hyphen) = self.0.iter().find(|cr| cr.start == '-') {
-            fmt_charclass(w, hyphen)?;
-        }
-        self.0
+        let start_hyphen = self.0.iter().find(|r| r.start == '-');
+        let mut end_hyphen = self
+            .0
             .iter()
-            .filter(|&cr| cr.start != '-' && cr.end != '-')
-            .try_fold((), |(), cr| fmt_charclass(w, cr))?;
-        if let Some(hyphen) = self.0.iter().find(|cr| cr.end == '-' && cr.start != '-') {
-            fmt_charclass(w, hyphen)?;
+            .copied()
+            .find(|r| r.end == '-' && r.start != '-');
+        let mut rest = self
+            .0
+            .iter()
+            .copied()
+            .filter(|r| r.start != '-' && r.end != '-')
+            .peekable();
+        write!(w, "[")?;
+        if let Some(r) = start_hyphen {
+            fmt_charclass(w, r)?;
+        } else if let Some(r) = rest.next_if(|r| r.start == '^') {
+            if r.size() == 2 {
+                write!(w, "_^")?;
+            } else if r.size() == 3 {
+                write!(w, "_^`")?;
+            } else if let Some(q) = rest.next() {
+                fmt_charclass(w, &q)?;
+                fmt_charclass(w, &r)?;
+            } else if r.end != '^' {
+                fmt_charclass(w, &CharRange::from(('_', r.end)))?;
+                write!(w, "^")?;
+            } else if let Some(q) = end_hyphen.as_mut() {
+                write_escape(w, q.start)?;
+                q.start = next_char(q.start).unwrap();
+                fmt_charclass(w, &r)?;
+            } else {
+                // A plain `^` is also accepted here at parse.
+                write!(w, "\\^")?;
+            }
+        }
+        for r in rest.chain(end_hyphen) {
+            fmt_charclass(w, &r)?;
         }
         write!(w, "]")?;
         Ok(())
@@ -182,11 +234,23 @@ mod tests {
             ("[\\\\\\]]", &[('\\', ']')]),
             ("[!-#]", &[('!', '#')]),
             ("[!\"]", &[('!', '"')]),
+            ("[-^]", &[('-', '-'), ('^', '^')]),
+            ("[a-z^]", &[('^', '^'), ('a', 'z')]),
+            ("[_^]", &[('^', '_')]),
+            ("[,^-]", &[(',', '-'), ('^', '^')]),
+            ("[+^,-]", &[('+', '-'), ('^', '^')]),
+            ("[Z[^]", &[('Z', 'Z'), ('[', '['), ('^', '^')]),
+            ("[\\^]", &[('^', '^')]),
+            ("[_^`]", &[('^', '`')]),
+            ("[_-z^]", &[('^', 'z')]),
+            ("[_-z^!--]", &[('!', '-'), ('^', 'z')]),
+            ("[+^,-]", &[('+', '-'), ('^', '^')]),
+            ("[*^+--]", &[('*', '-'), ('^', '^')]),
         ];
         for (want, cs) in tests {
             let cs = Chars::from_ranges(cs.iter().copied());
-            eprintln!("want=\"{want}\" cs={cs:?}");
-            assert_eq!(want, &format!("{cs}"));
+            eprintln!("=== {want} {cs:?} ===");
+            assert_eq!(want, &format!("{cs}"), "cs={cs:?}");
             let expr = Expr::new(want.parse().unwrap());
             assert_eq!(want, &format!("{expr}"), "{want:?} cs={cs:?}");
         }
