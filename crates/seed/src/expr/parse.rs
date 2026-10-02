@@ -192,15 +192,17 @@ fn parse_node_inner(input: &str) -> IResult<&str, Node> {
 }
 
 fn parse_count(input: &str) -> IResult<&str, Node> {
-    let inner = alt((
+    let count = alt((
         verify(separated_pair(u32, char(','), u32), |&(a, b)| a <= b),
         map(u32, |n| (n, n)),
         map(preceded(char(','), u32), |n| (0, n)),
     ));
-    let inner = (parse_single, opt(braced(Brace::Curly, inner)));
-    map(inner, |(node, count)| match count {
-        None => node,
-        Some((a, b)) => Node::Count(Box::new(node), a, b),
+    let inner = (parse_single, opt(many1(braced(Brace::Curly, count))));
+    map(inner, |(mut node, count)| {
+        for (a, b) in count.into_iter().flatten() {
+            node = Node::Count(Box::new(node), a, b);
+        }
+        node
     })
     .parse(input)
 }
@@ -562,6 +564,7 @@ mod tests {
             extract_count(&format!("a{{{},{}}}", u32::MAX, u32::MAX)),
             Ok((u32::MAX, u32::MAX))
         );
+        assert_parse("a{1}{2}", count(count(lit("a"), 1, 1), 2, 2));
         assert_err!("a{5,2}", ",2}", Char);
         assert_err!("a{3,}", ",}", Char);
     }
