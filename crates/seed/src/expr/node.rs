@@ -1,11 +1,17 @@
 use core::iter::once;
 use std::io::{Result, Write};
 
-use crypto_bigint::{CheckedSub, NonZero, One, U256, Word};
+use crypto_bigint::{NonZero, U256, Word};
 use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
 
+#[allow(deprecated)]
+use super::size::count_size_legacy;
 use super::{
-    Eval, EvalContext, chars::Chars, context::Context, generator::Generator,
+    Eval, EvalContext,
+    chars::Chars,
+    context::{Context, CountRule},
+    generator::Generator,
+    size::{count_size, list_size},
     util::u256_saturating_pow,
 };
 
@@ -35,38 +41,13 @@ impl EvalContext for Node {
         match *self {
             Node::Literal(_) => NonZero::ONE,
             Node::Chars(ref chars) => chars.size(),
-            Node::List(ref nodes) => {
-                NonZero::new(nodes.into_iter().fold(U256::ONE, |acc, node| {
-                    acc.saturating_mul(&node.size(context))
-                }))
-                .unwrap()
-            }
+            Node::List(ref nodes) => list_size(nodes.iter().map(|node| node.size(context))),
 
-            Node::Count(ref node, min, max) => {
-                let (min, max) = (min as u64, max as u64);
-                let n = node.size(context);
-                if n.is_one().into() {
-                    return NonZero::new((max - min + 1).into()).unwrap();
-                }
-                // Closed form of n^k + … + n^l
-                //              = n^k (1 + … + n^(l-k))
-                //              = n^k (n^(l-k+1) - 1) / (n - 1)
-                //              = (n^(l+1) - n^k) / (n - 1)
-                let k = min;
-                let l = max;
-                let mut x = U256::ZERO;
-                u256_saturating_pow(&n, l + 1, &mut x);
-                let mut y = U256::ZERO;
-                u256_saturating_pow(&n, k, &mut y);
-                if x == U256::MAX && y == U256::MAX {
-                    // Assume we got an overflow.
-                    return NonZero::MAX;
-                }
-                x = x.checked_sub(&y).unwrap();
-                let (x, rem) = x.div_rem(&NonZero::new(n.saturating_sub(&U256::ONE)).unwrap());
-                assert!(bool::from(rem.is_zero()));
-                NonZero::new(x).unwrap()
-            }
+            Node::Count(ref node, min, max) => match context.count_rule {
+                CountRule::Current => count_size(&node.size(context), min, max),
+                #[allow(deprecated)]
+                CountRule::Legacy => count_size_legacy(&node.size(context), min, max).unwrap(),
+            },
 
             Node::Generator(ref generator) => generator.size(context),
         }

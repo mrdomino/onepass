@@ -59,5 +59,57 @@ mod macros;
 pub mod site;
 pub mod url;
 
+use core::{error::Error, fmt};
+
+use crypto_bigint::NonZero;
 pub use crypto_bigint::U256;
 pub use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox, SecretString};
+
+use expr::{Context, Node, size::sizes};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LegacyCountError {
+    WouldPanic,
+    Changed {
+        old: NonZero<U256>,
+        new: NonZero<U256>,
+    },
+}
+
+/// Check whether the given schema changed with v3.3.0.
+pub fn check_legacy_count(context: &Context, node: &Node) -> Result<(), LegacyCountError> {
+    let s = sizes(context, node).ok_or(LegacyCountError::WouldPanic)?;
+    if s.changed {
+        return Err(LegacyCountError::Changed {
+            old: s.old,
+            new: s.new,
+        });
+    }
+    Ok(())
+}
+
+impl fmt::Display for LegacyCountError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LegacyCountError::WouldPanic => f.write_str("would panic"),
+            LegacyCountError::Changed { old, new } => {
+                f.write_str("must be rotated")?;
+                let old_bits = old.bits_vartime() - 1;
+                let new_bits = new.bits_vartime() - 1;
+                let diff = new_bits - old_bits;
+                if diff != 0 {
+                    write!(
+                        f,
+                        ", entropy diff (bits): {diff}\told: {old_bits}\tnew: {new_bits}"
+                    )?;
+                } else if old != new {
+                    write!(f, ", size differs by {}", (**new - **old).to_words()[0])?;
+                } else {
+                    f.write_str(", internal sizes differ")?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+impl Error for LegacyCountError {}
