@@ -59,5 +59,135 @@ mod macros;
 pub mod site;
 pub mod url;
 
+use core::{error::Error, fmt};
+
+use crypto_bigint::NonZero;
 pub use crypto_bigint::U256;
 pub use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox, SecretString};
+
+use expr::{Context, Node, size::sizes};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LegacyCountError {
+    WouldPanic,
+    Changed {
+        old: NonZero<U256>,
+        new: NonZero<U256>,
+    },
+}
+
+/// Check whether the given schema changed with v3.3.0.
+pub fn check_legacy_count(context: &Context, node: &Node) -> Result<(), LegacyCountError> {
+    let s = sizes(context, node).ok_or(LegacyCountError::WouldPanic)?;
+    if s.changed {
+        return Err(LegacyCountError::Changed {
+            old: s.old,
+            new: s.new,
+        });
+    }
+    Ok(())
+}
+
+impl fmt::Display for LegacyCountError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LegacyCountError::WouldPanic => f.write_str("would panic"),
+            LegacyCountError::Changed { old, new } => {
+                f.write_str("must be rotated")?;
+                let old_bits = old.bits_vartime() - 1;
+                let new_bits = new.bits_vartime() - 1;
+                let diff = new_bits - old_bits;
+                if diff != 0 {
+                    write!(
+                        f,
+                        ", entropy diff (bits): {diff}\told: {old_bits}\tnew: {new_bits}"
+                    )?;
+                } else if old != new {
+                    write!(f, ", size differs by {}", (**new - **old).to_words()[0])?;
+                } else {
+                    f.write_str(", internal sizes differ")?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+impl Error for LegacyCountError {}
+
+#[cfg(test)]
+pub(crate) mod testing {
+    use crypto_bigint::{NonZero, U256};
+    use serde::{Deserialize, Deserializer, de};
+
+    pub(crate) const COUNT_VECTORS: &str = include_str!("../data/count_vectors.toml");
+
+    pub(crate) fn u256_from_be_hex<'de, D>(
+        deserializer: D,
+    ) -> Result<Option<NonZero<U256>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if s == "none" {
+            return Ok(None);
+        }
+        let s = s.strip_prefix("0x").unwrap_or(&s);
+        if s.len() != 64 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err(de::Error::custom(
+                "expected 64 hex characters (optionally prefixed with 0x)",
+            ));
+        }
+        Ok(Some(NonZero::new(U256::from_be_hex(s)).unwrap()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde::Deserialize;
+
+    use super::{testing::*, *};
+
+    #[derive(Deserialize)]
+    struct Schema {
+        name: String,
+        schema: String,
+        why: String,
+        expect: String,
+        #[serde(default)]
+        display: String,
+        #[serde(default, deserialize_with = "u256_from_be_hex")]
+        old: Option<NonZero<U256>>,
+        #[serde(default, deserialize_with = "u256_from_be_hex")]
+        new: Option<NonZero<U256>>,
+    }
+
+    #[derive(Deserialize)]
+    struct Schemata {
+        schema: Vec<Schema>,
+    }
+
+    #[test]
+    fn test_vectors() {
+        for s in toml::from_str::<Schemata>(COUNT_VECTORS).unwrap().schema {
+            eprintln!("{}/{}", s.name, s.why);
+            let node: Node = s.schema.parse().unwrap();
+            let res = check_legacy_count(&Context::default(), &node);
+            match res {
+                Ok(()) => assert_eq!("ok", s.expect, "{res:?}"),
+                Err(err) => {
+                    assert_eq!(s.display, format!("{err}"));
+                    match err {
+                        LegacyCountError::WouldPanic => {
+                            assert_eq!("would_panic", s.expect, "{err}")
+                        }
+                        LegacyCountError::Changed { old, new } => {
+                            assert_eq!("changed", s.expect, "{err}");
+                            assert_eq!(s.old.unwrap(), old, "old");
+                            assert_eq!(s.new.unwrap(), new, "new");
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -3,11 +3,12 @@
 //! the [`Eval`] and [`EvalContext`] instances for the generation scheme.
 
 mod chars;
-mod context;
+pub(crate) mod context;
 mod generator;
 mod node;
 mod parse;
 mod repr;
+pub(crate) mod size;
 mod util;
 
 use std::{
