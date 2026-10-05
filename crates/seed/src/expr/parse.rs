@@ -616,10 +616,10 @@ mod tests {
 
     #[test]
     fn test_caret() {
-        assert_parse!("[^]", cs([('^', '^')]));
+        assert_parse("[^]", cs([('^', '^')]));
         assert_err!("[^a-z]", "^a-z]", Not);
-        assert_parse!("[\\^a-z]", cs([('^', '^'), ('a', 'z')]));
-        assert_parse!("[a-z^]", cs([('^', '^'), ('a', 'z')]));
+        assert_parse("[\\^a-z]", cs([('^', '^'), ('a', 'z')]));
+        assert_parse("[a-z^]", cs([('^', '^'), ('a', 'z')]));
     }
 
     fn lit<S: AsRef<str>>(s: S) -> Node {
