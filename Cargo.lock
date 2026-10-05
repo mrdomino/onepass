@@ -805,6 +805,7 @@ dependencies = [
  "rand_core",
  "secrecy",
  "serde",
+ "toml",
  "url",
 ]
 

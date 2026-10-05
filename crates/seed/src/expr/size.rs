@@ -23,11 +23,8 @@ pub(crate) fn sizes(context: &Context, node: &Node) -> Option<Sizes> {
             #[allow(deprecated)]
             let old = count_size_legacy(&old, min, max)?;
             let new = count_size(&new, min, max);
-            Some(Sizes {
-                old,
-                new,
-                changed: changed || old != new,
-            })
+            let changed = (max != 0 && changed) || old != new;
+            Some(Sizes { old, new, changed })
         }
 
         Node::List(ref nodes) => {
@@ -105,4 +102,49 @@ pub(crate) fn count_size_legacy(n: &NonZero<U256>, min: u32, max: u32) -> Option
 
 pub(crate) fn list_size(parts: impl Iterator<Item = NonZero<U256>>) -> NonZero<U256> {
     NonZero::new(parts.fold(U256::ONE, |acc, n| acc.saturating_mul(&n))).unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crypto_bigint::U256;
+    use serde::Deserialize;
+
+    use crate::testing::{COUNT_VECTORS, u256_from_be_hex};
+
+    #[derive(Deserialize)]
+    struct Count {
+        name: String,
+        why: String,
+        #[serde(deserialize_with = "u256_from_be_hex")]
+        n: Option<NonZero<U256>>,
+        min: u32,
+        max: u32,
+        #[serde(deserialize_with = "u256_from_be_hex")]
+        current: Option<NonZero<U256>>,
+        #[serde(deserialize_with = "u256_from_be_hex")]
+        legacy: Option<NonZero<U256>>,
+    }
+
+    #[derive(Deserialize)]
+    struct Counts {
+        count: Vec<Count>,
+    }
+
+    #[test]
+    fn test_vectors() {
+        for count in toml::from_str::<Counts>(COUNT_VECTORS).unwrap().count {
+            assert_eq!(
+                count.current.unwrap(),
+                count_size(&count.n.unwrap(), count.min, count.max),
+                "{}/{}",
+                count.name,
+                count.why
+            );
+            #[allow(deprecated)]
+            let old = count_size_legacy(&count.n.unwrap(), count.min, count.max);
+            assert_eq!(count.legacy, old, "{}/{}", count.name, count.why);
+        }
+    }
 }
