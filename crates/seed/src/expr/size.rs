@@ -100,8 +100,13 @@ pub(crate) fn count_size_legacy(n: &NonZero<U256>, min: u32, max: u32) -> Option
     NonZero::new(x).into_option()
 }
 
-pub(crate) fn list_size(parts: impl Iterator<Item = NonZero<U256>>) -> NonZero<U256> {
-    NonZero::new(parts.fold(U256::ONE, |acc, n| acc.saturating_mul(&n))).unwrap()
+pub(crate) fn list_size(mut parts: impl Iterator<Item = NonZero<U256>>) -> NonZero<U256> {
+    NonZero::new(
+        parts
+            .try_fold(U256::ONE, |acc, n| acc.checked_mul(&n).into_option())
+            .unwrap_or(U256::MAX),
+    )
+    .unwrap()
 }
 
 #[cfg(test)]
