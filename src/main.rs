@@ -13,7 +13,7 @@ use anyhow::{Context as _Context, Result};
 use clap::{CommandFactory, Parser, error::ErrorKind};
 use onepass_conf::{Config, Error, KeyringSeed, RawSite};
 use onepass_seed::{
-    ExposeSecret, SecretBox, SecretString, check_legacy_count,
+    ExposeSecret, LegacyCountError, SecretBox, SecretString, check_legacy_count,
     dict::{BoxDict, Dict},
     expr::{Context, Eval},
     site::Site,
@@ -162,64 +162,7 @@ fn main() -> Result<()> {
     }
 
     if args.check_legacy_counts {
-        let mut rc = 0;
-
-        let words: Option<_> = read_words_str(&args, &config)?;
-        let dict = words
-            .as_deref()
-            .map(BoxDict::from_lines)
-            .map(|d| -> Arc<dyn Dict + '_> { Arc::new(d) });
-        let context = dict.map_or_else(Context::default, Context::with_dict);
-
-        if let Some(schema) = args.schema {
-            match check_legacy_count(&context, &schema.parse()?) {
-                Ok(_) => (),
-                Err(err) => {
-                    rc = 1;
-                    eprintln!("Schema {schema:?}: {err}");
-                }
-            }
-        }
-
-        for (site, schema) in config
-            .sites()
-            .iter()
-            .filter_map(|s| Some((s.as_deref(), s.schema.as_deref()?)))
-        {
-            match check_legacy_count(&context, &schema.parse()?) {
-                Ok(_) => (),
-                Err(err) => {
-                    rc = 1;
-                    let url = site.url;
-                    eprint!("Site {url:?}");
-                    if let Some(username) = site.username {
-                        eprint!(" (username {username:?})");
-                    }
-                    eprintln!(", schema {schema:?}: {err}");
-                }
-            }
-        }
-
-        for (alias, schema) in config.global.alias.iter() {
-            match check_legacy_count(&context, &schema.parse()?) {
-                Ok(_) => (),
-                Err(err) => {
-                    rc = 1;
-                    eprintln!("Alias {alias} (schema {schema:?}): {err}");
-                }
-            }
-        }
-
-        let schema = config.default_schema();
-        match check_legacy_count(&context, &schema.parse()?) {
-            Ok(_) => (),
-            Err(err) => {
-                rc = 1;
-                eprintln!("Default schema {schema:?}: {err}");
-            }
-        }
-
-        exit(rc);
+        exit(check_legacy_counts(&config, &args)?);
     }
 
     if args.sites.is_empty() {
@@ -343,6 +286,74 @@ fn lookup_site(url: &str, config: &Config, args: &Args, context: &Context) -> Re
     // TODO(soon): do something about redundant default_schema call here
     site.to_site_with_context(config.default_schema(), context)
         .context("failed generating site")
+}
+
+fn check_schema(context: &Context, schema: &str) -> Result<Option<LegacyCountError>> {
+    match check_legacy_count(
+        context,
+        &schema
+            .parse()
+            .with_context(|| format!("failed parsing schema {schema:?}"))?,
+    ) {
+        Ok(()) => Ok(None),
+        Err(err) => Ok(Some(err)),
+    }
+}
+
+fn check_legacy_counts(config: &Config, args: &Args) -> Result<i32> {
+    let mut rc = 0;
+
+    let words: Option<_> = read_words_str(args, config)?;
+    let dict = words
+        .as_deref()
+        .map(BoxDict::from_lines)
+        .map(|d| -> Arc<dyn Dict + '_> { Arc::new(d) });
+    let context = dict.map_or_else(Context::default, Context::with_dict);
+
+    if let Some(schema) = args.schema.as_deref()
+        && let Some(err) = check_schema(&context, schema)?
+    {
+        rc = 1;
+        eprintln!("Schema {schema:?}: {err}");
+    }
+
+    for (site, schema) in config
+        .sites()
+        .iter()
+        .filter_map(|s| Some((s.as_deref(), s.schema.as_deref()?)))
+    {
+        if let Some(err) = check_schema(&context, schema).with_context(|| {
+            format!(
+                "failed checking url: {:?} username: {:?}",
+                site.url, site.username
+            )
+        })? {
+            rc = 1;
+            let url = site.url;
+            eprint!("Site {url:?}");
+            if let Some(username) = site.username {
+                eprint!(" (username {username:?})");
+            }
+            eprintln!(", schema {schema:?}: {err}");
+        }
+    }
+
+    for (alias, schema) in config.global.alias.iter() {
+        if let Some(err) = check_schema(&context, schema)
+            .with_context(|| format!("failed checking alias: {alias}"))?
+        {
+            rc = 1;
+            eprintln!("Alias {alias} (schema {schema:?}): {err}");
+        }
+    }
+
+    let schema = config.default_schema();
+    if let Some(err) = check_schema(&context, schema).context("failed checking default schema")? {
+        rc = 1;
+        eprintln!("Default schema {schema:?}: {err}");
+    }
+
+    Ok(rc)
 }
 
 impl Args {
