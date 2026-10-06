@@ -82,6 +82,10 @@ struct Args {
     #[arg(long, help_heading = "Password Entry")]
     stdin: bool,
 
+    /// Accept empty password
+    #[arg(long, help_heading = "Password Entry")]
+    allow_empty: bool,
+
     /// Override word list
     #[arg(
         short,
@@ -219,7 +223,11 @@ fn main() -> Result<()> {
         // Check for schema validity before unlocking seed keyring.
         let site = lookup_site(url, &config, &args, &context)?;
         if seed.is_none() {
-            seed = Some(seed_password::read(seed_keyring, args.confirm, rp_flags)?);
+            let seed_ = seed_password::read(seed_keyring, args.confirm, rp_flags)?;
+            if !args.allow_empty && seed_.expose_secret().is_empty() {
+                anyhow::bail!("empty password not allowed (pass --allow-empty to use)");
+            }
+            seed = Some(seed_);
         }
         let res = gen_password_config(seed.as_ref().unwrap().expose_secret(), &site, url, &args)?;
         stdout.write_all(res.expose_secret().as_bytes())?;
