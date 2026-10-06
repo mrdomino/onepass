@@ -15,7 +15,7 @@ use onepass_conf::{Config, Error, KeyringSeed, RawSite};
 use onepass_seed::{
     ExposeSecret, LegacyCountError, SecretBox, SecretString, check_legacy_count,
     dict::{BoxDict, Dict},
-    expr::{Context, Eval},
+    expr::{Context, Eval, Expr},
     site::Site,
 };
 use readpassphrase_3::Flags as RpFlags;
@@ -165,7 +165,7 @@ fn main() -> Result<()> {
         exit(check_legacy_counts(&config, &args)?);
     }
 
-    if args.sites.is_empty() {
+    if args.sites.is_empty() && !args.describe {
         if args.confirm {
             let _ = seed_password::read(seed_keyring, true, rp_flags)?;
         }
@@ -189,6 +189,14 @@ fn main() -> Result<()> {
     }
 
     if args.describe {
+        if args.sites.is_empty()
+            && let Some(schema) = args.schema.as_deref()
+        {
+            let schema = config.global.alias.get(schema).map_or(schema, |s| s);
+            let expr = Expr::parse_with_context(schema, &context)?;
+            println!("{expr}");
+            println!("about {:.02} bits of entropy", expr.entropy());
+        }
         for url in &args.sites {
             let site = lookup_site(url, &config, &args, &context)?;
 
