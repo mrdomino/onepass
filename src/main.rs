@@ -127,7 +127,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     let config_path = args.config_path.as_deref();
-    let config = Config::from_or_init(config_path).context("failed to read config")?;
+    let config = Config::from_or_init(config_path).context("failed loading config")?;
     let seed_keyring = args
         .seed_keyring()
         .unwrap_or(match config.global.keyring.seed {

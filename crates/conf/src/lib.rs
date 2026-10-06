@@ -195,6 +195,13 @@ impl Config {
                     // We will create `onepass` but not `.config` or above.
                     //
                     // TODO(soon): warn and proceed without config if `.config` does not exist.
+                    if let Some(dir) = config_dir.parent()
+                        && !dir.try_exists()?
+                    {
+                        return Err(io::Error::other(format!(
+                            "{dir:?} does not exist; create it first"
+                        )));
+                    }
                     let _ = fs::create_dir(config_dir);
                 }
                 fs::write(config_path, EXAMPLE_CONFIG).map_err(|e| {
