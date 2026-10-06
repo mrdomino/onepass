@@ -505,7 +505,7 @@ why = "silent under-count"
 expect = "changed"
 old = "0x0421084210842108421084210842108421084210842108421084210842108421"
 new = "0x8000000000000000000000000000000000000000000000000000000000000000"
-display = "must be rotated, entropy diff (bits): 5\told: 250\tnew: 255"
+display = "must be rotated, entropy diff (bits): 4.95\told: 250.05\tnew: 255.00"
 
 [[schema]]
 name = "silent_w_range"
@@ -514,7 +514,7 @@ why = "silent, range spans K*"
 expect = "changed"
 old = "0x04210842108421084210842108420dafca2b8788686d47cffcc674571b50c121"
 new = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-display = "must be rotated, entropy diff (bits): 5\told: 250\tnew: 255"
+display = "must be rotated, entropy diff (bits): 5.95\told: 250.05\tnew: 256.00"
 
 [[schema]]
 name = "masked_by_prefix"
@@ -560,7 +560,7 @@ why = "saturated inner under {0,1}: legacy 1"
 expect = "changed"
 old = "0x0000000000000000000000000000000000000000000000000000000000000001"
 new = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-display = "must be rotated, entropy diff (bits): 255\told: 0\tnew: 255"
+display = "must be rotated, entropy diff (bits): 256.00\told: 0.00\tnew: 256.00"
 
 [[schema]]
 name = "collapse_with_prefix"
@@ -569,7 +569,7 @@ why = "only the prefix counted"
 expect = "changed"
 old = "0x000000000000000000000000000000000000000000000000000000309f102100"
 new = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-display = "must be rotated, entropy diff (bits): 218\told: 37\tnew: 255"
+display = "must be rotated, entropy diff (bits): 218.40\told: 37.60\tnew: 256.00"
 
 [[schema]]
 name = "zero_discards_changed"
@@ -591,7 +591,7 @@ why = "nested, genuinely changed: legacy inner 1 feeds n == 1 branch"
 expect = "changed"
 old = "0x0000000000000000000000000000000000000000000000000000000000000002"
 new = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-display = "must be rotated, entropy diff (bits): 254\told: 1\tnew: 255"
+display = "must be rotated, entropy diff (bits): 255.00\told: 1.00\tnew: 256.00"
 
 [[schema]]
 name = "eff_words_K"
@@ -607,4 +607,4 @@ why = "inner exact, outer silent: 170 -> 255 bits"
 expect = "changed"
 old = "0x0000000000000000000004000000000000000000002000000000000000000001"
 new = "0x8000000000000000000000000000000000000000000000000000000000000000"
-display = "must be rotated, entropy diff (bits): 85\told: 170\tnew: 255"
+display = "must be rotated, entropy diff (bits): 85.00\told: 170.00\tnew: 255.00"

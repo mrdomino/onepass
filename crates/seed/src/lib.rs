@@ -88,19 +88,31 @@ pub fn check_legacy_count(context: &Context, node: &Node) -> Result<(), LegacyCo
     Ok(())
 }
 
+pub(crate) fn entropy(n: &NonZero<U256>) -> f32 {
+    let bits = n.bits_vartime();
+    let top: u32 = if bits > 24 {
+        (n.get() >> (bits - 24)).as_words()[0] as u32
+    } else {
+        (n.as_words()[0] as u32) << (24 - bits)
+    };
+    let m = (top as f32) / 8388608.0; // 2**23, m in [1, 2)
+    (bits - 1) as f32 + m.log2()
+}
+
 impl fmt::Display for LegacyCountError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             LegacyCountError::WouldPanic => f.write_str("would panic"),
             LegacyCountError::Changed { old, new } => {
                 f.write_str("must be rotated")?;
-                let old_bits = old.bits_vartime() - 1;
-                let new_bits = new.bits_vartime() - 1;
-                let diff = new_bits - old_bits;
-                if diff != 0 {
+                let old_entropy = entropy(old);
+                let new_entropy = entropy(new);
+                let diff = new_entropy - old_entropy;
+                if diff != 0.0 {
                     write!(
                         f,
-                        ", entropy diff (bits): {diff}\told: {old_bits}\tnew: {new_bits}"
+                        ", entropy diff (bits): {:.02}\told: {:.02}\tnew: {:.02}",
+                        diff, old_entropy, new_entropy
                     )?;
                 } else if old != new {
                     write!(f, ", size differs by {}", (**new - **old).to_words()[0])?;

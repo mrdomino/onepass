@@ -50,6 +50,10 @@ pub trait Eval {
     /// `self.size() - 1` will be the highest or lexicographically last password, but this is not
     /// required.
     fn write_to(&self, w: &mut dyn Write, index: &mut dyn ExposeSecretMut<U256>) -> Result<()>;
+
+    fn entropy(&self) -> f32 {
+        crate::entropy(&self.size())
+    }
 }
 
 /// Delineates a type that knows how to [`Eval`] itself but needs some extra

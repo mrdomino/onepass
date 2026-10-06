@@ -191,7 +191,6 @@ fn main() -> Result<()> {
     if args.describe {
         for url in &args.sites {
             let site = lookup_site(url, &config, &args, &context)?;
-            let size = site.expr.size();
 
             println!("{url}:");
             println!("{}", site.expr);
@@ -201,7 +200,7 @@ fn main() -> Result<()> {
             let example = String::from_utf8(buf.into_inner()?)?;
             println!("Looks like: {example:?}");
 
-            println!("about {} bits of entropy", size.bits_vartime());
+            println!("about {:.02} bits of entropy", site.expr.entropy());
         }
         return Ok(());
     }
@@ -249,15 +248,15 @@ fn read_words_str(args: &Args, config: &Config) -> Result<Option<Box<str>>> {
 }
 
 fn gen_password_config(seed: &str, site: &Site, url: &str, args: &Args) -> Result<SecretString> {
-    let size = site.expr.size();
+    let size = site.expr.size().to_string();
+    let size = size.trim_start_matches('0');
+    let entropy = site.expr.entropy();
     let salt = format!("{site}");
 
     if args.verbose {
         eprintln!(
-            "schema for {2} has about {0} bits of entropy (0x{1} possible passwords)",
-            size.bits(),
-            size.to_string().trim_start_matches('0'),
-            url,
+            "schema for {} has about {:.02} bits of entropy (0x{} possible passwords)",
+            url, entropy, size
         );
         eprintln!("salt: {salt:?}");
     }
