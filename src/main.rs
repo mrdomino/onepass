@@ -79,7 +79,7 @@ struct Args {
     learn: Option<u32>,
 
     /// Read seed password from stdin instead of /dev/tty
-    #[arg(long)]
+    #[arg(long, help_heading = "Password Entry")]
     stdin: bool,
 
     /// Override word list
