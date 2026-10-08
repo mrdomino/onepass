@@ -39,12 +39,10 @@ pub(crate) fn sizes(context: &Context, node: &Node) -> Option<Sizes> {
         }
 
         Node::Literal(_) | Node::Chars(_) | Node::Generator(_) => {
-            let size = node.size(context);
-            Some(Sizes {
-                old: size,
-                new: size,
-                changed: false,
-            })
+            let old = node.size(context);
+            let new = old;
+            let changed = false;
+            Some(Sizes { old, new, changed })
         }
     }
 }
