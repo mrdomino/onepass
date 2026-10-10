@@ -88,6 +88,7 @@ impl Context {
     /// bug. WARNING: because [`EvalContext::size`][super::EvalContext::size] cannot return an
     /// error, the code panics when the pre-v3.3.0 count size would have panicked, i.e. when
     /// [`crate::check_legacy_count`] returns [`WouldPanic`][crate::LegacyCountError::WouldPanic].
+    #[deprecated(since = "0.4.6", note = "going away with next major release")]
     pub fn with_legacy_count_rule(self) -> Self {
         Context {
             count_rule: CountRule::Legacy,
