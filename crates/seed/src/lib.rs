@@ -68,6 +68,7 @@ pub use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox, SecretString};
 use expr::{Context, Node, size::sizes};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[deprecated(since = "0.4.6", note = "going away with next major release")]
 pub enum LegacyCountError {
     WouldPanic,
     Changed {
@@ -77,6 +78,8 @@ pub enum LegacyCountError {
 }
 
 /// Check whether the given schema changed with v3.3.0.
+#[deprecated(since = "0.4.6", note = "going away with next major release")]
+#[allow(deprecated)]
 pub fn check_legacy_count(context: &Context, node: &Node) -> Result<(), LegacyCountError> {
     let s = sizes(context, node).ok_or(LegacyCountError::WouldPanic)?;
     if s.changed {
@@ -88,6 +91,7 @@ pub fn check_legacy_count(context: &Context, node: &Node) -> Result<(), LegacyCo
     Ok(())
 }
 
+#[allow(deprecated)]
 impl fmt::Display for LegacyCountError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -112,6 +116,7 @@ impl fmt::Display for LegacyCountError {
         }
     }
 }
+#[allow(deprecated)]
 impl Error for LegacyCountError {}
 
 #[cfg(test)]
@@ -167,6 +172,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_vectors() {
         for s in toml::from_str::<Schemata>(COUNT_VECTORS).unwrap().schema {
             eprintln!("{}/{}", s.name, s.why);

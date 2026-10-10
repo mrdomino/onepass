@@ -13,11 +13,13 @@ use anyhow::{Context as _Context, Result};
 use clap::{CommandFactory, Parser, error::ErrorKind};
 use onepass_conf::{Config, Error, KeyringSeed, RawSite};
 use onepass_seed::{
-    ExposeSecret, LegacyCountError, SecretBox, SecretString, check_legacy_count,
+    ExposeSecret, SecretBox, SecretString,
     dict::{BoxDict, Dict},
     expr::{Context, Eval},
     site::Site,
 };
+#[allow(deprecated)]
+use onepass_seed::{LegacyCountError, check_legacy_count};
 use readpassphrase_3::Flags as RpFlags;
 
 #[derive(Debug, Parser)]
@@ -185,7 +187,10 @@ fn main() -> Result<()> {
     let mut context = dict.map_or_else(Context::default, Context::with_dict);
     if args.legacy_count_rule {
         eprintln!("WARNING: using legacy count rule.");
-        context = context.with_legacy_count_rule();
+        #[allow(deprecated)]
+        {
+            context = context.with_legacy_count_rule();
+        }
     }
 
     if args.describe {
@@ -288,6 +293,7 @@ fn lookup_site(url: &str, config: &Config, args: &Args, context: &Context) -> Re
         .context("failed generating site")
 }
 
+#[allow(deprecated)]
 fn check_schema(context: &Context, schema: &str) -> Result<Option<LegacyCountError>> {
     match check_legacy_count(
         context,
