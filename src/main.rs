@@ -5,7 +5,6 @@ use std::{
     io::{BufWriter, IsTerminal, Write, stdout},
     num::NonZero,
     path::Path,
-    process::exit,
     sync::Arc,
 };
 
@@ -18,8 +17,6 @@ use onepass_seed::{
     expr::{Context, Eval, Expr},
     site::Site,
 };
-#[allow(deprecated)]
-use onepass_seed::{LegacyCountError, check_legacy_count};
 use readpassphrase_3::Flags as RpFlags;
 
 #[derive(Debug, Parser)]
@@ -112,14 +109,6 @@ struct Args {
     #[arg(short, long, help_heading = "Configuration")]
     print_sites: bool,
 
-    /// Generate passwords using the pre-v3.3.0 count rule, for recovery/rotation
-    #[arg(long, help_heading = "Configuration")]
-    legacy_count_rule: bool,
-
-    /// Check if any sites need to be rotated for the new count rule as of v3.3.0
-    #[arg(long, help_heading = "Diagnostics")]
-    check_legacy_counts: bool,
-
     /// Print verbose site password entropy output
     #[arg(short, long)]
     verbose: bool,
@@ -147,14 +136,6 @@ fn main() -> Result<()> {
         seed_password::delete()?;
     }
     if args.print_sites {
-        if args.check_legacy_counts {
-            Args::command()
-                .error(
-                    ErrorKind::ArgumentConflict,
-                    "--check-legacy-counts and --print-sites are mutually exclusive",
-                )
-                .exit();
-        }
         let mut urls = config
             .sites()
             .iter()
@@ -165,10 +146,6 @@ fn main() -> Result<()> {
             println!("{url}");
         }
         return Ok(());
-    }
-
-    if args.check_legacy_counts {
-        exit(check_legacy_counts(&config, &args)?);
     }
 
     if args.sites.is_empty() && !args.describe {
@@ -188,14 +165,7 @@ fn main() -> Result<()> {
         .as_deref()
         .map(BoxDict::from_lines)
         .map(|d| -> Arc<dyn Dict + '_> { Arc::new(d) });
-    let mut context = dict.map_or_else(Context::default, Context::with_dict);
-    if args.legacy_count_rule {
-        eprintln!("WARNING: using legacy count rule.");
-        #[allow(deprecated)]
-        {
-            context = context.with_legacy_count_rule();
-        }
-    }
+    let context = dict.map_or_else(Context::default, Context::with_dict);
 
     if args.describe {
         if args.sites.is_empty()
@@ -304,75 +274,6 @@ fn lookup_site(url: &str, config: &Config, args: &Args, context: &Context) -> Re
     // TODO(soon): do something about redundant default_schema call here
     site.to_site_with_context(config.default_schema(), context)
         .context("failed generating site")
-}
-
-#[allow(deprecated)]
-fn check_schema(context: &Context, schema: &str) -> Result<Option<LegacyCountError>> {
-    match check_legacy_count(
-        context,
-        &schema
-            .parse()
-            .with_context(|| format!("failed parsing schema {schema:?}"))?,
-    ) {
-        Ok(()) => Ok(None),
-        Err(err) => Ok(Some(err)),
-    }
-}
-
-fn check_legacy_counts(config: &Config, args: &Args) -> Result<i32> {
-    let mut rc = 0;
-
-    let words: Option<_> = read_words_str(args, config)?;
-    let dict = words
-        .as_deref()
-        .map(BoxDict::from_lines)
-        .map(|d| -> Arc<dyn Dict + '_> { Arc::new(d) });
-    let context = dict.map_or_else(Context::default, Context::with_dict);
-
-    if let Some(schema) = args.schema.as_deref()
-        && let Some(err) = check_schema(&context, schema)?
-    {
-        rc = 1;
-        eprintln!("Schema {schema:?}: {err}");
-    }
-
-    for (site, schema) in config
-        .sites()
-        .iter()
-        .filter_map(|s| Some((s.as_deref(), s.schema.as_deref()?)))
-    {
-        if let Some(err) = check_schema(&context, schema).with_context(|| {
-            format!(
-                "failed checking url: {:?} username: {:?}",
-                site.url, site.username
-            )
-        })? {
-            rc = 1;
-            let url = site.url;
-            eprint!("Site {url:?}");
-            if let Some(username) = site.username {
-                eprint!(" (username {username:?})");
-            }
-            eprintln!(", schema {schema:?}: {err}");
-        }
-    }
-
-    for (alias, schema) in config.global.alias.iter() {
-        if let Some(err) = check_schema(&context, schema)
-            .with_context(|| format!("failed checking alias: {alias}"))?
-        {
-            rc = 1;
-            eprintln!("Alias {alias} (schema {schema:?}): {err}");
-        }
-    }
-
-    let schema = config.default_schema();
-    if let Some(err) = check_schema(&context, schema).context("failed checking default schema")? {
-        rc = 1;
-        eprintln!("Default schema {schema:?}: {err}");
-    }
-
-    Ok(rc)
 }
 
 impl Args {

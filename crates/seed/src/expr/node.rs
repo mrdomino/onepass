@@ -4,12 +4,10 @@ use std::io::{Result, Write};
 use crypto_bigint::{NonZero, U256, Word};
 use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
 
-#[allow(deprecated)]
-use super::size::count_size_legacy;
 use super::{
     Eval, EvalContext,
     chars::Chars,
-    context::{Context, CountRule},
+    context::Context,
     generator::Generator,
     size::{count_size, list_size},
     util::u256_saturating_pow,
@@ -43,11 +41,7 @@ impl EvalContext for Node {
             Node::Chars(ref chars) => chars.size(),
             Node::List(ref nodes) => list_size(nodes.iter().map(|node| node.size(context))),
 
-            Node::Count(ref node, min, max) => match context.count_rule {
-                CountRule::Current => count_size(&node.size(context), min, max),
-                #[allow(deprecated)]
-                CountRule::Legacy => count_size_legacy(&node.size(context), min, max).unwrap(),
-            },
+            Node::Count(ref node, min, max) => count_size(&node.size(context), min, max),
 
             Node::Generator(ref generator) => generator.size(context),
         }

@@ -21,15 +21,6 @@ pub struct Context {
     dict: Arc<HashMap<[u8; 32], Arc<dyn Dict>>>,
 
     pub default_dict: Arc<dyn Dict>,
-
-    pub(super) count_rule: CountRule,
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) enum CountRule {
-    Legacy,
-    #[default]
-    Current,
 }
 
 /// Error returned on unknown generators or dictionary hashes.
@@ -53,7 +44,6 @@ impl Context {
             generator,
             dict,
             default_dict,
-            count_rule: CountRule::default(),
         }
     }
 
@@ -63,7 +53,6 @@ impl Context {
             generator: Arc::default(),
             dict: Arc::default(),
             default_dict: Arc::new(EFF_WORDLIST),
-            count_rule: CountRule::default(),
         }
     }
 
@@ -78,21 +67,6 @@ impl Context {
             generator: self.generator.clone(),
             dict: self.dict.clone(),
             default_dict,
-            count_rule: self.count_rule,
-        }
-    }
-
-    /// Returns a context with the pre-v3.3.0 count rule.
-    ///
-    /// This should only be used to rotate passwords that were impacted by the v3.3.0 count size
-    /// bug. WARNING: because [`EvalContext::size`][super::EvalContext::size] cannot return an
-    /// error, the code panics when the pre-v3.3.0 count size would have panicked, i.e. when
-    /// [`crate::check_legacy_count`] returns [`WouldPanic`][crate::LegacyCountError::WouldPanic].
-    #[deprecated(since = "0.4.6", note = "going away with next major release")]
-    pub fn with_legacy_count_rule(self) -> Self {
-        Context {
-            count_rule: CountRule::Legacy,
-            ..self
         }
     }
 

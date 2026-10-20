@@ -59,37 +59,9 @@ mod macros;
 pub mod site;
 pub mod url;
 
-use core::{error::Error, fmt};
-
 use crypto_bigint::NonZero;
 pub use crypto_bigint::U256;
 pub use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox, SecretString};
-
-use expr::{Context, Node, size::sizes};
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[deprecated(since = "0.4.6", note = "going away with next major release")]
-pub enum LegacyCountError {
-    WouldPanic,
-    Changed {
-        old: NonZero<U256>,
-        new: NonZero<U256>,
-    },
-}
-
-/// Check whether the given schema changed with v3.3.0.
-#[deprecated(since = "0.4.6", note = "going away with next major release")]
-#[allow(deprecated)]
-pub fn check_legacy_count(context: &Context, node: &Node) -> Result<(), LegacyCountError> {
-    let s = sizes(context, node).ok_or(LegacyCountError::WouldPanic)?;
-    if s.changed {
-        return Err(LegacyCountError::Changed {
-            old: s.old,
-            new: s.new,
-        });
-    }
-    Ok(())
-}
 
 pub(crate) fn entropy(n: &NonZero<U256>) -> f32 {
     let bits = n.bits_vartime();
@@ -101,35 +73,6 @@ pub(crate) fn entropy(n: &NonZero<U256>) -> f32 {
     let m = (top as f32) / 8388608.0; // 2**23, m in [1, 2)
     (bits - 1) as f32 + m.log2()
 }
-
-#[allow(deprecated)]
-impl fmt::Display for LegacyCountError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            LegacyCountError::WouldPanic => f.write_str("would panic"),
-            LegacyCountError::Changed { old, new } => {
-                f.write_str("must be rotated")?;
-                let old_entropy = entropy(old);
-                let new_entropy = entropy(new);
-                let diff = new_entropy - old_entropy;
-                if diff != 0.0 {
-                    write!(
-                        f,
-                        ", entropy diff (bits): {:.02}\told: {:.02}\tnew: {:.02}",
-                        diff, old_entropy, new_entropy
-                    )?;
-                } else if old != new {
-                    write!(f, ", size differs by {}", (**new - **old).to_words()[0])?;
-                } else {
-                    f.write_str(", internal sizes differ")?;
-                }
-                Ok(())
-            }
-        }
-    }
-}
-#[allow(deprecated)]
-impl Error for LegacyCountError {}
 
 #[cfg(test)]
 pub(crate) mod testing {
@@ -155,57 +98,5 @@ pub(crate) mod testing {
             ));
         }
         Ok(Some(NonZero::new(U256::from_be_hex(s)).unwrap()))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use serde::Deserialize;
-
-    use super::{testing::*, *};
-
-    #[derive(Deserialize)]
-    struct Schema {
-        name: String,
-        schema: String,
-        why: String,
-        expect: String,
-        #[serde(default)]
-        display: String,
-        #[serde(default, deserialize_with = "u256_from_be_hex")]
-        old: Option<NonZero<U256>>,
-        #[serde(default, deserialize_with = "u256_from_be_hex")]
-        new: Option<NonZero<U256>>,
-    }
-
-    #[derive(Deserialize)]
-    struct Schemata {
-        schema: Vec<Schema>,
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn test_vectors() {
-        for s in toml::from_str::<Schemata>(COUNT_VECTORS).unwrap().schema {
-            eprintln!("{}/{}", s.name, s.why);
-            let node: Node = s.schema.parse().unwrap();
-            let res = check_legacy_count(&Context::default(), &node);
-            match res {
-                Ok(()) => assert_eq!("ok", s.expect, "{res:?}"),
-                Err(err) => {
-                    assert_eq!(s.display, format!("{err}"));
-                    match err {
-                        LegacyCountError::WouldPanic => {
-                            assert_eq!("would_panic", s.expect, "{err}")
-                        }
-                        LegacyCountError::Changed { old, new } => {
-                            assert_eq!("changed", s.expect, "{err}");
-                            assert_eq!(s.old.unwrap(), old, "old");
-                            assert_eq!(s.new.unwrap(), new, "new");
-                        }
-                    }
-                }
-            }
-        }
     }
 }
