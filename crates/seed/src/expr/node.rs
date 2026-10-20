@@ -17,16 +17,12 @@ use super::{
 pub enum Node {
     /// String literal.
     Literal(Box<str>),
-
     /// Character class (see [`Chars`].)
     Chars(Chars),
-
     /// Sequence of nodes.
     List(Box<[Node]>),
-
     /// Variable count from min to max.
     Count(Box<Node>, u32, u32),
-
     /// [`Generator`] call.
     Generator(Generator),
 }
@@ -39,9 +35,7 @@ impl EvalContext for Node {
             Node::Literal(_) => NonZero::ONE,
             Node::Chars(ref chars) => chars.size(),
             Node::List(ref nodes) => list_size(nodes.iter().map(|node| node.size(context))),
-
             Node::Count(ref node, min, max) => count_size(&node.size(context), min, max),
-
             Node::Generator(ref generator) => generator.size(context),
         }
     }
