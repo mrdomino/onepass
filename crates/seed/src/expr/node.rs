@@ -1,7 +1,7 @@
 use core::iter::once;
 use std::io::{Result, Write};
 
-use crypto_bigint::{NonZero, U256, Word};
+use crypto_bigint::{NonZero, U64, U256};
 use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
 
 use super::{
@@ -10,7 +10,6 @@ use super::{
     context::Context,
     generator::Generator,
     size::{count_size, list_size},
-    util::u256_saturating_pow,
 };
 
 /// AST representation for [`Expr`][super::Expr] nodes.
@@ -75,8 +74,10 @@ impl EvalContext for Node {
                 let node = node.as_ref();
                 let base = SecretBox::init_with(|| node.size(context));
                 let mut count = min;
-                let mut n: SecretBox<U256> = SecretBox::init_with_mut(|n| {
-                    u256_saturating_pow(base.expose_secret(), Word::from(min), n)
+                let mut n: SecretBox<U256> = SecretBox::init_with(|| {
+                    base.expose_secret()
+                        .checked_pow(&U64::from(min))
+                        .unwrap_or(U256::MAX)
                 });
                 let n = n.expose_secret_mut();
                 while n <= index.expose_secret_mut() {

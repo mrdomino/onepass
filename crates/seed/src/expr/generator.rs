@@ -1,16 +1,11 @@
 use core::fmt;
 use std::{io, sync::Arc};
 
-use crypto_bigint::{NonZero, U256, Word as _Word};
+use crypto_bigint::{NonZero, U64, U256, Word as _Word};
 use onepass_base::dict::Dict;
 use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
 
-use super::{
-    EvalContext,
-    context::Context,
-    repr::write_literal,
-    util::{u256_saturating_pow, u256_to_word},
-};
+use super::{EvalContext, context::Context, repr::write_literal, util::u256_to_word};
 use crate::dict::EFF_WORDLIST;
 
 pub trait GeneratorFunc: Send + Sync {
@@ -215,13 +210,20 @@ impl GeneratorFunc for Words {
 
     fn size(&self, context: &Context, args: &[&str]) -> NonZero<U256> {
         let (count, _, upper) = Self::parse_args(args);
+        let count = U64::from(count);
         let base = Word.size(context, args);
-        let mut n = U256::ZERO;
-        u256_saturating_pow(&base, count.into(), &mut n);
-        if upper {
-            n = n.saturating_mul(&U256::from_u32(count));
-        }
-        NonZero::new(n).unwrap()
+        NonZero::new(
+            base.checked_pow(&count)
+                .into_option()
+                .and_then(|n| {
+                    upper
+                        .then(|| n.checked_mul(&count).into_option())
+                        .flatten()
+                        .or(Some(n))
+                })
+                .unwrap_or(U256::MAX),
+        )
+        .unwrap()
     }
 
     fn write_to(
