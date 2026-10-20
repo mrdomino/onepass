@@ -1,12 +1,15 @@
 use core::iter::once;
 use std::io::{Result, Write};
 
-use crypto_bigint::{CheckedSub, NonZero, One, U256, Word};
+use crypto_bigint::{NonZero, U64, U256};
 use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
 
 use super::{
-    Eval, EvalContext, chars::Chars, context::Context, generator::Generator,
-    util::u256_saturating_pow,
+    Eval, EvalContext,
+    chars::Chars,
+    context::Context,
+    generator::Generator,
+    size::{count_size, list_size},
 };
 
 /// AST representation for [`Expr`][super::Expr] nodes.
@@ -35,38 +38,9 @@ impl EvalContext for Node {
         match *self {
             Node::Literal(_) => NonZero::ONE,
             Node::Chars(ref chars) => chars.size(),
-            Node::List(ref nodes) => {
-                NonZero::new(nodes.into_iter().fold(U256::ONE, |acc, node| {
-                    acc.saturating_mul(&node.size(context))
-                }))
-                .unwrap()
-            }
+            Node::List(ref nodes) => list_size(nodes.iter().map(|node| node.size(context))),
 
-            Node::Count(ref node, min, max) => {
-                let (min, max) = (min as u64, max as u64);
-                let n = node.size(context);
-                if n.is_one().into() {
-                    return NonZero::new((max - min + 1).into()).unwrap();
-                }
-                // Closed form of n^k + … + n^l
-                //              = n^k (1 + … + n^(l-k))
-                //              = n^k (n^(l-k+1) - 1) / (n - 1)
-                //              = (n^(l+1) - n^k) / (n - 1)
-                let k = min;
-                let l = max;
-                let mut x = U256::ZERO;
-                u256_saturating_pow(&n, l + 1, &mut x);
-                let mut y = U256::ZERO;
-                u256_saturating_pow(&n, k, &mut y);
-                if x == U256::MAX && y == U256::MAX {
-                    // Assume we got an overflow.
-                    return NonZero::MAX;
-                }
-                x = x.checked_sub(&y).unwrap();
-                let (x, rem) = x.div_rem(&NonZero::new(n.saturating_sub(&U256::ONE)).unwrap());
-                assert!(bool::from(rem.is_zero()));
-                NonZero::new(x).unwrap()
-            }
+            Node::Count(ref node, min, max) => count_size(&node.size(context), min, max),
 
             Node::Generator(ref generator) => generator.size(context),
         }
@@ -100,8 +74,10 @@ impl EvalContext for Node {
                 let node = node.as_ref();
                 let base = SecretBox::init_with(|| node.size(context));
                 let mut count = min;
-                let mut n: SecretBox<U256> = SecretBox::init_with_mut(|n| {
-                    u256_saturating_pow(base.expose_secret(), Word::from(min), n)
+                let mut n: SecretBox<U256> = SecretBox::init_with(|| {
+                    base.expose_secret()
+                        .checked_pow(&U64::from(min))
+                        .unwrap_or(U256::MAX)
                 });
                 let n = n.expose_secret_mut();
                 while n <= index.expose_secret_mut() {

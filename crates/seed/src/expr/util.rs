@@ -1,5 +1,6 @@
 use crypto_bigint::{U256, Word};
-use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox};
+#[cfg(test)]
+use secrecy::SecretBox;
 
 #[cfg(test)]
 use super::EvalContext;
@@ -7,22 +8,6 @@ use super::EvalContext;
 pub(super) fn u256_to_word(x: &U256) -> Word {
     assert!(x.bits_vartime() <= Word::BITS);
     x.as_words()[0]
-}
-
-pub(super) fn u256_saturating_pow(base: &U256, mut n: u64, res: &mut U256) {
-    *res = U256::ONE;
-    if n == 0 {
-        return;
-    }
-    let mut base = SecretBox::new(Box::new(*base));
-    while n > 0 {
-        if n & 1 == 1 {
-            *res = res.saturating_mul(base.expose_secret());
-        }
-        n >>= 1;
-        let base = base.expose_secret_mut();
-        *base = base.saturating_mul(base);
-    }
 }
 
 #[cfg(test)]

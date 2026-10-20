@@ -59,5 +59,44 @@ mod macros;
 pub mod site;
 pub mod url;
 
+use crypto_bigint::NonZero;
 pub use crypto_bigint::U256;
 pub use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox, SecretString};
+
+pub(crate) fn entropy(n: &NonZero<U256>) -> f32 {
+    let bits = n.bits_vartime();
+    let top: u32 = if bits > 24 {
+        (n.get() >> (bits - 24)).as_words()[0] as u32
+    } else {
+        (n.as_words()[0] as u32) << (24 - bits)
+    };
+    let m = (top as f32) / 8388608.0; // 2**23, m in [1, 2)
+    (bits - 1) as f32 + m.log2()
+}
+
+#[cfg(test)]
+pub(crate) mod testing {
+    use crypto_bigint::{NonZero, U256};
+    use serde::{Deserialize, Deserializer, de};
+
+    pub(crate) const COUNT_VECTORS: &str = include_str!("../data/count_vectors.toml");
+
+    pub(crate) fn u256_from_be_hex<'de, D>(
+        deserializer: D,
+    ) -> Result<Option<NonZero<U256>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if s == "none" {
+            return Ok(None);
+        }
+        let s = s.strip_prefix("0x").unwrap_or(&s);
+        if s.len() != 64 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err(de::Error::custom(
+                "expected 64 hex characters (optionally prefixed with 0x)",
+            ));
+        }
+        Ok(Some(NonZero::new(U256::from_be_hex(s)).unwrap()))
+    }
+}

@@ -14,7 +14,7 @@ use onepass_conf::{Config, Error, KeyringSeed, RawSite};
 use onepass_seed::{
     ExposeSecret, SecretBox, SecretString,
     dict::{BoxDict, Dict},
-    expr::{Context, Eval},
+    expr::{Context, Eval, Expr},
     site::Site,
 };
 use readpassphrase_3::Flags as RpFlags;
@@ -78,8 +78,12 @@ struct Args {
     learn: Option<u32>,
 
     /// Read seed password from stdin instead of /dev/tty
-    #[arg(long)]
+    #[arg(long, help_heading = "Password Entry")]
     stdin: bool,
+
+    /// Accept empty password
+    #[arg(long, help_heading = "Password Entry")]
+    allow_empty: bool,
 
     /// Override word list
     #[arg(
@@ -114,7 +118,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     let config_path = args.config_path.as_deref();
-    let config = Config::from_or_init(config_path).context("failed to read config")?;
+    let config = Config::from_or_init(config_path).context("failed loading config")?;
     let seed_keyring = args
         .seed_keyring()
         .unwrap_or(match config.global.keyring.seed {
@@ -143,7 +147,8 @@ fn main() -> Result<()> {
         }
         return Ok(());
     }
-    if args.sites.is_empty() {
+
+    if args.sites.is_empty() && !args.describe {
         if args.confirm {
             let _ = seed_password::read(seed_keyring, true, rp_flags)?;
         }
@@ -163,9 +168,16 @@ fn main() -> Result<()> {
     let context = dict.map_or_else(Context::default, Context::with_dict);
 
     if args.describe {
+        if args.sites.is_empty()
+            && let Some(schema) = args.schema.as_deref()
+        {
+            let schema = config.global.alias.get(schema).map_or(schema, |s| s);
+            let expr = Expr::parse_with_context(schema, &context)?;
+            println!("{expr}");
+            println!("about {:.02} bits of entropy", expr.entropy());
+        }
         for url in &args.sites {
             let site = lookup_site(url, &config, &args, &context)?;
-            let size = site.expr.size();
 
             println!("{url}:");
             println!("{}", site.expr);
@@ -175,7 +187,7 @@ fn main() -> Result<()> {
             let example = String::from_utf8(buf.into_inner()?)?;
             println!("Looks like: {example:?}");
 
-            println!("about {} bits of entropy", size.bits_vartime());
+            println!("about {:.02} bits of entropy", site.expr.entropy());
         }
         return Ok(());
     }
@@ -186,7 +198,11 @@ fn main() -> Result<()> {
         // Check for schema validity before unlocking seed keyring.
         let site = lookup_site(url, &config, &args, &context)?;
         if seed.is_none() {
-            seed = Some(seed_password::read(seed_keyring, args.confirm, rp_flags)?);
+            let seed_ = seed_password::read(seed_keyring, args.confirm, rp_flags)?;
+            if !args.allow_empty && seed_.expose_secret().is_empty() {
+                anyhow::bail!("empty password not allowed (pass --allow-empty to use)");
+            }
+            seed = Some(seed_);
         }
         let res = gen_password_config(seed.as_ref().unwrap().expose_secret(), &site, url, &args)?;
         stdout.write_all(res.expose_secret().as_bytes())?;
@@ -223,15 +239,15 @@ fn read_words_str(args: &Args, config: &Config) -> Result<Option<Box<str>>> {
 }
 
 fn gen_password_config(seed: &str, site: &Site, url: &str, args: &Args) -> Result<SecretString> {
-    let size = site.expr.size();
+    let size = site.expr.size().to_string();
+    let size = size.trim_start_matches('0');
+    let entropy = site.expr.entropy();
     let salt = format!("{site}");
 
     if args.verbose {
         eprintln!(
-            "schema for {2} has about {0} bits of entropy (0x{1} possible passwords)",
-            size.bits(),
-            size.to_string().trim_start_matches('0'),
-            url,
+            "schema for {} has about {:.02} bits of entropy (0x{} possible passwords)",
+            url, entropy, size
         );
         eprintln!("salt: {salt:?}");
     }
