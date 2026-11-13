@@ -16,12 +16,12 @@ nom = "8.0.0"
 onepass-base.workspace = true
 rand_core = "0.10.0"
 secrecy.workspace = true
-serde = { version = "1.0.228", default-features = false, features = ["derive"] }
 url = { version = "2.5.8", default-features = false }
 
 [dev-dependencies]
 hex = { workspace = true, default-features = true }
 num-traits = "0.2.19"
+serde = { version = "1.0.228", default-features = false, features = ["derive"] }
 toml = "1.1.1"
 
 [build-dependencies]
